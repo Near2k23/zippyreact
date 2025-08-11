@@ -1,0 +1,42 @@
+{
+  "files": {
+    "main.css": "/static/css/main.9f94e753.css",
+    "main.js": "/static/js/main.bf6b020a.js",
+    "static/js/743.6cd9723e.chunk.js": "/static/js/743.6cd9723e.chunk.js",
+    "static/js/621.ce2f21c7.chunk.js": "/static/js/621.ce2f21c7.chunk.js",
+    "static/js/613.afecef45.chunk.js": "/static/js/613.afecef45.chunk.js",
+    "static/media/background.jpg": "/static/media/background.295b62b301c345305b93.jpg",
+    "static/media/logo.png": "/static/media/logo.2dc8651d123cf1cac1b6.png",
+    "static/media/download_google.png": "/static/media/download_google.a767fc681f5509f6dcd8.png",
+    "static/media/logo-white.png": "/static/media/logo-white.64d374ca57b15e4c990d.png",
+    "static/media/download_apple.png": "/static/media/download_apple.070069496e39ff567cc7.png",
+    "static/media/download_google_ESP.png": "/static/media/download_google_ESP.877e9a59e87f7a687017.png",
+    "static/media/app2.png": "/static/media/app2.84553952f878a9caedac.png",
+    "static/media/tap-logo.png": "/static/media/tap-logo.cbc86fc1fa0c985f2b16.png",
+    "static/media/app1.png": "/static/media/app1.eebf053f504e452cef58.png",
+    "static/media/download_apple_ESP.png": "/static/media/download_apple_ESP.46caf98efb3d2c2d174c.png",
+    "static/media/errorPage.png": "/static/media/errorPage.11e1cd04dc8e12bb0465.png",
+    "static/media/money3.jpg": "/static/media/money3.058743b6e5d874f6b6d2.jpg",
+    "static/media/money1.jpg": "/static/media/money1.ec50af158c717ac1e86c.jpg",
+    "static/media/money2.jpg": "/static/media/money2.433df22e85898e84d846.jpg",
+    "static/media/paymongo-logo.png": "/static/media/paymongo-logo.e5c3fa77369b3cf2b947.png",
+    "static/media/braintree-logo.png": "/static/media/braintree-logo.9d588dee614c817dfbb9.png",
+    "static/media/wipay-logo.png": "/static/media/wipay-logo.c5ffd97405fef5ffc5f6.png",
+    "static/media/mercadopago-logo.png": "/static/media/mercadopago-logo.2de0453b1c7f1d9ac69c.png",
+    "static/media/razorpay-logo.png": "/static/media/razorpay-logo.50322d2de855cb0fd4ac.png",
+    "static/media/payfast-logo.png": "/static/media/payfast-logo.906855d0f285478a02ae.png",
+    "static/media/squareup-logo.png": "/static/media/squareup-logo.53cb67ecf544b9db872f.png",
+    "static/media/paystack-logo.png": "/static/media/paystack-logo.0ef1ef27d43868483624.png",
+    "static/media/profilePic.png": "/static/media/profilePic.f9b727f87563630a8368.png",
+    "index.html": "/index.html",
+    "main.9f94e753.css.map": "/static/css/main.9f94e753.css.map",
+    "main.bf6b020a.js.map": "/static/js/main.bf6b020a.js.map",
+    "743.6cd9723e.chunk.js.map": "/static/js/743.6cd9723e.chunk.js.map",
+    "621.ce2f21c7.chunk.js.map": "/static/js/621.ce2f21c7.chunk.js.map",
+    "613.afecef45.chunk.js.map": "/static/js/613.afecef45.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.9f94e753.css",
+    "static/js/main.bf6b020a.js"
+  ]
+}

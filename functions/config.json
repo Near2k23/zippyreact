@@ -1,0 +1,21 @@
+{
+	"app_name": "WayGO",
+	"app_description": "Viajes",
+	"app_identifier": "com.waygo.rides",
+	"ios_app_version": "1.0.0",
+	"android_app_version": "100",
+	"firebaseProjectId": "waygo-561e9",
+	"googleApiKeys": {
+		"ios": "AIzaSyBgtXHZO-AZWMU-4RWR--OZNsF8vPF7gZg",
+		"android": "AIzaSyBgtXHZO-AZWMU-4RWR--OZNsF8vPF7gZg",
+		"web": "AIzaSyBgtXHZO-AZWMU-4RWR--OZNsF8vPF7gZg",
+		"server": "AIzaSyBgtXHZO-AZWMU-4RWR--OZNsF8vPF7gZg"
+	},
+	"expo_owner": "tecnosoluciones",
+	"expo_slug": "waygo",
+	"expo_project_id": "d9dabcd8-fad2-4bd5-8160-b915f4c6d88b",
+	"admin_email": "yorksvn@gmail.com",
+	"databaseURL": "https://waygo-561e9-default-rtdb.firebaseio.com/",
+	"projectId": "waygo-561e9",
+	"encryptionKey": "c5moP9246_6D1[VQ"
+}
