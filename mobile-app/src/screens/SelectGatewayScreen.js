@@ -25,15 +25,15 @@ export default function SelectGatewayPage(props) {
   const { t } = i18n;
 
   useEffect(() => {
-      if (auth && auth.profile && auth.profile.mode) {
-          if (auth.profile.mode === 'system'){
-              setMode(colorScheme);
-          }else{
-              setMode(auth.profile.mode);
-          }
-      } else {
-          setMode(colorScheme);
+    if (auth?.profile?.mode) {
+      if (auth.profile.mode === 'system'){
+        setMode(colorScheme);
+      }else{
+        setMode(auth.profile.mode);
       }
+    } else {
+      setMode('light');
+    }
   }, [auth, colorScheme]);
 
   const icons = {

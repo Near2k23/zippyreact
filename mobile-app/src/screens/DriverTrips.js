@@ -79,14 +79,14 @@ export default function DriverTrips(props) {
     }
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
@@ -462,7 +462,7 @@ export default function DriverTrips(props) {
                                                 <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
                                                 <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('no_car_assign_text')}</Text>
                                             </View>
-                                            <Button onPress={() => props.navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Cars', params: { fromPage: 'DriverTrips' } }] }))}
+                                            <Button onPress={() => props.navigation.navigate('Cars', { fromPage: 'DriverTrips' })}
                                                 title={t('cars')} titleStyle={styles.checkButtonTitle} buttonStyle={styles.checkButtonStyle} />
                                         </View>
                                         : null}

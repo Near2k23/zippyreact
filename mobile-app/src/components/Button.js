@@ -34,7 +34,8 @@ const styles = StyleSheet.create({
         borderRadius:10
     },
     textStyle:{
-        width:"100%",
-        textAlign: "center",
+        textAlign: 'center',
+        includeFontPadding: false,
+        paddingHorizontal: 6,
     }
 });

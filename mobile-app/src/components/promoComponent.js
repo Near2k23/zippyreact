@@ -43,15 +43,15 @@ export default function PromoComp(props) {
   }
 
   useEffect(() => {
-      if (auth && auth.profile && auth.profile.mode) {
-          if (auth.profile.mode === 'system'){
-              setMode(colorScheme);
-          }else{
-              setMode(auth.profile.mode);
-          }
-      } else {
+    if (auth?.profile?.mode) {
+      if (auth.profile.mode === 'system'){
           setMode(colorScheme);
+      }else{
+        setMode(auth.profile.mode);
       }
+    } else {
+      setMode('light');
+    }
   }, [auth, colorScheme]);
 
   const onPressButton = (item, index) => {

@@ -4,7 +4,8 @@ import {
   View,
   KeyboardAvoidingView,
   Platform,
-  useColorScheme
+  useColorScheme,
+  ActivityIndicator
 } from "react-native";
 import { colors } from "../common/theme";
 import i18n from 'i18n-js';
@@ -25,7 +26,7 @@ export default function OnlineChat(props) {
   
   const [messages, setMessages] = useState([]);
   const deviceColorScheme = useColorScheme();
-  const [mode, setMode] = useState(auth?.profile?.mode === 'system' ? deviceColorScheme : auth?.profile?.mode || deviceColorScheme);
+  const [mode, setMode] = useState(auth?.profile?.mode === 'system' ? deviceColorScheme : auth?.profile?.mode || 'light');
   const messageRef = useRef([]);
   const role = auth?.profile?.usertype;
 
@@ -36,6 +37,8 @@ export default function OnlineChat(props) {
   useEffect(() => {
     if (auth?.profile?.mode) {
       setMode(auth.profile.mode === 'system' ? deviceColorScheme : auth.profile.mode);
+    }else {
+      setMode('light');
     }
   }, [deviceColorScheme, auth?.profile?.mode]);
 
@@ -174,7 +177,7 @@ export default function OnlineChat(props) {
           <GiftedChat {...chatProps} />
         </KeyboardAvoidingView>
       ) : (
-        <View style={{flex: 1, marginBottom: hasNotch ? -30 : null, marginTop: -20}}>
+        <View style={{flex: 1, marginBottom: hasNotch ? 30 : null, marginTop: -20}}>
          <GiftedChat
           messages={messages}
           onSend={onSend}
@@ -182,7 +185,6 @@ export default function OnlineChat(props) {
           renderBubble={renderBubble}
           renderSend={renderSend}
           renderLoading={() => <ActivityIndicator size="large" color={colors.BLUE} />}
-          isLoadingEarlier={isLoading}
           scrollToBottom
           scrollToBottomStyle={{
             backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,

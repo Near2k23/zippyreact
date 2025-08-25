@@ -1,0 +1,8 @@
+{
+  "android": {
+    "package": "com.waygo.rider"
+  },
+  "ios": {
+    "bundleIdentifier": "com.waygo.rider"
+  }
+}

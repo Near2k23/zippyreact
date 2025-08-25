@@ -85,6 +85,7 @@ export default class RNPickerSelect extends PureComponent {
         touchableWrapperProps: {},
         Icon: null,
         InputAccessoryView: null,
+        mode: '',
     };
 
     static handlePlaceholder({ placeholder }) {
@@ -283,6 +284,7 @@ export default class RNPickerSelect extends PureComponent {
             onDonePress,
             style,
             touchableDoneProps,
+            mode
         } = this.props;
 
         const { doneDepressed } = this.state;
@@ -293,7 +295,7 @@ export default class RNPickerSelect extends PureComponent {
 
         return (
             <View
-                style={[defaultStyles.modalViewMiddle, style.modalViewMiddle]}
+                style={[defaultStyles.modalViewMiddle, style.modalViewMiddle, {backgroundColor: mode === 'dark' ? 'black' : '#f8f8f8'}]}
                 testID="input_accessory_view"
             >
                 <View style={[defaultStyles.chevronContainer, style.chevronContainer]}>
@@ -413,7 +415,7 @@ export default class RNPickerSelect extends PureComponent {
     }
 
     renderIOS() {
-        const { style, modalProps, pickerProps, touchableWrapperProps } = this.props;
+        const { style, modalProps, pickerProps, touchableWrapperProps,mode } = this.props;
         const { animationType, orientation, selectedItem, showPicker } = this.state;
 
         return (
@@ -448,7 +450,7 @@ export default class RNPickerSelect extends PureComponent {
                     <View
                         style={[
                             defaultStyles.modalViewBottom,
-                            { height: orientation === 'portrait' ? 215 : 162 },
+                            { height: orientation === 'portrait' ? 215 : 162, backgroundColor: mode === 'dark' ? 'black' : 'white',  },
                             style.modalViewBottom,
                         ]}
                     >
@@ -457,6 +459,7 @@ export default class RNPickerSelect extends PureComponent {
                             onValueChange={this.onValueChange}
                             selectedValue={selectedItem.value}
                             {...pickerProps}
+                            itemStyle={{ color: mode === 'dark' ? 'white' : 'black'}}
                         >
                             {this.renderPickerItems()}
                         </Picker>

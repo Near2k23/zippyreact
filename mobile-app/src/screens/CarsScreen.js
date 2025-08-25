@@ -28,14 +28,14 @@ export default function CarsScreen(props) {
     const [mode, setMode] = useState();
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
@@ -77,11 +77,28 @@ export default function CarsScreen(props) {
         props.navigation.setOptions({
             headerRight: () => {
                 return (
-                    <TouchableOpacity onPress={() => props.navigation.navigate('CarEdit')} style={{ marginEnd: 8, alignItems: 'flex-end', padding: 5 }}><Text style={[styles.headerTitleStyle, { color: colors.WHITE, transform: [{ scaleX: isRTL ? -1 : 1 }]}]}>{t('add')}</Text></TouchableOpacity>
+                    <TouchableOpacity 
+                        onPress={() => props.navigation.navigate('CarEdit')} 
+                        style={[
+                            styles.addButton,
+                            { 
+                                marginEnd: 12,
+                                width: 120,
+                                paddingHorizontal: 16,
+                                flexDirection: 'row',
+                                gap: 6
+                            }
+                        ]}
+                    >
+                        <MaterialIcons name="add" size={20} color={colors.WHITE} />
+                        <Text style={styles.addButtonText}>
+                            {t('add_car')}
+                        </Text>
+                    </TouchableOpacity>
                 )
             }
         });
-    }, [props.navigation]);
+    }, [props.navigation, mode]);
 
 
     const deleteCar = async (item) => {
@@ -114,7 +131,7 @@ export default function CarsScreen(props) {
 
         <View style={[styles.container, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
             <View style={{flex: 1, position: 'absolute',backgroundColor: colors.TRANSPARENT, height:'100%', width: '100%' }}>
-                <ScrollView styles={styles.container} showsVerticalScrollIndicator={false}>
+                <ScrollView styles={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 100, paddingHorizontal: 16, paddingTop: 16}}>
                     {data && data.length > 0 ?
                         data.map((c, i) => {
                             return (
@@ -204,6 +221,13 @@ export default function CarsScreen(props) {
                     }
                 </ScrollView>
             </View>
+            <TouchableOpacity
+                style={styles.floatingButton}
+                onPress={() => props.navigation.navigate('CarEdit')}
+            >
+                <MaterialIcons name="add" size={24} color={colors.WHITE} />
+                <Text style={styles.floatingButtonText}>{t('add_car')}</Text>
+            </TouchableOpacity>
         </View>
     )
 }
@@ -220,16 +244,15 @@ const styles = StyleSheet.create({
     },
     card: {
         backgroundColor: colors.WHITE,
-        margin: 10,
-        marginVertical: 5,
-        borderRadius: 10,
-        padding: 5,
+        marginVertical: 8,
+        borderRadius: 12,
+        padding: 16,
         shadowColor: colors.BLACK,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 2,
-        elevation: 3,
-        gap: 5
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+        gap: 12
     },
     shadowBack: {
         shadowColor: colors.SHADOW,
@@ -288,6 +311,44 @@ const styles = StyleSheet.create({
     },
     textStyleBold: {
         fontSize: 15,
+        fontFamily: fonts.Bold
+    },
+    addButton: {
+        width: '100%',
+        backgroundColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4
+    },
+    addButtonText: {
+        color: colors.WHITE,
+        fontSize: 16,
+        fontFamily: fonts.Bold
+    },
+    floatingButton: {
+        position: 'absolute',
+        bottom: 30,
+        left: 16,
+        right: 16,
+        backgroundColor: '#1369B4',
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: colors.BLACK,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 8,
+        flexDirection: 'row',
+        gap: 10
+    },
+    floatingButtonText: {
+        color: colors.WHITE,
+        fontSize: 16,
         fontFamily: fonts.Bold
     },
 })

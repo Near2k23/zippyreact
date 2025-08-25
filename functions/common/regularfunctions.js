@@ -19,18 +19,29 @@ async function validateBasicAuth(authHeader, config) {
     const colonIndex = credentials.indexOf(':');
     
     const username = credentials.substring(0, colonIndex);
-    const encryptedPassword = credentials.substring(colonIndex + 1);
+    const receivedPassword = credentials.substring(colonIndex + 1);
     
-    // Desencriptar contraseña con AES
-    const decryptedPassword = CryptoJS.AES.decrypt(
-      encryptedPassword,
-      'c5moP9246_6D1[VQ'
-    ).toString(CryptoJS.enc.Utf8);
+    // El AccessKey ya viene encriptado desde el cliente
+    // Intentar desencriptar para obtener la clave real
+    let decryptedPassword;
+    try {
+      decryptedPassword = CryptoJS.AES.decrypt(
+        receivedPassword,
+        config.encryptionKey
+      ).toString(CryptoJS.enc.Utf8);
+    } catch (decryptError) {
+      // Si falla la desencriptación, asumir que es la clave directa
+      decryptedPassword = receivedPassword;
+    }
     
-    // Validar credenciales
-    return username === config.firebaseProjectId && 
-           decryptedPassword === config.encryptionKey;
+    // Validar credenciales - verificar tanto la clave encriptada como desencriptada
+    const isValidProject = username === config.firebaseProjectId;
+    const isValidKey = decryptedPassword === config.encryptionKey || 
+                      receivedPassword === config.encryptionKey;
+    
+    return isValidProject && isValidKey;
   } catch (error) {
+    console.log('🔐 AUTH DEBUG - Error en validateBasicAuth:', error);
     return false;
   }
 }

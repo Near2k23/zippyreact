@@ -6,6 +6,7 @@ import PromoComp from './promoComponent';
 import WTransactionHistory from './WalletTransactionHistory';
 import OtpModal from './OtpModal';
 import DriverEarningRidelist from './DriverEarningRidelist';
+import WaygoDialog from './WaygoDialog';
 export {
     Background,
     Button,
@@ -14,5 +15,6 @@ export {
     PromoComp,
     WTransactionHistory,
     OtpModal,
-    DriverEarningRidelist
+    DriverEarningRidelist,
+    WaygoDialog
 };

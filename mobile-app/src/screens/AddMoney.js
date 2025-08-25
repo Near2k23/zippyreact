@@ -20,7 +20,7 @@ import { api } from 'common';
 export default function AddMoneyScreen(props) {
 
   const settings = useSelector(state => state.settingsdata.settings);
-  const { userdata, providers, tipamount } = props.route.params;
+  const { userdata, providers, tipamount, preselectedAmount } = props.route.params;
   const { parseNumberInput, formatNumberInput } = api;
 
   const [state, setState] = useState({
@@ -53,15 +53,15 @@ export default function AddMoneyScreen(props) {
   }
 
   useEffect(() => {
-      if (auth && auth.profile && auth.profile.mode) {
+    if (auth?.profile?.mode) {
       if (auth.profile.mode === 'system') {
-              setMode(colorScheme);
+        setMode(colorScheme);
       } else {
-              setMode(auth.profile.mode);
-          }
-      } else {
-          setMode(colorScheme);
+        setMode(auth.profile.mode);
       }
+    } else {
+      setMode('light');
+    }
   }, [auth, colorScheme]);
 
   useEffect(() => {
@@ -82,12 +82,16 @@ export default function AddMoneyScreen(props) {
       const isVietnamese = settings.country === "Vietnam";
       const displayAmount = isVietnamese ? formatNumberInput(tipamount, true) : tipamount.toString();
       setState({ ...state, amount: tipamount.toString(), displayAmount: displayAmount, qickMoney: arr, payAuto: true });
-      } else {
+    } else if (preselectedAmount && preselectedAmount > 0) {
+      const isVietnamese = settings.country === "Vietnam";
+      const displayAmount = isVietnamese ? formatNumberInput(preselectedAmount, true) : preselectedAmount.toString();
+      setState({ ...state, amount: preselectedAmount.toString(), displayAmount: displayAmount, qickMoney: arr, payAuto: true });
+    } else {
       const isVietnamese = settings.country === "Vietnam";
       const displayAmount = isVietnamese ? formatNumberInput(arr[0].amount, true) : arr[0].amount;
       setState({ ...state, amount: arr[0].amount, displayAmount: displayAmount, qickMoney: arr });
-      }
-  }, [settings, tipamount, setTimeout, payNow]);
+    }
+  }, [settings, tipamount, preselectedAmount, setTimeout, payNow]);
 
   useEffect(() => {
     if (state.payAuto) {

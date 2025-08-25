@@ -1,7 +1,7 @@
 {
-  "name": "waygo",
-  "version": "1.0.0",
-  "description": "WayGO",
+  "name": "zippy",
+  "version": "4.7.0",
+  "description": "Exicube App Solutions",
   "scripts": {
     "app": "yarn workspace mobile-app start",
     "app:publish": "cd mobile-app && eas update",
@@ -16,8 +16,10 @@
     "app:upgrade-sdk": "yarn workspace mobile-app upgrade-sdk",
     "web": "yarn workspace web-app start",
     "web:deploy": "yarn workspace web-app build && firebase deploy --only hosting",
-    "deploy": "yarn workspace web-app build && firebase deploy && node ./script/install.js initialize",
-    "postinstall": "node ./script/install.js install"
+    "deploy": "yarn workspace web-app build && firebase deploy && node script/install.js initialize",
+    "postinstall": "patch-package && node script/install.js install",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "workspaces": [
     "mobile-app",
@@ -25,19 +27,25 @@
     "functions",
     "common"
   ],
-  "author": "WebCheap CO",
+  "author": "Exicube App Solutions (OPC) Private Limited",
   "private": true,
   "dependencies": {
     "concurrently": "7.0.0",
     "crypto-js": "^4.1.1",
+    "exicube-cli": "2.0.0",
     "firebase-tools": "^14.4.0",
     "fs-extra": "10.0.0",
     "node-fetch": "2.6.7",
     "open": "^8.4.0",
-    "xml2json": "^0.12.0"
+    "patch-package": "^8.0.0",
+    "xml2json": "^0.12.0",
+    "expo": "~53.0.11",
+    "react": "19.0.0",
+    "react-native": "0.79.3"
   },
   "resolutions": {
-    "@expo/config-plugins": "~10.0.0",
+    "@expo/config-plugins": "~10.1.1",
+    "@expo/prebuild-config": "~9.0.0",
     "react-native-safe-area-context": "5.4.0",
     "@babel/core": "^7.20.0"
   },

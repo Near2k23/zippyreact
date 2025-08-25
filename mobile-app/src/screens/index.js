@@ -1,4 +1,5 @@
 import AuthLoadingScreen from './AuthLoadingScreen';
+import IntroScreen from './IntroScreen';
 import RideListPage from './RideListScreen';
 import MapScreen from './MapScreen';
 import BookedCabScreen from './BookedCabScreen';
@@ -22,10 +23,12 @@ import RegistrationPage from './Registration';
 import SettingsScreen from './SettingsScreen';
 import CarsScreen from './CarsScreen';
 import CarEditScreen from './CarEditScreen';
+import TransactionHistory from './TransactionHistory';
 
 export {
     RegistrationPage,
     AuthLoadingScreen,
+    IntroScreen,
     MapScreen,
     BookedCabScreen,
     DriverRating,
@@ -47,5 +50,6 @@ export {
     Notifications,
     SettingsScreen,
     CarsScreen,
-    CarEditScreen
+    CarEditScreen,
+    TransactionHistory
 };

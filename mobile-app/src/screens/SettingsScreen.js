@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { StyleSheet, FlatList, View, Text, TouchableOpacity, Alert, Share, Pressable, Linking, ActivityIndicator, Dimensions, Platform, useColorScheme, Modal, Image, Animated } from "react-native";
+import { StyleSheet, View, Text, TouchableOpacity, Alert, Share, Pressable, Linking, ActivityIndicator, Dimensions, Platform, useColorScheme, Modal, Image, Animated, ScrollView } from "react-native";
 import { Icon } from "react-native-elements";
 import i18n from 'i18n-js';
 import { colors } from '../common/theme';
@@ -13,6 +13,8 @@ import { appConsts } from '../common/sharedFunctions';
 var { width, height } = Dimensions.get('window');
 import { fonts } from "../common/font";
 import Button from '../components/Button';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import WaygoDialog from '../components/WaygoDialog';
 
 export default function SettingsScreen(props) {
     const { t } = i18n;
@@ -26,12 +28,15 @@ export default function SettingsScreen(props) {
     const [profileData, setProfileData] = useState(null);
     const [themeModalVisible, setThemeModalVisible] = useState(false);
     const [theme, setTheme] = useState(false);
+    const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+    const [convertModalVisible, setConvertModalVisible] = useState(false);
+    const [sosModalVisible, setSosModalVisible] = useState(false);
 
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
                 setTheme('system');
@@ -40,8 +45,8 @@ export default function SettingsScreen(props) {
                 setTheme(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
-            setTheme(colorScheme);
+            setMode('light');
+            setTheme('light');
         }
     }, [auth, colorScheme]);
 
@@ -52,7 +57,7 @@ export default function SettingsScreen(props) {
         { name: auth.profile && auth.profile && auth.profile.usertype == "driver" ? t('convert_to_rider') : t('convert_to_driver'), navigationName: 'Convert', icon: 'account-convert-outline', type: 'material-community' },
         { name: t('cars'), navigationName: 'Cars', icon: 'car-cog', type: 'material-community' },
         { name: t('refer_earn'), navigationName: 'Refer', icon: 'cash-outline', type: 'ionicon' },
-        { name: t('sos'), navigationName: 'Sos', icon: 'radio-outline', type: 'ionicon' },
+        { name: t('sos'), navigationName: 'Sos', icon: 'alert-circle-outline', type: 'ionicon' },
         { name: t('push_notification_title'), navigationName: 'Notifications', icon: 'notifications-outline', type: 'ionicon' },
         { name: t('complain'), navigationName: 'Complain', icon: 'chatbox-ellipses-outline', type: 'ionicon' },
         { name: t('theme'), navigationName: 'Theme', icon: 'sun', type: 'feather' },
@@ -99,18 +104,12 @@ export default function SettingsScreen(props) {
         }
     }, [auth.profile]);
 
-    const sos = () => {
-        Alert.alert(
-            t('panic_text'),
-            t('panic_question'),
-            [
-                {
-                    text: t('cancel'),
-                    onPress: () => { },
-                    style: 'cancel'
-                },
-                {
-                    text: t('ok'), onPress: async () => {
+    const showSosModal = () => {
+        setSosModalVisible(true);
+    };
+
+    const executeSos = async () => {
+        setSosModalVisible(false);
                         let call_link = Platform.OS == 'android' ? 'tel:' + settings.panic : 'telprompt:' + settings.panic;
                         Linking.openURL(call_link);
 
@@ -121,25 +120,18 @@ export default function SettingsScreen(props) {
                         obj.user_type = auth.profile && auth.profile && auth.profile.usertype ? auth.profile.usertype : null;
                         obj.complainDate = new Date().getTime();
                         dispatch(editSos(obj, "Add"));
-                    }
-                }
-            ],
-            { cancelable: false }
-        )
+    };
+
+    const sos = () => {
+        showSosModal();
     }
 
-    const convert = () => {
-        Alert.alert(
-            t('convert_button'),
-            auth.profile && auth.profile.usertype == "driver" ? t('convert_to_rider') : t('convert_to_driver'),
-            [
-                {
-                    text: t('cancel'),
-                    onPress: () => { },
-                    style: 'cancel',
-                },
-                {
-                    text: t('ok'), onPress: async () => {
+    const showConvertModal = () => {
+        setConvertModalVisible(true);
+    };
+
+    const convertUserType = async () => {
+        setConvertModalVisible(false);
                         let userData = {
                             approved: (auth.profile && auth.profile.usertype == "driver" ? true : auth.profile && auth.profile.adminApprovedTrue == true ? true : settings && settings.driver_approval ? false : true),
                             usertype: auth.profile && auth.profile.usertype == "driver" ? "customer" : "driver",
@@ -158,11 +150,10 @@ export default function SettingsScreen(props) {
                                 dispatch(api.fetchBookings());
                             }
                         }, 3000);
-                    }
-                }
-            ],
-            { cancelable: false }
-        )
+    };
+
+    const convert = () => {
+        showConvertModal();
     }
 
     const StopBackgroundLocation = async () => {
@@ -189,7 +180,12 @@ export default function SettingsScreen(props) {
             })
     }
 
+    const showLogoutModal = () => {
+        setLogoutModalVisible(true);
+    };
+
     const logOff = () => {
+        setLogoutModalVisible(false);
         auth && auth.profile && auth.profile.usertype == 'driver' ? StopBackgroundLocation() : null;
         setLoading(true);
         if (auth && auth.profile && auth.profile.usertype === 'driver') { StopBackgroundLocation() };
@@ -202,67 +198,23 @@ export default function SettingsScreen(props) {
         }, 1000);
     }
 
-    const themeModal = () => {
-        return (
-            <Modal
-                animationType="none"
-                transparent={true}
-                visible={themeModalVisible}
-                onRequestClose={() => {
+    const applyTheme = () => {
                     setThemeModalVisible(false);
-                }}>
-                <View style={{ flex: 1, backgroundColor: colors.BACKGROUND, justifyContent: 'center', alignItems: 'center' }}>
-                    <View style={{ width: width - 70, borderRadius: 10, flex: 1, maxHeight: 225, marginTop: 15, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, padding: 10}}>
-                        <Text style={{fontWeight:'700', fontSize: 18, color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left'}}>{t('theme')}</Text>
-                        <TouchableOpacity onPress={() => setTheme('light')} style={{borderTopWidth: 1, flexDirection : isRTL ? 'row-reverse' : 'row', paddingVertical: 10, gap: 5, borderColor: mode === 'dark' ? colors.SHADOW : colors.BLACK}}>
-                            <Entypo name="light-down" size={24} color={theme === 'light' ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                            <Text style={{fontWeight:'700', fontSize: 14, color: theme === 'light' ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('light')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setTheme('dark')} style={{borderTopWidth: 1, flexDirection : isRTL ? 'row-reverse' : 'row', paddingVertical: 10, gap: 5, borderColor: mode === 'dark' ? colors.SHADOW : colors.BLACK}}>
-                            <MaterialIcons name="dark-mode" size={22} color={theme === 'dark' ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                            <Text style={{fontWeight:'700', fontSize: 14, color: theme === 'dark' ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('dark')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setTheme('system')} style={{borderTopWidth: 1, flexDirection : isRTL ? 'row-reverse' : 'row', paddingVertical: 10, gap: 5, borderColor: mode === 'dark' ? colors.SHADOW : colors.BLACK}}>
-                            <Ionicons name="settings-outline" size={22} color={theme === 'system' ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                            <Text style={{fontWeight:'700', fontSize: 14, color: theme === 'system' ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('system')}</Text>
-                        </TouchableOpacity>
+        dispatch(updateProfile({ mode: theme }));
+        AsyncStorage.setItem('theme', JSON.stringify({ mode: theme }));
+    };
 
-                        <View style={{ flex: 1, flexDirection : isRTL ? 'row-reverse' : 'row', marginTop: 10, gap: 5 }}>
-                       
-                            <TouchableOpacity 
-                                onPress={() => setThemeModalVisible(false)}
-                                style={[styles.clearButton, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}
-                            >
-                                <Ionicons 
-                                    name="close-circle-outline" 
-                                    size={24} 
-                                    color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                                />
-                            </TouchableOpacity>
 
-                            <Button
-                                title={t('ok')}
-                                loading={false}
-                                loadingColor={{ color: colors.GREEN }}
-                                buttonStyle={[styles.textStyleBold, { color: colors.WHITE }]}
-                                style={{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,  flex: 1, borderRadius: 10, height: 40 }}
-                                textStyle={{ fontSize: 16, fontFamily: fonts.Bold }}
-                                btnClick={() => { 
-                                    setThemeModalVisible(false);
-                                    dispatch(updateProfile({ mode: theme }))
-                                }}
-                            />
-                         </View>
-                    </View>
-                </View>
-            </Modal>
-        )
-    }
 
     return (
-        <View style={[styles.mainView,{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+        <ScrollView 
+            style={[styles.mainView,{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND}]}
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}
+        >
+            {/* Profile Section */}
             <Animated.View 
-                style={{
+                style={[styles.profileSection, {
                     opacity: profileAnim,
                     transform: [{
                         translateY: profileAnim.interpolate({
@@ -270,36 +222,54 @@ export default function SettingsScreen(props) {
                             outputRange: [-50, 0]
                         })
                     }]
-                }}
+                }]}
             >
-                <Pressable onPress={() => props.navigation.navigate("Profile")} 
-                    style={{flexDirection: isRTL ? 'row-reverse' : 'row', padding: 5, gap: 10, alignItems: 'center', marginHorizontal: 15}}
-                >
-                    <>
-                        <View style={styles.imageViewStyle} >
+                <View style={styles.profileContainer}>
+                    <View style={styles.profileInfo}>
+                        <View style={styles.profileTextContainer}>
+                            <Text style={[styles.profileName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                {auth.profile && (auth.profile.firstName && auth.profile.lastName) ? 
+                                    auth.profile.firstName + " " + auth.profile.lastName : t('no_name')}
+                            </Text>
+                            <Text style={[styles.profilePhone, { color: mode === 'dark' ? colors.WHITE + '80' : colors.BLACK + '80' }]}>
+                                {auth.profile && auth.profile.mobile ? auth.profile.mobile : '300-000-0000'}
+                            </Text>
+                        </View>
+                        
+                        <TouchableOpacity 
+                            onPress={() => props.navigation.navigate("Profile")}
+                            style={styles.profileImageContainer}
+                        >
                             {loader ?
                                 <View style={[styles.loadingcontainer, styles.horizontal]}>
                                     <ActivityIndicator size="large" color={colors.INDICATOR_BLUE} />
                                 </View>
-                                : <View>
-                                    <Image source={profileData && profileData.profile_image ? { uri: profileData.profile_image } : require('../../assets/images/profilePic.png')} style={{ width: 70, height: 70, alignSelf: 'center', borderRadius: 70 / 2 }} />
+                                : <View style={styles.profileImageWrapper}>
+                                    <Image 
+                                        source={profileData && profileData.profile_image ? { uri: profileData.profile_image } : require('../../assets/images/profilePic.png')} 
+                                        style={styles.profileImage} 
+                                    />
+                                    <View style={[styles.editBadge, { 
+                                        backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR 
+                                    }]}>
+                                        <MaterialIcons name="edit" size={12} color={colors.WHITE} />
+                                    </View>
                                 </View>
                             }
-                        </View>
-                        <Text numberOfLines={1} style={[styles.textPropStyle,{textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK}]} >{auth.profile && (auth.profile.firstName && auth.profile.lastName) ? auth.profile.firstName.toUpperCase() + " " + auth.profile.lastName.toUpperCase()  : t('no_name')}</Text>
-                    </>
-                    <MaterialIcons name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} size={30} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
-                </Pressable> 
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </Animated.View>
             
-            <View style={[styles.bigbox,{paddingVertical: 5, flex: 1, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-                <FlatList
-                    keyExtractor={(item, index) => index.toString()}
-                    data={menuList}
-                    scrollEnabled={true}
-                    initialNumToRender={13}
-                    showsVerticalScrollIndicator={false}
-                    renderItem={({ item, index }) => {
+            {/* Configuration Section */}
+            <View style={styles.configurationSection}>
+                <Text style={[styles.sectionTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                    Configuración
+                </Text>
+            
+            <View style={[styles.menuContainer, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+                {menuList.map((item, index) => {
+                    // Conditional rendering logic
                         if (auth.profile && auth.profile.usertype == "customer" && (item.navigationName == "Cars" || item.navigationName == "MyEarning")) {
                             return null;
                         }
@@ -316,8 +286,9 @@ export default function SettingsScreen(props) {
                         } else {
                             return (
                                 <Animated.View 
+                                    key={index}
                                     style={[
-                                        styles.vew,
+                                        styles.menuItem,
                                         {
                                             opacity: fadeAnims[index] || 1,
                                             transform: [
@@ -333,10 +304,11 @@ export default function SettingsScreen(props) {
                                     ]}
                                 >
                                     <TouchableOpacity
-                                        style={{ height: '100%', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}
+                                        style={[styles.menuItemButton, { 
+                                            flexDirection: isRTL ? 'row-reverse' : 'row' 
+                                        }]}
                                         key={item.navigationName}
                                         onPress={() => {
-                                            // Add press animation
                                             Animated.sequence([
                                                 Animated.timing(fadeAnims[index], {
                                                     toValue: 0.8,
@@ -354,7 +326,7 @@ export default function SettingsScreen(props) {
                                                 } else if (item.navigationName === 'Refer') {
                                                     refer();
                                                 } else if (item.navigationName === 'Logout') {
-                                                    logOff('Logout');
+                                                    showLogoutModal();
                                                 } else if (item.navigationName === 'Theme') {
                                                     setThemeModalVisible(true);
                                                 } else if (item.navigationName === 'Convert') {
@@ -365,32 +337,178 @@ export default function SettingsScreen(props) {
                                             });
                                         }}
                                     >
-                                         <View style={[styles.vew2,{backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20'}]}>
+                                        <View style={styles.menuItemIcon}>
                                             <Icon
                                                 name={item.icon}
                                                 type={item.type}
-                                                color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                                size={23}
+                                                color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                                                size={22}
                                             />
                                         </View>
-                                        <View style={{ flex: 1, height: '100%', justifyContent: 'center' }}>
+                                        
+                                        <View style={styles.menuItemContent}>
                                             {loading && item.navigationName === 'Logout' ?
-                                                <ActivityIndicator color={mode === 'dark' ? colors.WHITE : colors.BLACK} size='large' style={{ marginLeft: isRTL ? 0 : 50, marginRight: isRTL ? 50 : 0 }} />
-                                                : <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontFamily:fonts.Regular, textAlign: isRTL ? 'right' : 'left' }}>{item.name}</Text>
+                                                <ActivityIndicator color={mode === 'dark' ? colors.WHITE : colors.BLACK} size='small' />
+                                                : <Text style={[styles.menuItemText, { 
+                                                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                    textAlign: isRTL ? 'right' : 'left' 
+                                                }]}>
+                                                    {item.name}
+                                                </Text>
                                             }
                                         </View>
-                                        <View style={{ height: '100%', width: 50, alignItems: 'center', justifyContent: 'center' }}>
-                                            <MaterialIcons name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} size={30} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                        
+                                        <View style={styles.menuItemArrow}>
+                                            <MaterialIcons 
+                                                name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
+                                                size={24} 
+                                                color={mode === 'dark' ? colors.WHITE + '60' : colors.BLACK + '60'} 
+                                            />
                                         </View>
                                     </TouchableOpacity>
                                 </Animated.View>
                             )
                         }
-                    }}
-                />
+                })}
             </View>
-            {themeModal()}
-        </View>
+            </View>
+            
+            <WaygoDialog
+                visible={themeModalVisible}
+                onClose={() => setThemeModalVisible(false)}
+                title={t('theme')}
+                showIcon={false}
+                showButtons={true}
+                onConfirm={() => {
+                    setThemeModalVisible(false);
+                    dispatch(updateProfile({ mode: theme }));
+                    AsyncStorage.setItem('theme', JSON.stringify({ mode: theme }));
+                }}
+                confirmText={t('ok')}
+                cancelText={t('cancel')}
+                customContent={
+                    <View style={styles.themeOptionsContainer}>
+                        <TouchableOpacity 
+                            onPress={() => setTheme('light')} 
+                            style={[styles.themeOption, {
+                                backgroundColor: theme === 'light' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20') : 
+                                    'transparent'
+                            }]}
+                        >
+                            <Entypo 
+                                name="light-down" 
+                                size={22} 
+                                color={theme === 'light' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : 
+                                    (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                                } 
+                            />
+                            <Text style={[styles.themeOptionText, {
+                                color: theme === 'light' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : 
+                                    (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                            }]}>
+                                {t('light')}
+                            </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                            onPress={() => setTheme('dark')} 
+                            style={[styles.themeOption, {
+                                backgroundColor: theme === 'dark' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20') : 
+                                    'transparent'
+                            }]}
+                        >
+                            <MaterialIcons 
+                                name="dark-mode" 
+                                size={22} 
+                                color={theme === 'dark' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : 
+                                    (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                                } 
+                            />
+                            <Text style={[styles.themeOptionText, {
+                                color: theme === 'dark' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : 
+                                    (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                            }]}>
+                                {t('dark')}
+                            </Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity 
+                            onPress={() => setTheme('system')} 
+                            style={[styles.themeOption, {
+                                backgroundColor: theme === 'system' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20') : 
+                                    'transparent'
+                            }]}
+                        >
+                            <Ionicons 
+                                name="settings-outline" 
+                                size={22} 
+                                color={theme === 'system' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : 
+                                    (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                                } 
+                            />
+                            <Text style={[styles.themeOptionText, {
+                                color: theme === 'system' ? 
+                                    (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : 
+                                    (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                            }]}>
+                                {t('system')}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                }
+            />
+            
+            <WaygoDialog
+                visible={logoutModalVisible}
+                onClose={() => setLogoutModalVisible(false)}
+                title={t('logout')}
+                message={t('logout_message')}
+                type="warning"
+                showButtons={true}
+                showIcon={false}
+                onConfirm={logOff}
+                confirmText={t('yes')}
+                cancelText={t('cancel')}
+            />
+            
+            <WaygoDialog
+                visible={convertModalVisible}
+                onClose={() => setConvertModalVisible(false)}
+                title={t('convert_button')}
+                message={auth.profile && auth.profile.usertype == "driver" ? t('convert_to_rider') : t('convert_to_driver')}
+                icon="account-convert-outline"
+                iconColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                type="confirm"
+                showButtons={true}
+                showIcon={true}
+                onConfirm={convertUserType}
+                confirmText={t('ok')}
+                cancelText={t('cancel')}
+            />
+            
+            <WaygoDialog
+                visible={sosModalVisible}
+                onClose={() => setSosModalVisible(false)}
+                title={t('panic_text')}
+                message={t('panic_question')}
+                icon="alert-circle-outline"
+                iconColor={colors.RED}
+                type="warning"
+                showButtons={true}
+                showIcon={true}
+                onConfirm={executeSos}
+                confirmText={t('ok')}
+                cancelText={t('cancel')}
+            />
+        </ScrollView>
     );
 }
 
@@ -584,5 +702,126 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: colors.SHADOW,
-    }
+    },
+    // Estilos para opciones de tema
+    themeOptionsContainer: {
+        marginBottom: 20,
+        marginTop: 8,
+    },
+    themeOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        marginVertical: 4,
+    },
+    themeOptionText: {
+        fontSize: 16,
+        fontFamily: fonts.Medium,
+        marginLeft: 12,
+        flex: 1,
+    },
+    // Nuevos estilos para el diseño actualizado
+    profileSection: {
+        paddingHorizontal: 20,
+        paddingVertical: 20,
+    },
+    profileContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    profileInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    profileImageContainer: {
+        marginLeft: 16,
+    },
+    profileImageWrapper: {
+        position: 'relative',
+        width: 60,
+        height: 60,
+        borderRadius: 0,
+        overflow: 'hidden',
+    },
+    profileImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 0,
+        overflow: 'hidden',
+    },
+    editBadge: {
+        position: 'absolute',
+        bottom: -2,
+        right: -2,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: colors.WHITE,
+    },
+    profileTextContainer: {
+        flex: 1,
+    },
+    profileName: {
+        fontSize: 20,
+        fontFamily: fonts.Bold,
+        marginBottom: 4,
+    },
+    profilePhone: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+    },
+    profileEditButton: {
+        marginLeft: 12,
+    },
+    profileEditIcon: {
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    configurationSection: {
+        flex: 1,
+        paddingHorizontal: 12,
+        paddingBottom: 40
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+        marginBottom: 16,
+    },
+    menuContainer: {
+        flex: 1,
+    },
+    menuItem: {
+        marginBottom: 2,
+    },
+    menuItemButton: {
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+    },
+    menuItemIcon: {
+        width: 32,
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    menuItemContent: {
+        flex: 1,
+    },
+    menuItemText: {
+        fontSize: 16,
+        fontFamily: fonts.Regular,
+    },
+    menuItemArrow: {
+        width: 24,
+        alignItems: 'center',
+    },
 })

@@ -21,6 +21,8 @@ import { FirebaseConfig } from './config/FirebaseConfig';
 import { colors } from './src/common/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
+import { GluestackUIProvider } from '@gluestack-ui/themed';
+import { config } from '@gluestack-ui/config';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -60,7 +62,7 @@ export default function App() {
         require('./assets/images/background.jpg'),
         require('./assets/images/logo165x90white.png'),
         require('./assets/images/bg.jpg'),
-        require('./assets/images/intro.jpg'),
+        require('./assets/images/intro.png'),
         require('./assets/images/g4.gif'),
         require('./assets/images/lodingDriver.gif')
       ]),
@@ -106,9 +108,10 @@ export default function App() {
   if (!assetsLoaded) {
     return <View style={styles.container}>
       <ImageBackground
-        source={require('./assets/images/intro.jpg')}
-        resizeMode="stretch"
+        source={require('./assets/images/intro.png')}
+        resizeMode="cover"
         style={styles.imagebg}
+        imageStyle={{ resizeMode: 'contain', width: '100%', height: '100%' }}
       >
         <ActivityIndicator style={{ paddingBottom: 100 }} color={colors.BLUE} size='large' />
       </ImageBackground>
@@ -121,9 +124,11 @@ export default function App() {
         config={FirebaseConfig} 
         AsyncStorage={AsyncStorage}
       >
-        <AppCommon>
-          <AppContainer />
-        </AppCommon>
+        <GluestackUIProvider config={config}>
+          <AppCommon>
+            <AppContainer />
+          </AppCommon>
+        </GluestackUIProvider>
       </FirebaseProvider>
     </Provider>
   );

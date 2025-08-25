@@ -45,6 +45,7 @@ export default {
         config: "metro.config.js"
     },
     ios: {
+        newArchEnabled: false,
         splash: {
             image: "./assets/images/splash_ios.png",
             resizeMode: "cover",
@@ -99,6 +100,7 @@ export default {
     android: {
         package: AppConfig.app_identifier,
         versionCode: AppConfig.android_app_version,
+        newArchEnabled: false,
         edgeToEdgeEnabled: false,
         permissions: [
             "CAMERA",

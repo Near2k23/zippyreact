@@ -1,33 +1,34 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { colors } from '../common/theme';
-import { useSelector, useDispatch } from 'react-redux';
 import {
     View,
     Text,
     Dimensions,
-    TouchableOpacity,
     ScrollView,
     KeyboardAvoidingView,
-    Image,
     Platform,
-    Alert,
     StyleSheet,
+    Alert,
+    TouchableOpacity,
     TextInput,
+    SafeAreaView,
+    useColorScheme,
     ActivityIndicator,
-    useColorScheme
+    Image
 } from 'react-native';
-import { AntDesign } from '@expo/vector-icons';
-import Button from '../components/Button';
-import RNPickerSelect from '../components/RNPickerSelect';
-import * as ImagePicker from 'expo-image-picker';
-import { api } from 'common';
-import ActionSheet from "react-native-actions-sheet";
-import i18n from 'i18n-js';
-import { Ionicons } from '@expo/vector-icons';
-import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
-import {fonts}from "../common/font"
-import { getLangKey } from 'common/src/other/getLangKey';
+import { colors } from '../common/theme';
 var { height, width } = Dimensions.get('window');
+import i18n from 'i18n-js';
+import RNPickerSelect from '../components/RNPickerSelect';
+import { useSelector, useDispatch } from 'react-redux';
+import { api } from 'common';
+import { Feather, Ionicons, AntDesign } from '@expo/vector-icons';
+import { Keyboard } from 'react-native';
+import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
+import Button from '../components/Button';
+import { fonts } from '../common/font';
+import * as ImagePicker from 'expo-image-picker';
+import ActionSheet from "react-native-actions-sheet";
+import { getLangKey } from 'common/src/other/getLangKey';
 
 export default function CarEditScreen(props) {
     const { t } = i18n;
@@ -45,6 +46,7 @@ export default function CarEditScreen(props) {
     const [carTypes, setCarTypes] = useState(null);
     const [loading, setLoading] = useState(false);
     const [capturedImage, setCapturedImage] = useState(null);
+    const [focusedInput, setFocusedInput] = useState(null);
     const actionSheetRef = useRef(null);
     const [cars, setCars] = useState({});
     const [updateCalled, setUpdateCalled] = useState(false);
@@ -55,14 +57,14 @@ export default function CarEditScreen(props) {
     const [mode, setMode] = useState();
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
@@ -263,10 +265,11 @@ export default function CarEditScreen(props) {
     }
 
     return (
-        <View style={{ flex: 1 }}>
-            <View style={{ flex: 1, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, height: '100%', width: '100%' }}>
-                <KeyboardAvoidingView style={styles.form} behavior={Platform.OS == "ios" ? "padding" : (__DEV__ ? null : "padding")} keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 0}>
-                    <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
+        <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>
+            <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+                <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12.5, paddingBottom: 30 }}>
+                  
+                    <View style={styles.form}>
                         {
                             uploadImage()
                         }
@@ -303,244 +306,317 @@ export default function CarEditScreen(props) {
                                     </View>
                             }
 
-                            { car && car.id ? 
-                            <View style={[styles.textInputContainerStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                <TextInput
-                                    editable={car && car.id ? false : true}
-                                    value={t(getLangKey(car.carType))}
-                                    textAlign={isRTL ? 'right' : 'left'}
-                                    style={[styles.inPutFieldStyle, styles.fontBoldStyle, { paddingRight: isRTL ? 15 : 0, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
-                                />
-                            </View>
-                            :
-                            <View style={[styles.textInputContainerStyle, { borderColor: colors.SHADOW, borderWidth: 1, borderRadius: 10, }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-
-                                {carTypes ?
-                                    <View style={[{ width: "100%", height: "100%", paddingLeft: isRTL ? 0 : 10, paddingRight: isRTL ? 10 : 0, alignItems: 'center', position: 'relative' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={styles.containerStyle}>
+                            <View style={styles.inputContainerStyle}>
+                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                    {t('select_vehicle_type')}
+                                </Text>
+                                {car && car.id ? (
+                                    <TextInput
+                                        editable={false}
+                                        value={t(getLangKey(car.carType))}
+                                        style={[
+                                            styles.textInputStyle,
+                                            { 
+                                                backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                borderColor: '#E2E9EC'
+                                            }
+                                        ]}
+                                    />
+                                ) : (
+                                    carTypes && carTypes.length > 0 ? (
                                         <RNPickerSelect
                                             pickerRef={pickerRef1}
-                                            placeholder={{}} 
-                                            value={car && car.carType ? car.carType : state.carType}
+                                            placeholder={{ label: t('select_vehicle_type'), value: null }}
+                                            value={state.carType}
                                             useNativeAndroidPickerStyle={false}
                                             style={{
-                                                inputIOS: [styles.pickerStyle, styles.fontBoldStyle, { alignSelf: isRTL ? 'flex-end' : 'flex-start', textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }],
-                                                placeholder: {
-                                                    color: '#2a383b'
-                                                },
-                                                inputAndroid: [styles.pickerStyle, styles.fontBoldStyle, { alignSelf: isRTL ? 'flex-end' : 'flex-start', textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]
+                                                inputIOS: [
+                                                    styles.textInputStyle,
+                                                    { 
+                                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                        borderColor: focusedInput === 'carType' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                                    }
+                                                ],
+                                                inputAndroid: [
+                                                    styles.textInputStyle,
+                                                    { 
+                                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                        borderColor: focusedInput === 'carType' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                                    }
+                                                ]
                                             }}
-                                            onTap={() => { pickerRef1.current.focus() }}
+                                            onOpen={() => setFocusedInput('carType')}
+                                            onClose={() => setFocusedInput(null)}
                                             onValueChange={(value) => setState({ ...state, carType: value })}
                                             items={carTypes}
-                                            Icon={() => { return <Ionicons
-                                                style={{
-                                                    left: -10,
-                                                    top: '100%',
-                                                    transform: [{ translateY: -13 }],
-                                                    marginLeft: isRTL ? 10 : 0,
-                                                    marginRight: isRTL ? 0 : 10,
-                                                }}
-                                                name="arrow-down-outline"
-                                                size={26}
-                                                color="gray"
-                                            />; }}
                                         />
-                                    </View>
-                            : null}
+                                    ) : (
+                                        <View style={[styles.textInputStyle, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE, justifyContent: 'center' }]}>
+                                            <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK, opacity: 0.6 }}>
+                                                {t('loading')}
+                                            </Text>
+                                        </View>
+                                    )
+                                )}
                             </View>
-                            }
-                            
-                            <View style={[styles.textInputContainerStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+
+                            <View style={styles.inputContainerStyle}>
+                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                    {t('vehicle_model_name')}
+                                </Text>
                                 <TextInput
-                                    editable={car && car.id ? false : true}
-                                    placeholder={t('vehicle_model_name')}
+                                    editable={!(car && car.id)}
                                     value={state.vehicleMake}
-                                    textAlign={isRTL ? 'right' : 'left'}
-                                    style={[styles.inPutFieldStyle, styles.fontBoldStyle, { paddingRight: isRTL ? 15 : 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
+                                    onChangeText={(text) => setState({ ...state, vehicleMake: text })}
+                                    onFocus={() => setFocusedInput('vehicleMake')}
+                                    onBlur={() => setFocusedInput(null)}
+                                    style={[
+                                        styles.textInputStyle,
+                                        focusedInput === 'vehicleMake' && styles.inputFocused,
+                                        {
+                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                            borderColor: focusedInput === 'vehicleMake' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                        }
+                                    ]}
                                     placeholderTextColor={colors.SHADOW}
-                                    onChangeText={(text) => { setState({ ...state, vehicleMake: text }) }}
                                 />
                             </View>
-                            <View style={[styles.textInputContainerStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+
+                            <View style={styles.inputContainerStyle}>
+                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                    {t('vehicle_model_no')}
+                                </Text>
                                 <TextInput
-                                    editable={car && car.id ? false : true}
-                                    placeholder={t('vehicle_model_no')}
+                                    editable={!(car && car.id)}
                                     value={state.vehicleModel}
-                                    textAlign={isRTL ? 'right' : 'left'}
-                                    style={[styles.inPutFieldStyle, styles.fontBoldStyle, { paddingRight: isRTL ? 15 : 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
+                                    onChangeText={(text) => setState({ ...state, vehicleModel: text })}
+                                    onFocus={() => setFocusedInput('vehicleModel')}
+                                    onBlur={() => setFocusedInput(null)}
+                                    style={[
+                                        styles.textInputStyle,
+                                        focusedInput === 'vehicleModel' && styles.inputFocused,
+                                        {
+                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                            borderColor: focusedInput === 'vehicleModel' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                        }
+                                    ]}
                                     placeholderTextColor={colors.SHADOW}
-                                    onChangeText={(text) => { setState({ ...state, vehicleModel: text }) }}
                                 />
                             </View>
-                            <View style={[styles.textInputContainerStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+
+                            <View style={styles.inputContainerStyle}>
+                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                    {t('vehicle_reg_no')}
+                                </Text>
                                 <TextInput
-                                    editable={car && car.id ? false : true}
-                                    placeholder={t('vehicle_reg_no')}
+                                    editable={!(car && car.id)}
                                     value={state.vehicleNumber}
-                                    textAlign={isRTL ? 'right' : 'left'}
-                                    style={[styles.inPutFieldStyle, styles.fontBoldStyle, { paddingRight: isRTL ? 15 : 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
+                                    onChangeText={(text) => setState({ ...state, vehicleNumber: text })}
+                                    onFocus={() => setFocusedInput('vehicleNumber')}
+                                    onBlur={() => setFocusedInput(null)}
+                                    style={[
+                                        styles.textInputStyle,
+                                        focusedInput === 'vehicleNumber' && styles.inputFocused,
+                                        {
+                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                            borderColor: focusedInput === 'vehicleNumber' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                        }
+                                    ]}
                                     placeholderTextColor={colors.SHADOW}
-                                    onChangeText={(text) => { setState({ ...state, vehicleNumber: text }) }}
                                 />
                             </View>
-                            <View style={[styles.textInputContainerStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+
+                            <View style={styles.inputContainerStyle}>
+                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                    {t('other_info')}
+                                </Text>
                                 <TextInput
-                                    editable={car && car.id ? false : true}
-                                    placeholder={t('other_info')}
+                                    editable={!(car && car.id)}
                                     value={state.other_info}
-                                    textAlign={isRTL ? 'right' : 'left'}
-                                    style={[styles.inPutFieldStyle, styles.fontBoldStyle, { paddingRight: isRTL ? 15 : 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
+                                    onChangeText={(text) => setState({ ...state, other_info: text })}
+                                    onFocus={() => setFocusedInput('other_info')}
+                                    onBlur={() => setFocusedInput(null)}
+                                    multiline
+                                    numberOfLines={3}
+                                    style={[
+                                        styles.textInputStyle,
+                                        focusedInput === 'other_info' && styles.inputFocused,
+                                        {
+                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                            borderColor: focusedInput === 'other_info' ? colors.INPUT_FOCUS : '#E2E9EC',
+                                            height: 80,
+                                            textAlignVertical: 'top'
+                                        }
+                                    ]}
                                     placeholderTextColor={colors.SHADOW}
-                                    onChangeText={(text) => { setState({ ...state, other_info: text }) }}
                                 />
-                            </View>
-                            <View style={styles.buttonContainer}>
-                                {!car ?
-
-                                    <Button
-                                        btnClick={onSave}
-                                        title={t('save')}
-                                        loading={false}
-                                        loadingColor={{ color: colors.WHITE }}
-                                        style={[styles.registerButton, loading === true ? styles.registerButtonClicked : styles.registerButton,{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}]}
-                                        buttonStyle={[styles.buttonTitle, styles.fontBoldStyle]}
-                                    />
-
-                                    : null}
-                                {car && car.id && !car.active ?
-
-                                    <Button
-                                        btnClick={makeActive}
-                                        title={t('make_active')}
-                                        loading={false}
-                                        loadingColor={{ color: colors.WHITE }}
-                                        style={ [styles.registerButton, loading === true ? styles.registerButtonClicked : styles.registerButton,{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}]}
-                                        buttonStyle={[styles.buttonTitle, styles.fontBoldStyle]}
-                                    />
-                                    :
-                                    null}
-                                {loading === true ?
-                                    <ActivityIndicator size="large" color={colors.WHITE} style={styles.loader} />
-                                    : null
-                                }
                             </View>
                         </View>
-                    </ScrollView>
-                </KeyboardAvoidingView>
-            </View>
-        </View>
+                        <View style={styles.buttonContainer}>
+                            {!car ? (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.registerButton,
+                                        loading && styles.registerButtonClicked,
+                                        { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
+                                    ]}
+                                    onPress={onSave}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator size="small" color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.buttonStyle}>{t('save')}</Text>
+                                    )}
+                                </TouchableOpacity>
+                            ) : null}
+                            
+                            {car && car.id && !car.active ? (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.registerButton,
+                                        loading && styles.registerButtonClicked,
+                                        { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
+                                    ]}
+                                    onPress={makeActive}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator size="small" color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.buttonStyle}>{t('make_active')}</Text>
+                                    )}
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 
 }
 
 const styles = StyleSheet.create({
-    mainView: {
-        flex: 1,
-        backgroundColor: colors.PAGEBACK
+    container: {
+        flex: 1
+    },
+    headerContainer: {
+        marginBottom: 20,
+        width: width - 25,
+        alignSelf: 'center'
+    },
+    headerStyle: {
+        fontSize: 28,
+        color: colors.BLACK,
+        fontFamily: fonts.Bold,
+        width: '100%'
+    },
+    headerSubtitle: {
+        fontSize: 14,
+        color: '#A7A9AC',
+        marginTop: 4,
+        fontFamily: fonts.Regular,
+        width: '100%'
+    },
+    form: {
+        alignItems: 'center',
+        width: '100%',
+        gap: 25,
+        marginBottom: 25,
+        flex: 1
+    },
+    containerStyle: {
+        flexDirection: 'column',
+        marginTop: 10,
+        width: '100%',
+        gap: 10
     },
     inputContainerStyle: {
         width: "100%",
     },
-    vew1: {
-        height: '100%',
-        borderBottomRightRadius: 120,
-        overflow: 'hidden',
-        backgroundColor: colors.WHITE,
-    },
-    iconContainer: {
-        width: '15%',
-        alignItems: 'center'
-    },
-    vew: {
-        borderTopLeftRadius: 130,
-        height: '100%',
-        alignItems: 'flex-end'
-    },
-    gapView: {
-        height: 40,
-        width: '100%'
-    },
-    registerButton: {
-        borderRadius: 10,
-        justifyContent: "center",
-        alignItems: 'center',
-        width: '95%'
-    },
-    registerButtonClicked: {
-        backgroundColor: colors.WHITE,
-        borderWidth: 1,
-        width: '95%'
-    },
-    buttonTitle: {
-        fontSize: 18,
-        color: colors.WHITE,
-        paddingVertical: 5,
-    },
-    pickerStyle: {
-        color: colors.HEADER,
-        fontSize: 15,
-        height: "100%",
-        minWidth: "100%",
-    },
-    inputTextStyle: {
-        color: colors.BLACK,
+    inputLabel: {
+        width: '100%',
         fontSize: 13,
-        marginLeft: 0,
-        height: 32,
-    },
-    containerStyle: {
-        flexDirection: 'column',
-        width: '100%',
-        gap: 5,
-        alignItems: 'center'
-    },
-    form: {
-        flex: 1,
-    },
-    logo: {
-        width: '100%',
-        justifyContent: "center",
-        height: '10%',
-        borderBottomRightRadius: 150,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 3,
-        marginBottom: 2,
-    },
-    scrollViewStyle: {
-        height: height
-    },
-    fontStyle: {
-        fontFamily:fonts.Regular
-    },
-    fontBoldStyle: {
+        color: '#A7A9AC',
+        marginBottom: 6,
         fontFamily: fonts.Bold
     },
-    textInputContainerStyle: {
-        width: '95%',
-        height: 60,
-        marginVertical: 5,
-        alignItems: 'center',
-        justifyContent: "center"
-    },
-    inPutFieldStyle: {
-        width: "100%",
-        height: "100%",
-        borderRadius: 10,
+    textInputStyle: {
         borderWidth: 1,
-        borderColor: colors.SHADOW,
-        fontSize: 14,
-        paddingLeft:15
+        borderColor: '#E2E9EC',
+        paddingVertical: 15,
+        borderRadius: 10,
+        paddingLeft: 10,
+        paddingRight: 10,
+        fontFamily: fonts.Regular
     },
-    headerStyle: {
-        fontSize: 25,
-        color: colors.WHITE,
+    inputFocused: {
+        paddingVertical: 14,
+    },
+    RnpickerBox: {
+        width: "100%",
+        height: 50,
+        overflow: 'hidden',
         flexDirection: 'row',
+        borderWidth: 1,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    pickerFocus: {
+        borderWidth: 2,
+        borderColor: colors.INPUT_FOCUS
+    },
+    pickerStyle: {
+        fontSize: 15,
+        paddingVertical: 12,
+        position: 'relative',
+        paddingLeft: 10,
+        paddingRight: 10,
+        fontFamily: fonts.Bold,
+        flexWrap: 'wrap',
+        width: "100%",
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        width: width - 25,
+        position: 'relative',
+        marginBottom: 30,
+        marginTop: 10
+    },
+    registerButton: {
+        width: '100%',
+        backgroundColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+        marginBottom: 5,
+    },
+    registerButtonClicked: {
+        width: '100%',
+        borderWidth: 1,
+        borderRadius: 10,
+        elevation: 0
+    },
+    buttonStyle: {
+        color: colors.WHITE,
+        fontSize: 16,
+        fontFamily: fonts.Bold,
+    },
+    scrollViewStyle: {
+        flex: 1,
     },
     capturePhoto: {
         width: '95%',
@@ -557,8 +633,7 @@ const styles = StyleSheet.create({
         color: colors.BLACK,
         fontSize: 16,
         textAlign: 'center',
-        paddingBottom: 15,
-
+        paddingBottom: 15
     },
     errorPhotoTitle: {
         color: colors.RED,
@@ -577,11 +652,11 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
         marginTop: 15,
         width: '95%',
-        height: height / 4,
+        height: height / 4
     },
     imagePosition: {
         position: 'relative',
-        width: "100%",
+        width: "100%"
     },
     photoClick: {
         paddingRight: 35,
@@ -598,10 +673,9 @@ const styles = StyleSheet.create({
     },
     imageStyle: {
         width: 25,
-        height: 25,
+        height: 25
     },
     flexView1: {
-
         width: "100%",
         height: "100%"
     },
@@ -618,13 +692,6 @@ const styles = StyleSheet.create({
         width: 1,
         alignItems: 'center'
     },
-    myView1: {
-        height: height / 18,
-        width: 1.5,
-        backgroundColor: colors.SHADOW,
-        alignItems: 'center',
-        marginTop: 10
-    },
     myView2: {
         flex: 20,
         alignItems: 'center',
@@ -634,16 +701,6 @@ const styles = StyleSheet.create({
         flex: 2.2,
         alignItems: 'center',
         justifyContent: 'center'
-    },
-    loader: {
-        position: 'absolute'
-    },
-    buttonContainer: {
-        width: "100%",
-        alignItems: "center",
-        justifyContent: 'center',
-        marginBottom: 12,
-        position: "relative",
-    },
+    }
 
 });

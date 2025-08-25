@@ -10,21 +10,24 @@ import {
     Alert,
     TouchableOpacity,
     TextInput,
-    SafeAreaView
+    SafeAreaView,
+    useColorScheme
 } from 'react-native';
 import { colors } from '../common/theme';
 var { height,width } = Dimensions.get('window');
 import i18n from 'i18n-js';
-import RadioForm from 'react-native-simple-radio-button';
+
 import RNPickerSelect from './RNPickerSelect';
 import { useSelector,useDispatch } from 'react-redux';
 import { api } from 'common';
-import { Feather, AntDesign } from '@expo/vector-icons';
+import { Feather, Ionicons, AntDesign } from '@expo/vector-icons';
+import { Keyboard } from 'react-native';
+import { Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal, SelectBackdrop, SelectContent, SelectItem, ChevronDownIcon } from '@gluestack-ui/themed';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import Button from './Button';
 import { fonts } from '../common/font';
-import { useColorScheme } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const hasNotch = DeviceInfo.hasNotch();
 
@@ -62,19 +65,26 @@ export default function Registration(props) {
     const [referralIdFocus, setreferralIdFocus] = useState(false)
     const pickerRef1 = React.createRef();
     const useduserReferral = useSelector(state => state.usedreferralid.usedreferral);
-
     let colorScheme = useColorScheme();
-    const [mode, setMode] = useState();
+    const [mode, setMode] = useState('');
 
     useEffect(() => {
-        setMode(colorScheme);
+        AsyncStorage.getItem('theme', (err, result) => {
+            if (result) {
+                const theme = JSON.parse(result)['mode']
+                 if (theme === 'system'){
+                    setMode(colorScheme);
+                }else{
+                    setMode(theme);
+                }
+            }else{
+                setMode('light');
+            }
+        });
     }, [colorScheme]);
 
     const { loading } = props
-    const radio_props = [
-        { label: t('customer'), value: 0 },
-        { label: t('driver'), value: 1 }
-    ];
+
 
     const formatCountries = useMemo(() => {
         let arr = [];
@@ -87,13 +97,15 @@ export default function Registration(props) {
 
     useEffect(() => {
         if (settings) {
+            // Set initial country code
             for (let i = 0; i < countries.length; i++) {
                 if (countries[i].label == settings.country) {
                     setCountryCode(countries[i].label + " (+" + countries[i].phone + ")");
                 }
             }
+            // Set initial user type
+            setState(prev => ({...prev, usertype: 'customer'}));
         }
-        
     }, [settings]);
 
 
@@ -140,10 +152,21 @@ export default function Registration(props) {
             if (/\S/.test(state.firstName) && state.firstName.length > 0 && /\S/.test(state.lastName) && state.lastName.length > 0) {
                 if (!validatePassword) {
                     if (mobileWithoutCountry && mobileWithoutCountry.length > 6) {
+                        console.log('📋 REGISTER - Datos de registro:', {
+                            mobileWithoutCountry: mobileWithoutCountry,
+                            countryCode: countryCode,
+                            fullMobile: state.mobile,
+                            email: state.email,
+                            firstName: state.firstName,
+                            lastName: state.lastName,
+                            usertype: state.usertype
+                        });
+                        
                         const userData = { ...state };
                         if (userData.usertype == 'customer') delete userData.carType;
                         
-                            onPressRegister(userData);
+                        console.log('🚀 REGISTER - Enviando userData:', userData);
+                        onPressRegister(userData);
                         
                     } else {
                         Alert.alert(t('alert'), t('mobile_no_blank_error'));
@@ -165,6 +188,14 @@ export default function Registration(props) {
         let extNum = text.split("(")[1].split(")")[0];
         let formattedNum = mobileWithoutCountry.replace(/ /g, '');
         formattedNum = extNum + formattedNum.replace(/-/g, '');
+        
+        console.log('🌍 REGISTER - Actualizando país:', {
+            selectedCountry: text,
+            extractedCode: extNum,
+            mobileWithoutCountry: mobileWithoutCountry,
+            finalFormattedNum: formattedNum
+        });
+        
         setState({ ...state, mobile: formattedNum })
     }
 
@@ -176,186 +207,220 @@ export default function Registration(props) {
             <SafeAreaView style={{ flex: 1, position: 'absolute', backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, height: '100%', width: '100%' }}>
                 <View style={[{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
                 <TouchableOpacity style={isRTL ? { marginRight: 10, alignSelf: 'flex-end', width: 70, padding: 8, marginTop: 12 } : { marginLeft: 10, width: 70, padding: 8, marginTop: Platform.OS == 'android' ? (__DEV__ ? 15 :40) : (hasNotch ? 35 : 30) }} onPress={props.onPressBack} >
-                        <AntDesign name={isRTL ? 'right' : "left"} size={30} color={ mode === 'dark' ? colors.WHITE : colors.BLACK} />
+                        <Ionicons name={isRTL ? 'arrow-forward-outline' : "arrow-back-outline"} size={30} color={ mode === 'dark' ? colors.WHITE : colors.BLACK} />
                     </TouchableOpacity>
                 </View>
-                <Text style={[styles.headerStyle,{color: mode === 'dark' ? colors.WHITE: colors.BLACK}, [isRTL ? { marginRight: 25, textAlign: 'right', padding: 8,marginTop:-12} : { marginLeft: 8, padding: 8,marginTop:-12}]]}>{t('registration_title')}</Text>
+                <View style={[styles.headerContainer, isRTL ? { alignItems: 'flex-end' } : null]}>
+                    <Text style={[styles.headerStyle, {color: mode === 'dark' ? colors.WHITE: colors.BLACK}]}>{t('registration_title')}</Text>
+                    <Text style={styles.headerSubtitle}>{t('registration_subtitle')}</Text>
+                </View>
                 <View style={{ height: '85%' }}>
                     <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : (__DEV__ ? null : "padding")} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} >
                         <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
                             <View style={[styles.containerStyle,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-                                <View style={[styles.textInputContainerStyle, { justifyContent: 'flex-start' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                    <RadioForm
-                                        radio_props={radio_props}
-                                        initial={0}
-                                        animation={false}
-                                        formHorizontal={true}
-                                        labelHorizontal={true}
-                                        buttonColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                        labelColor={colors.HEADER}
-                                        labelStyle={[isRTL ? { marginRight: 10 } : { marginRight: 10 },{fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE: colors.BLACK}]}
-                                        selectedButtonColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                        selectedLabelColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                        buttonSize={25}
-                                        buttonOuterSize={35}
-                                        buttonStyle={{}}
-                                        onPress={(value) => {
-                                            if (value == 0) {
-                                                setState({ ...state, usertype: 'customer' });
-                                            } else {
-                                                setState({ ...state, usertype: 'driver' });
-                                            }
-                                        }}
-                                    />
-                                </View>
+
                                 <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                    <TextInput
-                                        placeholder={t('first_name_placeholder')}
-                                        onFocus={() => setFirstNameFocus(!firstNameFocus)}
-                                        onBlur={() => setFirstNameFocus(!firstNameFocus)}
-                                        value={state.firstName}
-                                        onChangeText={(text) => { setState({ ...state, firstName: text }) }}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        placeholderTextColor={colors.SHADOW}
-                                        style={[styles.textInputStyle, { width: "47%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (firstNameFocus === true || state.firstName.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                        keyboardType={'email-address'}
-                                    />
-                                    <TextInput
-                                        placeholder={t('last_name_placeholder')}
-                                        onFocus={() => setlastNameFocus(!lastNameFocus)}
-                                        onBlur={() => setlastNameFocus(!lastNameFocus)}
-                                        value={state.lastName}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        onChangeText={(text) => { setState({ ...state, lastName: text }) }}
-                                        placeholderTextColor={colors.SHADOW}
-                                        style={[styles.textInputStyle, { width: "47%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (lastNameFocus === true || state.lastName.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                        keyboardType={'email-address'}
-                                    />
+                                    <View style={{width: "47%"}}>
+                                        <Text style={styles.inputLabel}>{t('first_name_placeholder')}</Text>
+                                        <TextInput
+                                            placeholder={''}
+                                            onFocus={() => setFirstNameFocus(!firstNameFocus)}
+                                            onBlur={() => setFirstNameFocus(!firstNameFocus)}
+                                            value={state.firstName}
+                                            onChangeText={(text) => { setState({ ...state, firstName: text }) }}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            placeholderTextColor={colors.SHADOW}
+                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (firstNameFocus === true || state.firstName.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
+                                            keyboardType={'email-address'}
+                                        />
+                                    </View>
+                                    <View style={{width: "47%"}}>
+                                        <Text style={styles.inputLabel}>{t('last_name_placeholder')}</Text>
+                                        <TextInput
+                                            placeholder={''}
+                                            onFocus={() => setlastNameFocus(!lastNameFocus)}
+                                            onBlur={() => setlastNameFocus(!lastNameFocus)}
+                                            value={state.lastName}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            onChangeText={(text) => { setState({ ...state, lastName: text }) }}
+                                            placeholderTextColor={colors.SHADOW}
+                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (lastNameFocus === true || state.lastName.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
+                                            keyboardType={'email-address'}
+                                        />
+                                    </View>
 
                                 </View>
                                 <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                    <TextInput
-                                        placeholder={t('email_placeholder')}
-                                        onFocus={() => setEmailFocus(!EmailFocus)}
-                                        onBlur={() => setEmailFocus(!EmailFocus)}
-                                        value={state.email}
-                                        placeholderTextColor={colors.SHADOW}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (EmailFocus === true || state.email.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                        onChangeText={(text) => { setState({ ...state, email: text }) }}
-                                        keyboardType={'email-address'}
-                                    />
+                                    <View style={{width: "100%"}}>
+                                        <Text style={styles.inputLabel}>{t('email_placeholder')}</Text>
+                                        <TextInput
+                                            placeholder={''}
+                                            onFocus={() => setEmailFocus(!EmailFocus)}
+                                            onBlur={() => setEmailFocus(!EmailFocus)}
+                                            value={state.email}
+                                            placeholderTextColor={colors.SHADOW}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (EmailFocus === true || state.email.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
+                                            onChangeText={(text) => { setState({ ...state, email: text }) }}
+                                            keyboardType={'email-address'}
+                                        />
+                                    </View>
                                 </View>
-                                <View style={[styles.textInputBoxStyle,{gap: 10} ]}>
-                                    <TouchableOpacity activeOpacity={0.5} style={[styles.RnpickerBox, { flexDirection: isRTL ? 'row-reverse' : "row", justifyContent:'space-between', borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} >
-                                        <View style={{ overflow: "hidden", height: '100%', width: "90%"}} >
-                                            <RNPickerSelect
-                                                numberOfLines={1}
-                                                pickerRef={pickerRef1}
-                                                onFocus={() => setCountryCodeFocus(!countrycodeFocus)}
-                                                onBlur={() => setCountryCodeFocus(!countrycodeFocus)}
-                                                key={countryCode}
-                                                placeholder={{ label: t('select_country'), value: t('select_country') }}
-                                                value={countryCode}
-                                                textInputProps={{
-                                                    maxLength: 40,
-                                                    styles: {
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis'
-                                                    }
-                                                }}
-                                                useNativeAndroidPickerStyle={false}
-                                                style={{
-                                                    inputIOS: [styles.pickerStyle, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start', color: mode === 'dark' ? colors.WHITE : colors.BLACK}, (countrycodeFocus === true) ? styles.pickerFocus
-                                                        : styles.pickerStyle],
-                                                    placeholder: {
-                                                        color: colors.SHADOW
-                                                    },
-                                                    inputAndroid: [styles.pickerStyle, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start', color: mode === 'dark' ? colors.WHITE : colors.BLACK}, (countrycodeFocus === true) ? styles.pickerFocus
-                                                        : styles.pickerStyle]
-                                                }}
-                                                onTap={() => {
-                                                    if(settings){
-                                                        if(settings.AllowCountrySelection){
-                                                            pickerRef1.current.focus() 
-                                                        }
-                                                    }
-                                                }}
-                                                onValueChange={(text) => { upDateCountry(text); }}
-                                                items={formatCountries}
-                                                disabled={settings.AllowCountrySelection ? false : true}
-                                            />
-
-                                        </View>
-                                        <AntDesign name="arrowdown" size={24} color={colors.CONVERTDRIVER_TEXT} style={{ width: 'auto', alignContent: 'flex-end'}} />
-                                    </TouchableOpacity>
-                                    <TextInput
-                                        placeholder={t('mobile')}
-                                        onFocus={() => setNumberFocus(!numberFocus)}
-                                        onBlur={() => setNumberFocus(!numberFocus)}
-                                        value={mobileWithoutCountry}
-                                        placeholderTextColor={colors.SHADOW}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (numberFocus === true || mobileWithoutCountry.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                        onChangeText={
-                                            (text) => {
-                                                setMobileWithoutCountry(text)
-                                                let formattedNum = text.replace(/ /g, '');
-                                                formattedNum = countryCode.split("(")[1].split(")")[0] + formattedNum.replace(/-/g, '');
-                                                setState({ ...state, mobile: formattedNum })
-                                            }
-                                        }
-                                        keyboardType={'number-pad'}
-                                    />
+                                <View style={styles.contactRow}>
+                                    <View style={styles.countryBoxSmall}>
+                                        <Text style={styles.inputLabel}>{t('country')}</Text>
+                                        <RNPickerSelect
+                                            pickerRef={pickerRef1}
+                                            placeholder={{ label: '+', value: t('select_country') }}
+                                            value={countryCode}
+                                            useNativeAndroidPickerStyle={false}
+                                            onTap={() => {
+                                                if (!settings || !settings.AllowCountrySelection) {
+                                                    return;
+                                                }
+                                                Keyboard.dismiss();
+                                                pickerRef1.current && pickerRef1.current.focus && pickerRef1.current.focus();
+                                            }}
+                                            style={{
+                                                viewContainer: styles.countryPickerContainer,
+                                                inputIOS: [
+                                                    styles.countryPickerSmall, 
+                                                    { textAlign: 'center' },
+                                                    (!settings || !settings.AllowCountrySelection) && { opacity: 0.5 }
+                                                ],
+                                                inputAndroid: [
+                                                    styles.countryPickerSmall, 
+                                                    { textAlign: 'center', textAlignVertical: 'center' },
+                                                    (!settings || !settings.AllowCountrySelection) && { opacity: 0.5 }
+                                                ]
+                                            }}
+                                            onValueChange={(text) => {
+                                                if (!settings?.AllowCountrySelection) return;
+                                                upDateCountry(text);
+                                            }}
+                                            items={formatCountries.map((it) => {
+                                                const match = it.value && it.value.match(/\(\+(\d+)\)/);
+                                                const codePart = match && match[1] ? `+${match[1]}` : (it.label?.startsWith('+') ? it.label : `+${it.label}`);
+                                                return { ...it, label: codePart };
+                                            })}
+                                            disabled={!settings?.AllowCountrySelection}
+                                            mode={mode}
+                                        />
+                                    </View>
+                                    <View style={styles.contactInputWrap}>
+                                        <Text style={styles.inputLabel}>{t('mobile')}</Text>
+                                        <TextInput
+                                            placeholder={''}
+                                            onFocus={() => setNumberFocus(!numberFocus)}
+                                            onBlur={() => setNumberFocus(!numberFocus)}
+                                            value={mobileWithoutCountry}
+                                            placeholderTextColor={colors.SHADOW}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            style={[styles.textInputStyle, (state.mobile && /^\d+$/.test(state.mobile)) ? styles.inputPhone : null, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (numberFocus === true || mobileWithoutCountry.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
+                                            onChangeText={(text) => {
+                                                const numericValue = text.replace(/\D/g, '');
+                                                setMobileWithoutCountry(numericValue);
+                                                if (countryCode) {
+                                                    const countryPart = countryCode.split("(")[1].split(")")[0];
+                                                    const fullMobile = countryPart + numericValue;
+                                                    
+                                                    console.log('📱 REGISTER - Actualizando teléfono:', {
+                                                        originalText: text,
+                                                        numericValue: numericValue,
+                                                        countryCode: countryCode,
+                                                        countryPart: countryPart,
+                                                        fullMobile: fullMobile
+                                                    });
+                                                    
+                                                    setState({ ...state, mobile: fullMobile });
+                                                }
+                                            }}
+                                            keyboardType="numeric"
+                                            maxLength={10}
+                                        />
+                                    </View>
                                 </View>
-                                <View style={[styles.passWordBox, { flexDirection: isRTL ? 'row-reverse' : 'row' },(passwordFocus === true || state.password.length > 0) ? [styles.passwordBoxFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.passWordBox]}>
-                                    <TextInput
-                                        placeholder={t('password')}
-                                        onFocus={() => setpasswordFocus(!passwordFocus)}
-                                        onBlur={() => setpasswordFocus(!passwordFocus)}
-                                        placeholderTextColor={colors.SHADOW}
-                                        value={state.password}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        style={[ styles.passwordInput,{paddingRight:isRTL?10:0, color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-                                        onChangeText={(text) => setState({ ...state, password: text })}
-                                        keyboardType="default"
-                                        secureTextEntry={eyePass}
-                                    />
+                                <View style={{width: "100%"}}>
+                                    <Text style={styles.inputLabel}>{t('password')}</Text>
+                                    <View style={[styles.passWordBox, { flexDirection: isRTL ? 'row-reverse' : 'row' },(passwordFocus === true || state.password.length > 0) ? [styles.passwordBoxFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.passWordBox]}>
+                                        <TextInput
+                                            placeholder={''}
+                                            onFocus={() => setpasswordFocus(!passwordFocus)}
+                                            onBlur={() => setpasswordFocus(!passwordFocus)}
+                                            placeholderTextColor={colors.SHADOW}
+                                            value={state.password}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            style={[ styles.passwordInput,{paddingRight:isRTL?10:0, color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
+                                            onChangeText={(text) => setState({ ...state, password: text })}
+                                            keyboardType="default"
+                                            secureTextEntry={eyePass}
+                                        />
                                     <TouchableOpacity onPress={() => setEyePass(!eyePass)} style={styles.passwordIcon}>
-                                        <Feather name={eyePass === true ? "eye-off" : "eye"} size={24} color={(passwordFocus === true || state.password.length > 0) ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW} />
+                                        <Feather name={eyePass === true ? "eye-off" : "eye"} size={22} color={(passwordFocus === true || state.password.length > 0) ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW} />
                                     </TouchableOpacity>
                                 </View>
-                                <View style={[styles.passWordBox,  { flexDirection: isRTL ? 'row-reverse' : 'row',},(confirmPasswordFocus === true || confirmpassword.length > 0) ? [styles.passwordBoxFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.passWordBox]}>
-                                    <TextInput
-                                        placeholder={t('confirm_password')}
-                                        secureTextEntry={eyeConfirmPass}
-                                        onFocus={() => setconfirmPasswordFocus(!confirmPasswordFocus)}
-                                        onBlur={() => setconfirmPasswordFocus(!confirmPasswordFocus)}
-                                        placeholderTextColor={colors.SHADOW}
-                                        value={confirmpassword}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        style={[ styles.passwordInput,{paddingRight:isRTL?10:0, color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-                                        onChangeText={(text) => setConfirmPassword(text)}
-                                        keyboardType="default"
-                                    />
+                                </View>
+                                <View style={{width: "100%"}}>
+                                    <Text style={styles.inputLabel}>{t('confirm_password')}</Text>
+                                    <View style={[styles.passWordBox,  { flexDirection: isRTL ? 'row-reverse' : 'row',},(confirmPasswordFocus === true || confirmpassword.length > 0) ? [styles.passwordBoxFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.passWordBox]}>
+                                        <TextInput
+                                            placeholder={''}
+                                            secureTextEntry={eyeConfirmPass}
+                                            onFocus={() => setconfirmPasswordFocus(!confirmPasswordFocus)}
+                                            onBlur={() => setconfirmPasswordFocus(!confirmPasswordFocus)}
+                                            placeholderTextColor={colors.SHADOW}
+                                            value={confirmpassword}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            style={[ styles.passwordInput,{paddingRight:isRTL?10:0, color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
+                                            onChangeText={(text) => setConfirmPassword(text)}
+                                            keyboardType="default"
+                                        />
                                     <TouchableOpacity onPress={() => setEyeConfirmPass(!eyeConfirmPass)} style={styles.passwordIcon}>
-                                        <Feather name={eyeConfirmPass === true ? "eye-off" : "eye"} size={24} color={(confirmPasswordFocus === true || confirmpassword.length > 0) ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW} />
+                                        <Feather name={eyeConfirmPass === true ? "eye-off" : "eye"} size={22} color={(confirmPasswordFocus === true || confirmpassword.length > 0) ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW} />
                                     </TouchableOpacity>
                                 </View>
-                                <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                    <TextInput
-                                        editable={true}
-                                        placeholder={t('referral_id_placeholder')}
-                                        onFocus={() => setreferralIdFocus(!referralIdFocus)}
-                                        onBlur={() => setreferralIdFocus(!referralIdFocus)}
-                                        placeholderTextColor={colors.SHADOW}
-                                        value={state.referralId}
-                                        textAlign={isRTL ? 'right' : 'left'}
-                                        style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (referralIdFocus === true || state.referralId.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                        onChangeText={(text) => { setState({ ...state, referralId: text }) }}
-                                        keyboardType={'email-address'}
-
-                                    />
+                                </View>
+                                <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }]}>
+                                    <View style={{width: "35%"}}>
+                                        <Text style={styles.inputLabel}>{t('user_type')}</Text>
+                                        <TouchableOpacity 
+                                            style={[styles.textInputStyle, {
+                                                flexDirection: 'row',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center'
+                                            }]}
+                                            onPress={() => {
+                                                setState(prev => ({
+                                                    ...prev, 
+                                                    usertype: prev.usertype === 'customer' ? 'driver' : 'customer'
+                                                }));
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontSize: 14,
+                                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                fontFamily: fonts.Regular
+                                            }}>
+                                                {state.usertype === 'customer' ? t('customer') : t('driver')}
+                                            </Text>
+                                            <Ionicons name="chevron-down" size={14} color={colors.SHADOW} />
+                                        </TouchableOpacity>
+                                    </View>
+                                    <View style={{width: "60%"}}>
+                                        <Text style={styles.inputLabel}>{t('referral_id_placeholder')}</Text>
+                                        <TextInput
+                                            editable={true}
+                                            placeholder={''}
+                                            onFocus={() => setreferralIdFocus(!referralIdFocus)}
+                                            onBlur={() => setreferralIdFocus(!referralIdFocus)}
+                                            placeholderTextColor={colors.SHADOW}
+                                            value={state.referralId}
+                                            textAlign={isRTL ? 'right' : 'left'}
+                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (referralIdFocus === true || state.referralId.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
+                                            onChangeText={(text) => { setState({ ...state, referralId: text }) }}
+                                            keyboardType={'email-address'}
+                                        />
+                                    </View>
                                 </View>
                                 <View style={[styles.buttonContainer]}>
                                     <Button
@@ -398,11 +463,43 @@ const styles = StyleSheet.create({
         marginLeft: 10,
         marginRight: 10
     },
-    textInputContainerStyle: {
-        width: width-25,
-        alignItems: 'center',
-        justifyContent: "center",
-        marginBottom:10
+    contactRow: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        columnGap: 8,
+        marginBottom: 12
+    },
+    countryBoxSmall: {
+        width: 84,
+        height: 50,
+    },
+    countryPickerContainer: {
+        height: '100%',
+        justifyContent: 'center'
+    },
+    countryPickerSmall: {
+        height: 50,
+        color: colors.BLACK,
+        fontFamily: fonts.Regular,
+        fontSize: 13,
+        width: '100%',
+        paddingHorizontal: 12,
+        paddingVertical: 0,
+        lineHeight: 50,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#E2E9EC',
+        backgroundColor: colors.WHITE,
+        textAlignVertical: 'center',
+        textAlign: 'center'
+    },
+    contactInputWrap: {
+        flex: 1
+    },
+    inputPhone: {
+        paddingVertical: 0,
+        lineHeight: 44
     },
     form: {
         alignItems: 'center',
@@ -425,19 +522,21 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     passwordIcon: {
-        width:"10%"
+        width:"10%",
+        height:45,
+        justifyContent:"center",
     },
     passWordBox:{
         borderWidth: 1,
         borderRadius: 10,
         paddingLeft: 10,
         width: width-25,
-        borderColor: colors.SHADOW,
-        justifyContent:"space-around",
-        paddingVertical:15,
+        borderColor: '#E2E9EC',
+        justifyContent:"center",
+        height:45
     },
     passwordBoxFocused:{
-        paddingVertical:15,
+        //paddingVertical:12,
     },
     passwordInput:{
         width: "90%",
@@ -446,15 +545,15 @@ const styles = StyleSheet.create({
     },
     textInputStyle: {
         borderWidth: 1,
-        borderColor: colors.SHADOW,
+        borderColor: '#E2E9EC',
         paddingVertical: 15,
         borderRadius: 10,
         paddingLeft: 10,
         paddingRight: 10,
-        fontFamily:fonts.Bold
+        fontFamily: fonts.Regular
     },
     inputFocused: {
-        paddingVertical: 12,
+        paddingVertical: 14,
     },
     inputContainerStyle: {
         width: "100%",
@@ -473,8 +572,13 @@ const styles = StyleSheet.create({
     },
     registerButton: {
         width: '100%',
+        backgroundColor: '#1369B4',
         borderRadius: 10,
-        marginBottom: 5
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+        marginBottom: 5,
     },
     loadingBox: {
         position: 'absolute',
@@ -487,10 +591,9 @@ const styles = StyleSheet.create({
         elevation: 0
     },
     buttonStyle: {
-        paddingVertical: 3,
-        fontSize: 22,
-        fontFamily: fonts.Bold,
         color: colors.WHITE,
+        fontSize: 16,
+        fontFamily: fonts.Bold,
     },
     pickerStyle: {
         fontSize: 15,
@@ -504,7 +607,7 @@ const styles = StyleSheet.create({
     },
     RnpickerBox: {
         width: "100%",
-        height:60,
+        height:50,
         overflow: 'hidden',
         flexDirection: 'row',
         borderWidth: 1,
@@ -530,10 +633,29 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     headerStyle: {
-        fontSize: 35,
+        fontSize: 28,
         color: colors.BLACK,
-        flexDirection: 'row',
-        fontFamily:fonts.Bold
+        fontFamily: fonts.Bold,
+        width: '100%'
+    },
+    headerContainer: {
+        marginBottom: 20,
+        width: width-25,
+        alignSelf: 'center'
+    },
+    headerSubtitle: {
+        fontSize: 14,
+        color: '#A7A9AC',
+        marginTop: 4,
+        fontFamily: fonts.Regular,
+        width: '100%'
+    },
+    inputLabel: {
+        width: '100%',
+        fontSize: 13,
+        color: '#A7A9AC',
+        marginBottom: 6,
+        fontFamily: fonts.Bold
     },
     capturePhoto: {
         width: '60%',

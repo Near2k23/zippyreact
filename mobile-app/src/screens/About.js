@@ -4,11 +4,11 @@ import {
     StyleSheet,
     View,
     Text,
-    Image,
     ScrollView,
-    Animated,
     Dimensions,
-    useColorScheme
+    useColorScheme,
+    TouchableOpacity,
+    Linking
 } from 'react-native';
 import i18n from 'i18n-js';
 import { useSelector } from "react-redux";
@@ -26,65 +26,75 @@ export default function AboutPage(props) {
     const [mode, setMode] = useState();
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
+    const handlePhonePress = () => {
+        if (settings.CompanyPhone) {
+            Linking.openURL(`tel:${settings.CompanyPhone}`);
+        }
+    };
+
+    const handleEmailPress = () => {
+        if (settings.contact_email) {
+            Linking.openURL(`mailto:${settings.contact_email}`);
+        }
+    };
+
+    const handleWebsitePress = () => {
+        if (settings.CompanyWebsite) {
+            Linking.openURL(settings.CompanyWebsite);
+        }
+    };
+
     return (
-        <View style={[styles.mainView,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-            <ScrollView showsVerticalScrollIndicator={false} style={{height:'100%'}}>
-                <View style={{flex:1}}>
-                    <View style={styles.logo}>
-                        <Image
-                            style={{ width: width/2.5, height: width/2.5, borderRadius: 10 }}
-                            source={require('../../assets/images/logo1024x1024.png')}
-                        />
-                    </View>
+        <View style={[styles.mainView, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContainer}>
+                <View style={styles.contentSection}>
+                    <Text style={[styles.description, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left'}]}>
+                        {t('about_us_content1')}
+                    </Text>
+                    
+                    <Text style={[styles.description, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left'}]}>
+                        {t('about_us_content2')}
+                    </Text>
                 </View>
-                <Text style={{ textAlign: isRTL? 'right' : 'left', fontSize: 16, marginHorizontal:20,marginBottom:20, fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>
-                    {t('about_us_content1') + ' ' + t('about_us_content2')}
-                </Text>
-                {settings && (settings.CompanyPhone || settings.contact_email || settings.CompanyWebsite)?
-                <View style={{ marginBottom: 20}}>
+
+                {settings && (settings.CompanyPhone || settings.contact_email || settings.CompanyWebsite) ?
+                <View style={styles.contactSection}>
                     {settings.CompanyPhone ?
-                        <View style={[styles.vew, {flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center'}]}>
-                            <View style={[styles.vewLogo, mode === 'dark'? styles.shadowBackDark : styles.shadowBack]}>
-                                <Ionicons name="call" size={30} color= {mode === 'dark'? colors.WHITE : colors.BLACK} />
-                            </View>
-                            <View style={styles.textpart}>
-                                <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK , fontFamily:fonts.Bold, fontSize: 14, textAlign: isRTL ? "right" : "left" }}>{t('contact_us')}</Text>
-                                <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK , fontFamily:fonts.Bold, fontSize: 12, textAlign: isRTL ? "right" : "left" }}>{settings.CompanyPhone}</Text>
-                            </View>
-                        </View>
+                        <TouchableOpacity onPress={handlePhonePress} style={[styles.contactBox, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                            <Ionicons name="call" size={18} color={colors.HEADER} />
+                            <Text style={[styles.contactText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
+                                {settings.CompanyPhone}
+                            </Text>
+                        </TouchableOpacity>
                     : null }
+                    
                     {settings.contact_email ?
-                        <View style={[styles.vew, {flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center'}]}>
-                            <View style={[styles.vewLogo, mode === 'dark'? styles.shadowBackDark : styles.shadowBack]}>
-                                <MaterialIcons name="email" size={30} color= {mode === 'dark'? colors.WHITE : colors.BLACK} />
-                            </View>
-                            <View style={styles.textpart}>
-                                <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK , fontFamily:fonts.Bold, fontSize: 14, textAlign: isRTL ? "right" : "left" }}>{t('email')}</Text>
-                                <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK , fontFamily:fonts.Bold, fontSize: 12, textAlign: isRTL ? "right" : "left" }}>{settings.contact_email}</Text>
-                            </View>
-                        </View>
+                        <TouchableOpacity onPress={handleEmailPress} style={[styles.contactBox, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                            <MaterialIcons name="email" size={18} color={colors.HEADER} />
+                            <Text style={[styles.contactText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
+                                {settings.contact_email}
+                            </Text>
+                        </TouchableOpacity>
                     : null }
+                    
                     {settings.CompanyWebsite ?
-                        <View style={[styles.vew, {flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center'}]}>
-                            <View style={[styles.vewLogo, mode === 'dark'? styles.shadowBackDark : styles.shadowBack]}>
-                                <MaterialCommunityIcons name="web" size={30} color= {mode === 'dark'? colors.WHITE : colors.BLACK} />
-                            </View>
-                            <View style={styles.textpart}>
-                                <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK , fontFamily:fonts.Bold, fontSize: 14, textAlign: isRTL ? "right" : "left" }}>{t('CompanyWebsite')}</Text>
-                                <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK , fontFamily:fonts.Bold, fontSize: 12, textAlign: isRTL ? "right" : "left" }}>{settings.CompanyWebsite}</Text>
-                            </View>
-                        </View>
+                        <TouchableOpacity onPress={handleWebsitePress} style={[styles.contactBox, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                            <MaterialCommunityIcons name="web" size={18} color={colors.HEADER} />
+                            <Text style={[styles.contactText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
+                                {settings.CompanyWebsite}
+                            </Text>
+                        </TouchableOpacity>
                     : null }
                 </View>
                 : null }
@@ -98,70 +108,36 @@ const styles = StyleSheet.create({
     mainView: {
         flex: 1
     },
-    vew: {
+    scrollContainer: {
         flex: 1,
-        height: 55,
-        width: width-40,
-        marginVertical: 6,
-        alignSelf: 'center'
+        paddingHorizontal: 15,
     },
-    logo:{
-        width: width/2.5,
-        height: width/2.5,
-        marginTop: 10,
-        marginBottom: 25,
-        alignSelf: 'center',
-        backgroundColor: colors.WHITE,
-        shadowColor: colors.BLACK,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 1,
-        borderRadius: 10
+    contentSection: {
+        marginBottom: 20,
+        marginTop: 15
     },
-    vewLogo: {
-        width: 50,
+    description: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        lineHeight: 20,
+        marginBottom: 10
+    },
+    contactSection: {
+        marginBottom: 20
+    },
+    contactBox: {
+        flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 10,
-        marginHorizontal: 2,
-        padding: 10,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        elevation: 2
+        padding: 12,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: colors.HEADER + '30',
+        borderRadius: 6
     },
-    shadowBack: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.WHITE,
-    },
-    shadowBackDark: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.PAGEBACK,
-    },
-    textpart: {
-        width: width-110,
-        marginHorizontal: 2,
-        padding: 10 ,
-        flexDirection: 'column'
-    },
-    linearGradient: {
-        flex: 1,
-        paddingLeft: 15,
-        paddingRight: 15,
-        borderRadius: 5
-    },
-    buttonText: {
-        fontSize: 18,
-        fontFamily: 'Gill Sans',
-        textAlign: 'center',
-        margin: 10,
-        color: '#ffffff',
-        backgroundColor: 'transparent',
-    },
+    contactText: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        marginLeft: 10,
+        flex: 1
+    }
 })

@@ -68,14 +68,14 @@ export default function ProfileScreen(props) {
     const [mode, setMode] = useState();
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
@@ -457,284 +457,178 @@ export default function ProfileScreen(props) {
         }
     }
 
-    const lCom = () => {
-        return (
-            <TouchableOpacity style={{ marginLeft: 10 }} onPress={onPressBack}>
-                <FontAwesome5 name="arrow-left" size={24} color={colors.WHITE} />
-            </TouchableOpacity>
-        );
-    }
-
     React.useEffect(() => {
         props.navigation.setOptions({
-            headerLeft: lCom,
+            headerShown: false,
         });
     }, [props.navigation]);
 
+    const CustomHeader = ({ title, navigation }) => (
+        <View style={{
+            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
+            paddingTop: Platform.OS === 'ios' ? 50 : 30,
+            paddingHorizontal: 20,
+            paddingBottom: 15,
+            elevation: 0,
+            shadowOpacity: 0,
+        }}>
+            <TouchableOpacity 
+                onPress={onPressBack}
+                style={{ 
+                    width: 40, 
+                    height: 40, 
+                    justifyContent: 'center', 
+                    alignItems: isRTL ? 'flex-end' : 'flex-start' 
+                }}
+            >
+                <Icon
+                    name={isRTL ? 'arrow-right' : 'arrow-back'}
+                    type='ionicon'
+                    color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                    size={24}
+                />
+                            </TouchableOpacity>
+            <Text style={{
+                fontFamily: fonts.Bold,
+                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                fontSize: 20,
+                marginTop: 8,
+                marginLeft: isRTL ? 0 : 0,
+                textAlign: isRTL ? 'right' : 'left',
+            }}>
+                {title}
+            </Text>
+                    </View>
+    );
+
 
     return (
-        <View style={styles.mainView}>
-            <View style={{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}>
-                <View style={[styles.profileInfo,{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
-                    <View style={styles.imageViewStyle} >
-                        {loader ?
-                            <View style={[styles.loadingcontainer, styles.horizontal]}>
-                                <ActivityIndicator size="large" color={colors.BLUE} />
-                            </View>
-                            : <TouchableOpacity onPress={showActionSheet}>
-                                <Image source={profileData && profileData.profile_image ? { uri: profileData.profile_image } : require('../../assets/images/profilePic.png')} style={{ width: 95, height: 95, alignSelf: 'center', borderRadius: 95 / 2 }} />
-                            </TouchableOpacity>
-                        }
-
-                    </View>
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', marginHorizontal: 20, paddingRight: 15, }}>
-                        {editName ?
-                            <View style={[isRTL ? { flexDirection: 'row-reverse', width: '100%' } : { flexDirection: 'row', marginLeft: 0, width: '100%', height: 50 }]}>
-                                <Input
-                                    editable={true}
-                                    underlineColorAndroid={colors.TRANSPARENT}
-                                    placeholder={t('first_name_placeholder')}
-                                    placeholderTextColor={colors.SHADOW}
-                                    value={profileData && profileData.firstName ? profileData.firstName : ""}
-                                    keyboardType={'email-address'}
-                                    inputStyle={[styles.inputTextStyle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL ? { textAlign: 'right', fontSize: 13, } : { textAlign: 'left', fontSize: 13 }]}
-                                    onChangeText={(text) => { setProfileData({ ...profileData, firstName: text }) }}
-                                    secureTextEntry={false}
-                                    errorStyle={styles.errorMessageStyle}
-                                    inputContainerStyle={styles.inputContainerStyle}
-                                    containerStyle={{ width: "50%" }}
-                                />
-                                <Input
-                                    editable={true}
-                                    underlineColorAndroid={colors.TRANSPARENT}
-                                    placeholder={t('last_name_placeholder')}
-                                    placeholderTextColor={colors.SHADOW}
-                                    value={profileData && profileData.lastName ? profileData.lastName : ""}
-                                    keyboardType={'email-address'}
-                                    inputStyle={[styles.inputTextStyle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL ? { textAlign: 'right', fontSize: 13 } : { textAlign: 'left', fontSize: 13 }]}
-                                    onChangeText={(text) => { setProfileData({ ...profileData, lastName: text }) }}
-                                    secureTextEntry={false}
-                                    errorStyle={styles.errorMessageStyle}
-                                    inputContainerStyle={styles.inputContainerStyle}
-                                    containerStyle={isRTL ? { marginLeft: 0, width: "50%" } : { marginRight: 0, width: "50%" }}
-                                />
-                            </View>
-                            :
-                            <View style={{ width: '100%' }}>
-                                {isRTL ?
-                                    <Text numberOfLines={1} style={[styles.textPropStyle, [isRTL ? { marginRight: 35 } : { marginLeft: 40 }, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]]} >{auth.profile && (auth.profile.firstName && auth.profile.lastName) ? auth.profile.lastName.toUpperCase() + " " + auth.profile.firstName.toUpperCase() : t('no_name')}</Text>
-                                    :
-                                    <Text numberOfLines={1} style={[styles.textPropStyle, [isRTL ? { marginRight: 35 } : { marginLeft: 40 }, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]]} >{auth.profile && (auth.profile.firstName && auth.profile.lastName) ? auth.profile.firstName.toUpperCase() + " " + auth.profile.lastName.toUpperCase() : t('no_name')}</Text>
-                                }
-                            </View>
-                        }
-                        {editName ?
-                            <View style={{ marginTop: -18,paddingLeft:isRTL?15:0, }}>
-                                <Entypo name="cross" size={24} color={colors.RED} onPress={() => cancle(0)} />
-                                <MaterialIcons onPress={saveName} name="check" size={24} style={{ marginTop: 10 }} color={colors.BLUE} />
-                            </View>
-                            :
-                            <TouchableOpacity onPress={() => setEditName(true)}  style={[{marginLeft:isRTL?20:0}]}>
-                                <Feather name="edit-3" size={22} color={colors.SHADOW} style={{ marginTop: 10 }} />
-                            </TouchableOpacity>
-                        }
-                    </View>
-                </View>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={[styles.scrollStyle, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-                {
-                    uploadImage()
-                }
-                <View style={[styles.newViewStyle,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-
-                    <View style={[styles.myViewStyle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { flexDirection: isRTL ? 'row-reverse' : 'row', height: editEmail ? 74 : 64 }]}>
-                        <View style={styles.iconViewStyle}>
-                            <Entypo name="email" size={25} color={colors.SHADOW} />
-                        </View>
-                        <View style={[isRTL ? { marginRight: 15, width: width - 70 } : { width: width - 70}]}>
-                            <Text style={[mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]}>{t('email_placeholder')}</Text>
-                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', paddingRight: 15, }}>
-                                {editEmail ?
-                                    <View style={{ width: width - 140 }}>
-                                        <TextInput
-                                            style={[mode === 'dark' ? styles.dataInfoDark : styles.dataInfo, { borderBottomColor: colors.SHADOW, borderBottomWidth: 1, height: editEmail ? 40 : null }]}
-                                            placeholder={t('email_placeholder')}
-                                            placeholderTextColor={colors.SHADOW}
-                                            value={profileData && profileData.email ? profileData.email : ''}
-                                            keyboardType={'email-address'}
-                                            onChangeText={(text) => { setProfileData({ ...profileData, email: text }) }}
-                                            secureTextEntry={false}
-                                            blurOnSubmit={true}
-                                            errorStyle={styles.errorMessageStyle}
-                                            inputContainerStyle={[styles.inputContainerStyle, { height: 50 }]}
-                                            autoCapitalize='none'
+        <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+            <CustomHeader title={t('profile_setting_menu')} navigation={props.navigation} />
+            
+            <View style={styles.profileImageSection}>
+                <TouchableOpacity style={styles.profileImageContainer} onPress={showActionSheet}>
+                    {loader ? (
+                        <View style={styles.profileImageLoader}>
+                            <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                            </View>
+                                        ) : (
+                        <View style={styles.profileImageWrapper}>
+                            <Image 
+                                source={profileData && profileData.profile_image ? 
+                                    { uri: profileData.profile_image } : 
+                                    require('../../assets/images/profilePic.png')
+                                } 
+                                style={styles.profileImage} 
                                         />
                                     </View>
-                                    :
-                                    <View style={{ marginTop: 1, width: width - 140, }}>
-                                        <Text style={[mode === 'dark' ? styles.dataInfoDark : styles.dataInfo, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]} numberOfLines={1}>{profileData && profileData.email ? profileData.email : t('email_placeholder')}</Text>
-                                    </View>
-                                }
-
-                                {editEmail ?
-                                    <View style={[{marginLeft:isRTL?15:0,width:'auto'}]}>
-                                        {emailLoading ?
-                                            <ActivityIndicator color={mode === 'dark' ? colors.WHITE : colors.BLACK} size='small' />
-                                            :
-                                            <View style={{ marginTop: -18, }}>
-                                                <Entypo name="cross" size={24} color={colors.RED} onPress={() => cancle(1)} />
-                                                <MaterialIcons onPress={() => saveProfile(1)} name="check" size={24} style={{ marginTop: 10 }} color={colors.BLUE} />
-                                            </View>
-                                        }
-                                    </View>
-                                    :
-                                    <TouchableOpacity onPress={() => setEditEmail(true)} style={[{marginLeft:isRTL?20:10}]}>
-                                        <Feather name="edit-3" size={22} color={colors.SHADOW} />
+                    )}
                                     </TouchableOpacity>
-                                }
-                            </View>
-                        </View>
                     </View>
 
-                    <View style={[styles.myViewStyle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { flexDirection: isRTL ? 'row-reverse' : 'row', height: editMobile ? 74 : 64 }]}>
-                        <View style={[styles.iconViewStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <Icon
-                                name='phone-call'
-                                type='feather'
-                                size={25}
-                                color={colors.SHADOW}
-                            />
-
+            <View style={styles.userNameSection}>
+                <Text style={[styles.userName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                    {auth.profile && (auth.profile.firstName && auth.profile.lastName) 
+                        ? `${auth.profile.firstName} ${auth.profile.lastName}`
+                        : ''}
+                </Text>
                         </View>
-                        <View style={[{ marginVertical:2 },[isRTL ? { marginRight: 15, width: width - 70 } : { width: width - 70 }]]}>
-                            
-                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems:"center", paddingRight: 15, marginVertical:3}}>
-                                {editMobile ?
-                                    <View style={{ width: width - 140, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems:"center", justifyContent:"space-between" }}>
 
-                                        <View style={{ width: "35%", height:"100%", flexDirection: "column", justifyContent:"space-around" }}>
-                                            <Text style={[mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }, {fontSize:12}]}>{t('select_country')}</Text>
-                                            <TouchableOpacity activeOpacity={0.5} style={[styles.RnpickerBox, { flexDirection: isRTL ? 'row-reverse' : "row",               justifyContent:'space-between', }]} 
-                                                disabled={settings.AllowCountrySelection}
-                                                >
-                                                <View style={{ overflow: "hidden", height: '100%', width: "100%",}} >
-                                                    <RNPickerSelect
-                                                        numberOfLines={1}
-                                                        pickerRef={pickerRef2}
-                                                        onFocus={() => setCountryCodeFocus(!countrycodeFocus)}
-                                                        onBlur={() => setCountryCodeFocus(!countrycodeFocus)}
-                                                        key={countryCode}
-                                                        placeholder={{ label: t('select_country'), value: t('select_country') }}
-                                                        value={countryCode}
-                                                        textInputProps={{
-                                                            maxLength: 40,
-                                                            styles: {
-                                                                overflow: 'hidden',
-                                                                textOverflow: 'ellipsis',
-                                                            }
-                                                        }}
-
-                                                        useNativeAndroidPickerStyle={false}
-                                                        style={{
-                                                            inputIOS: [styles.pickerStyle, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start', color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (countrycodeFocus === true) ? styles.pickerFocus
-                                                                : styles.pickerStyle],
-                                                            placeholder: {
-                                                                color: colors.SHADOW
-                                                            },
-                                                            inputAndroid: [styles.pickerStyle, { textAlign: isRTL ? 'right' : 'left', alignSelf: isRTL ? 'flex-end' : 'flex-start', color: mode === 'dark' ? colors.WHITE : colors.fbgf }, (countrycodeFocus === true) ? styles.pickerFocus
-                                                                : styles.pickerStyle]
-                                                        }}
-                                                        onTap={() => {
-                                                            if(settings){
-                                                                if(settings.AllowCountrySelection){
-                                                                    pickerRef2.current.focus() 
-                                                                }
-                                                            }
-                                                    
-                                                        }}
-                                                        onValueChange={(text) => { upDateCountry(text); }}
-                                                        items={formatCountries}
-                                                        disabled={settings.AllowCountrySelection ? false : true}
-                                                        Icon={() => { return <Ionicons name="arrow-down" size={18} color={colors.SHADOW} style={[isRTL ? { marginLeft: -(width - 80) } : { marginRight: Platform.OS == "ios" ? -1 : 1  }, {margin:5}]} />; }}
-                                                    />
-
-                                                </View>
-                                            </TouchableOpacity>
+            <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+                <View style={styles.fieldContainer}>
+                    <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                        {t('name')}
+                    </Text>
+                                        <TextInput
+                        style={[styles.fieldInput, { 
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                            backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+                        }]}
+                        value={profileData ? `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() : ''}
+                        onChangeText={(text) => {
+                            const nameParts = text.split(' ');
+                            setProfileData({ 
+                                ...profileData, 
+                                firstName: nameParts[0] || '', 
+                                lastName: nameParts.slice(1).join(' ') || ''
+                            });
+                        }}
+                        placeholder={t('name')}
+                        placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                                        />
                                         </View>
 
-                                        <View style={{ width: "60%", height:"100%", flexDirection: "column", justifyContent:"space-around",  }}>
-                                            <Text style={[mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }, {fontSize:12}]}>{t('mobile')}</Text>
+                {/* Email Field */}
+                <View style={styles.fieldContainer}>
+                    <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                        {t('email')}
+                    </Text>
                                             <TextInput
-                                                style={[
-                                                    mode === 'dark' ? styles.dataInfoDark : styles.dataInfo, 
-                                                    { borderBottomColor: colors.SHADOW, borderBottomWidth: 1, width:"100%" }, 
-                                                    isRTL ? { textAlign: 'right', fontSize: 16 } : { textAlign: 'left', fontSize: 16 }
-                                                ]}
-                                                placeholder={t('mobile')}
-                                                placeholderTextColor={colors.SHADOW}
-                                                value={userMobile?.replace(`+${countryCode.replace(/[^0-9]/g, '')}`, '')}
-                                                keyboardType={'phone-pad'}
-                                                onChangeText={(text) => {
-                                                    let extNum = countryCode.replace(/[^0-9]/g, '');
-                                                    setUserMobile(`+${extNum}${text}`)
-                                                    setProfileData({ ...profileData, mobile: `+${extNum}${text}` });
-                                                }}
-                                                secureTextEntry={false}
-                                                errorStyle={styles.errorMessageStyle}
-                                                inputContainerStyle={[styles.inputContainerStyle, { height: 50 }]}
-                                            />
+                        style={[styles.fieldInput, { 
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                            backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+                        }]}
+                        value={profileData?.email}
+                        onChangeText={(text) => setProfileData({ ...profileData, email: text })}
+                        placeholder={t('email')}
+                        placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
                                         </View>
-                                    </View>
-                                    :
-                                    <View style={{ width: width - 140, marginVertical: 1 }}>
-                                        <Text style={[mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]}>{t('mobile')}</Text>
-                                        <Text style={[mode === 'dark' ? styles.dataInfoDark : styles.dataInfo, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }, {}]} >{auth?.profile?.mobile ? auth.profile.mobile : t('mobile')}</Text>
-                                    </View>
-                                }
-                                {editMobile ?
-                                    <TouchableOpacity onPress={() => saveProfile(2)} style={[{marginLeft:isRTL?15:0}]}>
-                                        {mobileLoading ?
-                                            <ActivityIndicator color={mode === 'dark' ? colors.WHITE : colors.BLACK} size='small' />
-                                            :
-                                            <View style={{  }}>
-                                                <Entypo name="cross" size={24} color={colors.RED} onPress={() => cancle(2)} />
-                                                <MaterialIcons onPress={() => saveProfile(2)} name="check" size={24} style={{ marginTop: 10 }} color={colors.BLUE} />
-                                            </View>
-                                        }
-                                    </TouchableOpacity>
-                                    :
-                                    <TouchableOpacity onPress={() => setEditMobile(true)}  style={[{marginLeft:isRTL?20:0}]}>
-                                        <Feather name="edit-3" size={22} color={colors.SHADOW} />
-                                    </TouchableOpacity>
-                                }
-                            </View>
-                        </View>
+
+                <View style={styles.fieldContainer}>
+                    <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                        {t('mobile')}
+                    </Text>
+                                            <TextInput
+                        style={[styles.fieldInput, { 
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                            backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+                        }]}
+                        value={profileData?.mobile || ''}
+                        onChangeText={(text) => setProfileData({ ...profileData, mobile: text })}
+                                                placeholder={t('mobile')}
+                        placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                        keyboardType="phone-pad"
+                    />
                     </View>
 
-                    {langSelection && languagedata && languagedata.langlist && languagedata.langlist.length > 1 ?
-                        <View style={[styles.myViewStyle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <View style={styles.iconViewStyle}>
-                                <Ionicons name="language-sharp" size={25} color={colors.SHADOW} />
-                            </View>
-                            <View style={{ alignSelf: isRTL ? 'flex-end' : 'flex-start' }}>
-                                <Text style={[mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader, [isRTL ? { textAlign: 'right', marginRight: 15 } : { textAlign: 'left', marginRight: 15 }]]}>{t('lang')}</Text>
-                                {langSelection ?
+                {langSelection && languagedata && languagedata.langlist && languagedata.langlist.length > 1 && (
+                    <View style={styles.fieldContainer}>
+                        <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                            {t('language')}
+                        </Text>
+                        <View style={[styles.fieldInput, { 
+                            backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5',
+                            paddingVertical: 0,
+                            paddingHorizontal: 0,
+                        }]}>
                                     <RNPickerSelect
                                         pickerRef={pickerRef1}
                                         placeholder={{}}
                                         value={langSelection}
                                         useNativeAndroidPickerStyle={false}
                                         style={{
-                                            inputIOS: [styles.pickerStyle,{ color: mode === 'dark' ? colors.WHITE : colors.BLACK }, [isRTL ? { marginRight: 0, textAlign: 'right' } : { marginLeft: 15, textAlign: 'left' }]],
-                                            inputAndroid: [styles.pickerStyleAndroid,{ color: mode === 'dark' ? colors.WHITE : colors.BLACK }, [isRTL ? { marginRight: 0, textAlign: 'right' } : { marginLeft: 10, textAlign: 'left' }]],
+                                    inputIOS: {
+                                        fontSize: 14,
+                                        fontFamily: fonts.Regular,
+                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                        paddingVertical: 12,
+                                        paddingHorizontal: 12,
+                                    },
+                                    inputAndroid: {
+                                        fontSize: 14,
+                                        fontFamily: fonts.Regular,
+                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                        paddingVertical: 12,
+                                        paddingHorizontal: 12,
+                                    },
                                             placeholder: {
-                                                color: colors.SECONDARY
+                                        color: mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'
                                             }
                                         }}
-                                        onTap={() => { pickerRef1.current.focus() }}
-                                        onValueChange={
-                                            (text) => {
+                                onValueChange={(text) => {
                                                 let defl = null;
                                                 for (const value of Object.values(languagedata.langlist)) {
                                                     if (value.langLocale == text) {
@@ -747,269 +641,146 @@ export default function ProfileScreen(props) {
                                                 setIsRTL(text == 'he' || text == 'ar')
                                                 AsyncStorage.setItem('lang', JSON.stringify({ langLocale: text, dateLocale: defl.dateLocale }));
                                                 dispatch(updateProfile({ lang: { langLocale: text, dateLocale: defl.dateLocale } }));
-                                            }
-                                        }
-                                        label={"Language"}
-                                        items={Object.values(languagedata.langlist).map(function (value) { return { label: value.langName, value: value.langLocale }; })}
-                                        Icon={() => { return <Ionicons name="arrow-down" size={20} color={colors.SHADOW} style={[isRTL ? { marginLeft: -(width - 80) } : { marginRight: Platform.OS == "ios" ? -8 : 10 }]} />; }}
-                                    />
-                                    : null}
-                            </View>
-                        </View>
-                        : null}
-
-                    {profileData && profileData.referralId ?
-                        <View style={[styles.myViewStyle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <View style={[styles.iconViewStyle, { flexDirection: isRTL ? 'row-reverse' : 'row', }]}>
-                                <Icon
-                                    name='award'
-                                    type='feather'
-                                    color={colors.SHADOW}
-                                    size={25}
-                                />
-                            </View>
-                            <View style={[isRTL ? { marginRight: 15 } : null]}>
-                                <Text style={mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader}>{t('referralId')}</Text>
-                                <Text style={[mode === 'dark' ? styles.dataInfoDark : styles.dataInfo, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]} >{profileData.referralId}</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={[isRTL ? { marginRight: 10, marginTop: 15 } : { marginLeft: 10, marginTop: 15 }]}
-                                onPress={() => {
-                                    settings.bonus > 0 ?
-                                        Share.share({
-                                            message: t('share_msg') + settings.code + ' ' + settings.bonus + ".\n" + t('code_colon') + auth.profile.referralId + "\n" + t('app_link') + (Platform.OS == "ios" ? settings.AppleStoreLink : settings.PlayStoreLink)
-                                        })
-                                        :
-                                        Share.share({
-                                            message: t('share_msg_no_bonus') + "\n" + t('app_link') + (Platform.OS == "ios" ? settings.AppleStoreLink : settings.PlayStoreLink)
-                                        })
                                 }}
-                            >
-                                <Icon
-                                    name={Platform.OS == 'android' ? 'share-social' : 'share'}
-                                    type='ionicon'
-                                    color={colors.BLUE}
-                                />
-                            </TouchableOpacity>
-                        </View>
-                        : null}
-                    {profileData && profileData.usertype == 'driver' ?
-                        <View style={[styles.myViewStyle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <View style={[styles.iconViewStyle, { flexDirection: isRTL ? 'row-reverse' : 'row', }]}>
-                                <Ionicons name="car-sport-outline" size={25} color={colors.SHADOW} />
-                            </View>
-                            <View style={[isRTL ? { marginRight: 15 } : null]}>
-                                <Text style={mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader}>{t('car_type')}</Text>
-                                <Text style={mode === 'dark' ? styles.dataInfoDark : styles.dataInfo}>{profileData.carType && t(getLangKey(profileData.carType))}</Text>
-                            </View>
-                        </View>
-                        : null}
-                    {profileData && profileData.usertype == 'driver' ?
-                        <View style={[styles.myViewStyle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <View style={[styles.iconViewStyle, { flexDirection: isRTL ? 'row-reverse' : 'row', }]}>
-                                <MaterialCommunityIcons name="star-shooting-outline" size={25} color={colors.SHADOW} />
-                            </View>
-                            <View style={[isRTL ? { marginRight: 15 } : null]}>
-                                <Text style={[mode === 'dark' ? styles.dataHeaderDark : styles.dataHeader, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]}>{t('you_rated_text')}</Text>
-                                <View style={[{ flex: 1 }, isRTL ? { alignSelf: 'flex-end', flexDirection: 'row-reverse' } : { alignSelf: 'flex-start', flexDirection: 'row' }]}>
-                                    <Text style={[mode === 'dark' ? styles.dataInfoDark : styles.dataInfo, isRTL ? { color: mode === 'dark' ? colors.WHITE : colors.BLACK } : { left: 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{profileData && profileData.usertype && profileData.rating ? profileData.rating : 0}</Text>
-                                    <StarRating
-                                        maxStars={5}
-                                        starSize={15}
-                                        enableHalfStar={true}
-                                        color={colors.STAR}
-                                        emptyColor={colors.STAR}
-                                        rating={profileData && profileData.usertype && profileData.rating ? (Math.round(parseFloat(profileData.rating) * 2) / 2) : 0}
-                                        style={[styles.contStyle, isRTL ? { marginRight: 10, transform: [{ scaleX: -1 }] } : { marginLeft: 10 }]}
-                                        onChange={() => {
-                                            //console.log('hello')
-                                        }}
+                                items={Object.values(languagedata.langlist).map(function (value) { 
+                                    return { label: value.langName, value: value.langLocale }; 
+                                })}
+                                Icon={() => { 
+                                    return (
+                                        <MaterialIcons 
+                                            name="keyboard-arrow-down" 
+                                            size={20} 
+                                            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
+                                            style={{ marginRight: 12, marginTop: 12 }}
+                                        />
+                                    ); 
+                                }}
+                                        mode={mode}
                                     />
-                                </View>
                             </View>
                         </View>
-                        : null}
-                </View>
+                )}
 
-                <TouchableOpacity onPress={deleteAccount} style={styles.deleteBtn}>
-                    {dloading ?
-                        <ActivityIndicator color={mode === 'dark' ? colors.WHITE : colors.BLACK} size='small' />
-                        :
-                        <Text style={[styles.deleteBtnText, { color: colors.WHITE, paddingHorizontal: 10 }]}>{t('delete_account_lebel')}</Text>
-                    }
-                </TouchableOpacity>
-                <Dialog.Container visible={otpCalled}>
-                    <Dialog.Description style={{ color: colors.HEADER, fontWeight: 'bold' }}>{auth.profile && profileData && (auth.profile.mobile != profileData.mobile) ? t('check_mobile') : t('check_email')}</Dialog.Description>
-                    <Dialog.Input placeholder={t('otp_here')} placeholderTextColor={colors.HEADER} keyboardType='numeric' onChangeText={(otp) => setOtp(otp)} style={{ color: colors.HEADER, textAlign: isRTL ? 'right' : 'left' }}></Dialog.Input>
-                    <Dialog.Button label={t('cancel')} onPress={handleClose} style={{ marginRight: 15, color: colors.HEADER }} />
-                    <Dialog.Button label={t('ok')} onPress={handleVerify} style={{ marginRight: 10, color: colors.BLUE }} />
-                </Dialog.Container>
+                {profileData && profileData.referralId && (
+                    <View style={styles.fieldContainer}>
+                        <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                            {t('referralId')}
+                        </Text>
+                        <TextInput
+                            style={[styles.fieldInput, { 
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+                            }]}
+                            value={profileData.referralId}
+                            editable={false}
+                            placeholder={t('referralId')}
+                            placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                                />
+                            </View>
+                )}
+
+                            <TouchableOpacity
+                    style={[styles.updateButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                onPress={() => {
+                        if (profileData.firstName && profileData.lastName) {
+                            let userData = {
+                                firstName: profileData.firstName,
+                                lastName: profileData.lastName,
+                                email: profileData.email,
+                                mobile: profileData.mobile
+                            };
+                            setUpdateCalled(true);
+                            dispatch(updateProfile(userData));
+                        }
+                    }}
+                >
+                    {loading ? (
+                        <ActivityIndicator color={colors.WHITE} size="small" />
+                    ) : (
+                        <Text style={styles.updateButtonText}>{t('save')}</Text>
+                    )}
+                            </TouchableOpacity>
             </ScrollView>
+
+            {uploadImage()}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    scrollStyle: {
-        height: height
-    },
-    profileInfo: {
-        width: '100%',
-        marginTop: 50,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        alignItems: 'center'
-    },
-    imageViewStyle: {
-        backgroundColor: colors.WHITE,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 5,
-        },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 3,
-        width: 100,
-        height: 100,
-        alignSelf: 'center',
-        borderRadius: 100 / 2,
-        marginTop: -45,
-        overflow: 'hidden',
-        justifyContent: 'center'
-    },
-    textPropStyle: {
-        fontSize: 21,
-        fontFamily: fonts.Bold,
-        textTransform: 'uppercase',
-        textAlign: 'center',
-        marginTop: 10
-    },
-    newViewStyle: {
-        flex: 1,
-        marginTop: 10,
-        marginHorizontal: 10,
-    },
-    myViewStyle: {
-        flex: 1,
-        borderBottomColor: colors.SHADOW,
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.2,
-        shadowRadius: 3,
-        elevation: 2,
-        marginBottom: 10,
-        height: 64,
-        borderRadius: 15,
-        width: '100%',
-    },
-    shadowBack: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.WHITE,
-    },
-    shadowBackDark: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.PAGEBACK,
-    },
-    iconViewStyle: {
-        alignSelf: 'center',
-        padding: 10,
-        width: 50
-    },
-    deleteBtn: {
-        flexDirection: 'row',
-        height: 40,
-        minWidth: 150,
-        alignItems: 'center',
-        justifyContent: 'center',
-        alignSelf: 'center',
-        backgroundColor: colors.RED,
-        borderRadius: 10,
-        marginVertical: 15
-    },
-    deleteBtnText: {
-        fontSize: 17,
-        color: colors.BLACK,
-        fontFamily:fonts.Bold,
-        textAlign: 'center',
-        marginVertical: 5
-    },
-    dataHeader: {
-        fontSize: 17,
-        color: colors.BLACK,
-        fontFamily: fonts.Bold
-    },
-    dataHeaderDark: {
-        fontSize: 17,
-        color: colors.WHITE,
-        fontFamily: fonts.Bold
-    },
-    dataInfo: {
-        fontSize: 15,
-        color: colors.BLACK,
-        fontFamily:fonts.Regular,
-    },
-    dataInfoDark: {
-        fontSize: 15,
-        color: colors.WHITE,
-        fontFamily:fonts.Regular,
-    },
     mainView: {
         flex: 1,
-        backgroundColor: colors.WHITE,
     },
-    loadingcontainer: {
-        flex: 1,
-        justifyContent: 'center'
-    },
-    horizontal: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        padding: 10
-    },
-    contStyle: {
-        width: 90,
-    },
-    pickerStyle: {
-        width: width - 100,
-        fontSize: 15,
-        height: 30,
-        fontWeight: 'bold',
-        padding:2
-    },
-    pickerStyleAndroid: {
-        color: colors.HEADER,
-        width: width - 80,
-        fontSize: 15,
-        //height: 30,
-        fontFamily:fonts.Bold
-    },
-    errorMessageStyle: {
-        fontSize: 12,
-        fontFamily:fonts.Bold,
-        marginLeft: 0
-    },
-    inputContainerStyle: {
-        width: "100%",
-    },
-    inputTextStyle: {
-        color: colors.HEADER,
-        fontSize: 13,
-        height: 32,
-        fontFamily:fonts.Regular
-    },
-    RnpickerBox: {
-        width: "100%",
-        height:"50%",
-        overflow: 'hidden',
-        flexDirection: 'row',
-        borderWidth: 1,
-        borderColor: colors.SHADOW,
-        borderRadius: 10,
+    profileImageSection: {
         alignItems: 'center',
-        marginRight:5,
-        paddingHorizontal:5
+        marginVertical: 16,
+    },
+    profileImageContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: '#E2E6EA',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    profileImageWrapper: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    profileImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 12,
+    },
+    profileImageLoader: {
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    userNameSection: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    userName: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+    },
+    formContainer: {
+        flex: 1,
+        paddingHorizontal: 20,
+    },
+    fieldContainer: {
+        marginBottom: 16,
+    },
+    fieldLabel: {
+        fontSize: 12,
+        fontFamily: fonts.Regular,
+        marginBottom: 6,
+    },
+    fieldInput: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        borderWidth: 0,
+    },
+    updateButton: {
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+        marginBottom: 30,
+    },
+    updateButtonText: {
+        fontSize: 14,
+        fontFamily: fonts.Bold,
+        color: colors.WHITE,
     },
 });

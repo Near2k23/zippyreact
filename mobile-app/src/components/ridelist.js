@@ -38,14 +38,14 @@ export default function RideList(props) {
     const [scaleAnim] = useState(new Animated.Value(0));
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
-            if (auth.profile.mode === 'system') {
+        if (auth?.profile?.mode) {
+            if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
-            } else {
-                setMode(auth.profile.mode);
+            }else{
+            setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
@@ -470,6 +470,9 @@ export default function RideList(props) {
             </View>
 
             <DatePicker
+                title={t("select_date")}
+                confirmText={t('confirm')}
+                cancelText={t('cancel')}
                 modal
                 open={showStartDatePicker}
                 date={startDate || defaultDate}
@@ -479,6 +482,9 @@ export default function RideList(props) {
             />
 
             <DatePicker
+                title={t("select_date")}
+                confirmText={t('confirm')}
+                cancelText={t('cancel')}
                 modal
                 open={showEndDatePicker}
                 date={endDate || defaultDate}

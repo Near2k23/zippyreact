@@ -13,7 +13,7 @@ import {
   AuthLoadingScreen,
 } from './src/screens';
 import * as SplashScreen from 'expo-splash-screen';
-import { useAudioPlayer } from 'expo-audio';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
@@ -529,6 +529,24 @@ export default function AppCommon({ children }) {
     }
     dispatch(api.fetchusedreferral())
   }, [auth.error, auth.error.msg, languagedata && languagedata.langlist, settings]);
+
+  // Ensure background audio works on iOS
+  useEffect(() => {
+    (async () => {
+      try {
+        await setAudioModeAsync && setAudioModeAsync({
+          staysActiveInBackground: true,
+          playsInSilentMode: true,
+          interruptionModeIOS: 2, // DuckOthers
+          interruptionModeAndroid: 2, // DuckOthers
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+      } catch (e) {
+        console.log('Error setting audio mode:', e);
+      }
+    })();
+  }, []);
 
   if (authStillNotResponded.current || !(languagedata && languagedata.langlist) || !settings || authState.current == 'loading') {
     return <AuthLoadingScreen />;

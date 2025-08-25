@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
-  Alert,
   Keyboard,
   Image,
   Modal,
@@ -24,12 +23,13 @@ import { checkSearchPhrase, appConsts } from '../common/sharedFunctions';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 var { width,height } = Dimensions.get('window');
 import {  StackActions } from '@react-navigation/native';
-import { Entypo, MaterialIcons, AntDesign, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Entypo, MaterialIcons, AntDesign, FontAwesome, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { Button } from 'react-native-elements';
 import uuid from 'react-native-uuid';
 import { fonts } from '../common/font';
 import { useColorScheme } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
+import WaygoDialog from '../components/WaygoDialog';
 
 const hasNotch = DeviceInfo.hasNotch();
 
@@ -66,22 +66,24 @@ export default function SearchScreen(props) {
   const [saveNameValue, setSaveNameValue] = useState('');
   let colorScheme = useColorScheme();
   const [mode, setMode] = useState();
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [dialogData, setDialogData] = useState({});
 
   useEffect(() => {
-    if (auth && auth.profile && auth.profile.mode) {
+    if (auth?.profile?.mode) {
       if (auth.profile.mode === 'system'){
         setMode(colorScheme);
       }else{
         setMode(auth.profile.mode);
       }
     } else {
-      setMode(colorScheme);
+      setMode('light');
     }
   }, [auth, colorScheme]);
   const saveName = [
     {value: t('home'), lable: t('home'), icon: 'home-outline', type: 'material-community'},
-    {value: t('work'), lable: t('work'), icon: 'work-outline', type: 'materialIcons'},
-    {value: t('other'), lable: t('other'), icon: 'location', type: 'entypo'}
+    {value: t('work'), lable: t('work'), icon: 'domain', type: 'materialIcons'},
+    {value: t('other'), lable: t('other'), icon: 'location-outline', type: 'ionicon'}
   ];
 
   const [UUID, setUUID] = useState();
@@ -206,7 +208,12 @@ export default function SearchScreen(props) {
             props.navigation.dispatch(StackActions.pop(1));
           }
         } else {
-          Alert.alert(t('alert'), t('place_to_coords_error'));
+          setDialogData({
+            title: t('alert'),
+            message: t('place_to_coords_error'),
+            type: 'warning'
+          });
+          setDialogVisible(true);
         }
       });
     } else {
@@ -304,9 +311,25 @@ export default function SearchScreen(props) {
   }
 
   const saveLocation = (item)=>{
-    setLoading(true);
     if(item && saveNameValue && ((saveNameValue== t('other') && addressName) || saveNameValue!= t('other'))){
-      let name = saveNameValue== t('other') ? addressName : saveNameValue
+      let name = saveNameValue== t('other') ? addressName : saveNameValueßß
+      if (saveNameValue === t('home') || saveNameValue === t('work')) {
+        const existingAddress = savedAddresses.find(addr => addr.name === saveNameValue.toLowerCase());
+        if (existingAddress) {
+          setDialogData({
+            title: t('alert'),
+            message: t('address_already_exists_error'),
+            type: 'warning',
+            onConfirm: () => {
+              setDialogVisible(false);
+            }
+          });
+          setDialogVisible(true);
+          return;
+        }
+      }
+      
+      setLoading(true);
       fetchCoordsfromPlace(item.place_id).then((res) => {
         if (res && res.lat) {
           let dropObj = {
@@ -326,13 +349,16 @@ export default function SearchScreen(props) {
         setSaveNameValue('')
       },3000)
     }else{
-      Alert.alert(
-        t('alert'),
-        t('no_details_error'),
-        [
-          { text: t('ok'), onPress: () => {setLoading(false) } }
-        ]
-      );
+      setDialogData({
+        title: t('alert'),
+        message: t('no_details_error'),
+        type: 'warning',
+        onConfirm: () => {
+          setLoading(false);
+          setDialogVisible(false);
+        }
+      });
+      setDialogVisible(true);
     }
   }
 
@@ -343,7 +369,18 @@ export default function SearchScreen(props) {
   }
 
   const onPressDelete = (item) =>{
-    dispatch(editAddress(profile.uid, item, 'Delete'));
+    setDialogData({
+      title: t('confirm'),
+      message: t('confirm_delete_saved_address'),
+      type: 'warning',
+      icon: 'alert-octagon-outline',
+      iconColor: colors.RED,
+      onConfirm: () => {
+        dispatch(editAddress(profile.uid, item, 'Delete'));
+        setDialogVisible(false);
+      }
+    });
+    setDialogVisible(true);
   }
 
   const closeModel = () => {
@@ -354,12 +391,7 @@ export default function SearchScreen(props) {
     setSaveNameValue('')
   }
 
-  const cancelAddress = () => {
-    setSearchKeyword2('')
-    setAddressName('')
-    setAddress('')
-    setSaveNameValue('')
-  }
+
 
   return (
     <View style={{flex:1, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}}>
@@ -426,20 +458,26 @@ export default function SearchScreen(props) {
       </View>
 
       {!searchKeyword ?
-       <TouchableOpacity onPress={() => setAddressOnMap()} style={[mode === 'dark' ? styles.saveBoxDark : styles.saveBox,{flexDirection:isRTL? 'row-reverse':'row', marginTop: 5}]}>
-        <View style={{height: 45, justifyContent: 'center' }}>
-          <Text style={{ textAlign: isRTL ? "right" : "left", fontSize: 18, fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{ locationType == 'pickup' ? t('pickup_address_from_map') : t('drop_address_from_map')}</Text>
+       <TouchableOpacity onPress={() => setAddressOnMap()} style={[mode === 'dark' ? styles.optionCardDark : styles.optionCard,{flexDirection:isRTL? 'row-reverse':'row', marginTop: 5}]}>        
+        <View style={[styles.optionLeftIcon]}>          
+          <Ionicons name={locationType == 'pickup' ? 'navigate-outline' : 'location-outline'} size={22} color={mode === 'dark' ? colors.WHITE : colors.BLACK} />        
         </View>
-        <MaterialIcons name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} size={34} color= {mode === 'dark' ? colors.WHITE : colors.SECONDARY} />
+        <View style={{flex:1, justifyContent: 'center' }}>
+          <Text style={{ textAlign: isRTL ? 'right' : 'left', fontSize: 16, fontFamily:fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{ locationType == 'pickup' ? t('pickup_address_from_map') : t('drop_address_from_map')}</Text>
+        </View>
+        <MaterialIcons name={isRTL ? 'keyboard-arrow-left' : 'keyboard-arrow-right'} size={28} color={mode === 'dark' ? colors.WHITE : colors.SHADOW} />
       </TouchableOpacity>
       :null }
 
      {!searchKeyword ?
-     <TouchableOpacity onPress={() => setModalVisible(true)} style={[mode === 'dark' ? styles.saveBoxDark : styles.saveBox,{flexDirection:isRTL? 'row-reverse':'row', marginTop: 10}]}>
-        <View style={{height: 45, justifyContent: 'center' }}>
-          <Text style={{ textAlign: isRTL ? "right" : "left", fontFamily:fonts.Regular,fontSize: 20, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('saved_address')}</Text>
+     <TouchableOpacity onPress={() => setModalVisible(true)} style={[mode === 'dark' ? styles.optionCardDark : styles.optionCard,{flexDirection:isRTL? 'row-reverse':'row', marginTop: 10}]}>        
+        <View style={styles.optionLeftIcon}>          
+          <MaterialCommunityIcons name="bookmark-outline" size={22} color={mode === 'dark' ? colors.WHITE : colors.BLACK} />        
         </View>
-        <MaterialIcons name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} size={34} color= {mode === 'dark' ? colors.WHITE : colors.SECONDARY} />
+        <View style={{flex:1, justifyContent: 'center' }}>
+          <Text style={{ textAlign: isRTL ? 'right' : 'left', fontFamily:fonts.Bold,fontSize: 16, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('saved_address')}</Text>
+        </View>
+        <MaterialIcons name={isRTL ? 'keyboard-arrow-left' : 'keyboard-arrow-right'} size={28} color={mode === 'dark' ? colors.WHITE : colors.SHADOW} />
       </TouchableOpacity>
       :null }
 
@@ -467,9 +505,13 @@ export default function SearchScreen(props) {
           </View>
         : null}
         {selLocations.length > 0 && locationType == 'drop' ?
-          <TouchableOpacity  onPress={okClicked} style={styles.floting}>
-            <Text style={styles.headerTitleStyle}>{t('ok')}</Text>
-          </TouchableOpacity>
+          <View style={styles.okButtonContainer}>
+            <TouchableOpacity onPress={okClicked} style={[styles.okButton, {
+              backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
+            }]}>
+              <Text style={styles.okButtonText}>{t('ok')}</Text>
+            </TouchableOpacity>
+          </View>
         : null}
 
       <Modal
@@ -477,179 +519,250 @@ export default function SearchScreen(props) {
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => {
-          Alert.alert('Modal has been closed.');
           setModalVisible(!modalVisible);
         }}>
-        <View style={[mode === 'dark' ? styles.centeredViewDark : styles.centeredView,{marginTop: hasNotch ? 35 : null}]}>
-          <View style={mode === 'dark' ? styles.modalViewDark : styles.modalView}>
-            <View style={{flexDirection:isRTL? 'row-reverse':'row', alignItems: "center", backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}>
-              <View style={{width: 40, height: 45}}>
-              {((searchKeyword2 && isShowingResults2) || address || addressName) ?
-                  !address ?
-                  <Entypo name="cross" size={35} color= {colors.WHITE} onPress={() => searchSaveLocation()} style={{marginTop: 4}}/>
-                  : null
-                :
-                <MaterialIcons name={isRTL ? "keyboard-arrow-right" : "keyboard-arrow-left"} size={40} color= {colors.WHITE} onPress={() => closeModel()}/>
-              }
-              </View>
-              <View style={styles.savedbox}>
-                <Text style={styles.savesadd}>{t('saved_address')}</Text>
-              </View>
-            </View>
+        <View style={[mode === 'dark' ? styles.centeredViewDark : styles.centeredView]}>
+          <View style={[styles.modalHeader, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => closeModel()}
+            >
+              <MaterialIcons 
+                name={isRTL ? "arrow-right" : "arrow-back"} 
+                size={24} 
+                color={mode === 'dark' ? colors.WHITE : colors.BLACK} 
+              />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('saved_address')}</Text>
           </View>
 
-          <View style={{height: 65, alignItems: 'center'}}>
-          {(searchKeyword2 && isShowingResults2) || address || addressName?
-            <View style={{ height: 10, width: width, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}}>
-              <View style={{ height: 10, width: width, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderTopRightRadius: 10, borderTopLeftRadius: 10}}>
-              </View>
+          <ScrollView 
+            style={[styles.modalContent, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps='handled'
+          >
+            <View style={styles.imageContainer}>
+              <Image 
+                source={require('../../assets/images/address.png')} 
+                style={styles.addressImage}
+                resizeMode="contain"
+              />
             </View>
-            : null }
-            
-            <View style={[styles.addressStyle2,{borderWidth: 1, borderRadius: 5,borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK, marginTop: ((searchKeyword2 && isShowingResults2) || address || addressName) ? 0 : 10}]}>
-              <View style={[styles.autocompleteMain, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <FontAwesome name="search" size={20} color={mode === 'dark' ? colors.WHITE : colors.BLACK} style={{marginHorizontal: 5}} />
+
+            {address && saveNameValue === t('other') && (
+              <View style={styles.nameInputContainer}>
+                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                  {t('name')}
+                </Text>
                 <TextInput
-                  placeholder={t('search_for_an_address')}
-                  returnKeyType="search"
-                  style={[ mode === 'dark' ? styles.searchBoxDark : styles.searchBox, isRTL ? { textAlign: 'right' } : { textAlign: 'left', width: width-75}]}
-                  placeholderTextColor={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                  onChangeText={(text) => searchSaveLocation(text)}
-                  value={ address ? address.description : searchKeyword2}
+                  style={[styles.nameInput, {
+                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                    borderColor: '#E2E9EC',
+                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+                  }]}
+                  placeholder={''}
+                  placeholderTextColor={colors.SECONDARY}
+                  value={addressName}
+                  onChangeText={setAddressName}
+                  autoCapitalize='none'
+                  textAlign={isRTL ? 'right' : 'left'}
                 />
-                {address ?
-                  <TouchableOpacity style={{ justifyContent: 'center' ,alignItems: 'center', height: 48}} onPress={() => setAddress('')}>
-                    <Entypo name="cross" size={24} color= {mode === 'dark' ? colors.WHITE : colors.SECONDARY} style={{borderLeftWidth: 1, borderLeftColor: colors.SECONDARY}}/>
+              </View>
+            )}
+
+            <View style={{width: "100%", marginBottom: 10}}>
+              <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>{t('search_for_an_address')}</Text>
+              <View style={[styles.searchContainer, {
+                borderColor: '#E2E9EC',
+                backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+              }]}>
+                <Ionicons name="location-outline" size={20} color={colors.SECONDARY} style={{ marginRight: 10 }} />
+                <TextInput
+                  placeholder={''}
+                  returnKeyType="search"
+                  style={[styles.searchInput, {
+                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                    textAlign: isRTL ? 'right' : 'left',
+                    flex: 1,
+                    fontFamily: fonts.Regular
+                  }]}
+                  placeholderTextColor={colors.SECONDARY}
+                  onChangeText={(text) => searchSaveLocation(text)}
+                  value={address ? address.description : searchKeyword2}
+                />
+                {address && (
+                  <TouchableOpacity onPress={() => setAddress('')} style={{ marginLeft: 10 }}>
+                    <Entypo name="cross" size={20} color={colors.SECONDARY} />
                   </TouchableOpacity>
-                : null }
+                )}
               </View>
             </View>
 
-            {address?
-              <View style={[styles.categoryBox, {flexDirection: isRTL? 'row-reverse' : 'row'}]}>
+            {searchKeyword2 && isShowingResults2 && !address && (
+              <View style={styles.searchResultsWrapper}>
+                <FlatList
+                  keyboardShouldPersistTaps='always'
+                  data={searchResults2}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[styles.searchResultItem, {
+                        borderBottomColor: mode === 'dark' ? colors.WHITE : '#E0E0E0'
+                      }]}
+                      onPress={() => setAddress(item)}
+                    >
+                      <Ionicons name="location-outline" size={20} color={colors.SECONDARY} />
+                      <Text numberOfLines={2} style={[styles.searchResultText, {
+                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                        textAlign: isRTL ? "right" : "left"
+                      }]}>
+                        {item.description}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  style={styles.searchResults}
+                  nestedScrollEnabled={true}
+                />
+              </View>
+            )}
+
+            <View style={styles.categoryContainer}>
+              <View style={[styles.categoryGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 {saveName.map((item, index) => (
-                  <TouchableOpacity
-                  key={index}
-                    style={[styles.categoryItem,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: item.value == saveNameValue ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : mode === 'dark' ? colors.WHITE : colors.BLACK, borderWidth: item.value == saveNameValue ? 3 : 1, marginHorizontal: 2}]}
-                    onPress={() => {
-                      setSaveNameValue(item.value);
-                    }}
-                  >
+                                      <TouchableOpacity
+                      key={index}
+                      style={[styles.categoryCard, {
+                        backgroundColor: item.value === saveNameValue 
+                          ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                          : 'transparent'
+                      }]}
+                      onPress={() => setSaveNameValue(item.value)}
+                    >
                     <Icon
                       name={item.icon}
                       type={item.type}
-                      color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                      size={22}
-                      containerStyle={{ margin: 1 }}
+                      color={item.value === saveNameValue ? colors.WHITE : (mode === 'dark' ? colors.WHITE : colors.BLACK)}
+                      size={24}
                     />
-                    <Text style={[styles.categoryLabel,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
+                    <Text style={[styles.categoryText, {
+                      color: item.value === saveNameValue ? colors.WHITE : (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                    }]}>
                       {item.lable}
                     </Text>
                   </TouchableOpacity>
-                  
                 ))}
               </View>
-            : null}
+            </View>
 
-            {address && saveNameValue== t('other') ?
-              <View style={{width:width - 15, marginTop: 10}}>
-                <TextInput
-                  style={{fontFamily:fonts.Regular,fontSize: 16, borderBottomColor: colors.SHADOW, borderBottomWidth: 1, height: 40, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}
-                  placeholder={t('name')}
-                  placeholderTextColor={colors.SHADOW}
-                  value={addressName ? addressName : ''}
-                  keyboardType={'email-address'}
-                  onChangeText={(text) => { setAddressName( text ) }}
-                  secureTextEntry={false}
-                  blurOnSubmit={true}
-                  errorStyle={styles.errorMessageStyle}
-                  inputContainerStyle={[styles.inputContainerStyle, {height: 50}]}
-                  autoCapitalize='none'
-                />    
+            {address && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.saveButton, { 
+                    backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
+                    opacity: loading ? 0.7 : 1
+                  }]}
+                  onPress={() => saveLocation(address)}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={colors.WHITE} size="small" />
+                  ) : (
+                    <Text style={styles.buttonText}>{t('save')}</Text>
+                  )}
+                </TouchableOpacity>
               </View>
-            :null}
+            )}
 
-            {address ? 
-            <View style={{flexDirection: isRTL?'row-reverse' : 'row', width: width, justifyContent :'space-evenly'}}>
-              {loading ? null :
-                <Button
-                  onPress={() => cancelAddress()}
-                  title={t('cancel')}
-                  loading={false}
-                  titleStyle={[styles.buttonTitle]}
-                  buttonStyle={[styles.registerButton, { marginTop: 20, backgroundColor: colors.RED}]}
-                />
-              }
-              <Button
-                onPress={() => saveLocation(address)}
-                title={t('save')}
-                loading={loading}
-                titleStyle={styles.buttonTitle}
-                buttonStyle={[styles.registerButton, { marginTop: 20, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}]}
-              />
-            </View>
-            : null }
-          </View>
-
-          {searchKeyword2 && isShowingResults2 && !address?
-            <FlatList
-              keyboardShouldPersistTaps='always'
-              data={searchResults2}
-              renderItem={({ item, index }) => {
-                return (
-                  <TouchableOpacity
-                    key={item.description}
-                    style={[styles.resultItem,{borderBottomColor: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-                    onPress={() => setAddress(item)}>
-                    <Text numberOfLines={1} style={{fontSize: 16, fontFamily:fonts.Regular, textAlign: isRTL ? "right" : "left", width: width-20, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{item.description}</Text>
-                  </TouchableOpacity>
-                );
-              }}
-              style={[styles.searchResultsContainer,{marginTop: 10}]}
-            />
-            : null}
-          
-          {(searchKeyword2 && isShowingResults2) || address || addressName?
-           null 
-          :
-            <View style={mode === 'dark' ? styles.savedaddlistDark : styles.savedaddlist}>
-              <ScrollView style={{flex: 1, width: width-15, height: 'auto'}} showsVerticalScrollIndicator={false}>
-                {savedAddresses && savedAddresses.length > 0 ?
-                  savedAddresses.map((address, index) => {
-                    return (
-                      <View key={index} style={{flexDirection:isRTL? 'row-reverse':'row', borderBottomWidth: 1,borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK, width: width-15, minHeight: 60, paddingVertical: 5}}>
-                        <TouchableOpacity onPress={() => updateLocation(address)} style={{flexDirection:isRTL? 'row-reverse':'row', alignItems: "center", width: width-50}}>
-                          <View style={mode === 'dark' ? styles.vew1Dark : styles.vew1}>
-                            {address.name == 'home' ?
-                              <AntDesign name="home" size={22} color= {mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                            : address.name == 'work'?
-                              <MaterialIcons name="work-outline" size={22} color= {mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                            :
-                              <Entypo name="location" size={22}  color= {mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                            }
-                          </View>
-                          <View style={{ justifyContent: 'center', width: width-95, marginHorizontal: 5}}>
-                            <Text style={[mode === 'dark' ? styles.savedAddressesBoxDark : styles.savedAddressesBox, { textAlign: isRTL ? "right" : "left"}]}>{(address.name).toUpperCase()}</Text>
-                            <Text style={[mode === 'dark' ? styles.savedAddressesBoxDark : styles.savedAddressesBox, { textAlign: isRTL ? "right" : "left", fontSize: 13}]}>{address.description}</Text>
-                          </View>
-                        </TouchableOpacity>
-                        <View style={{width: 30}}>
-                          <MaterialCommunityIcons name="delete-circle-outline" size={28} color={mode === 'dark' ? colors.WHITE :colors.SECONDARY} onPress={() => onPressDelete(address)} />
+            {!searchKeyword2 && !address && (
+              <View style={styles.savedAddressList}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+                  {savedAddresses && savedAddresses.length > 0 ? (
+                    savedAddresses.map((savedAddress, index) => {
+                      const normalizedName = (savedAddress?.name || '').toLowerCase();
+                      const isHome = normalizedName === 'home' || normalizedName === t('home').toLowerCase();
+                      const isWork = normalizedName === 'work' || normalizedName === t('work').toLowerCase();
+                      const iconColor = mode === 'dark' ? colors.WHITE : colors.BLACK;
+                      return (
+                        <View
+                          key={index}
+                          style={[styles.savedAddressCard, {
+                            backgroundColor: mode === 'dark' ? '#2A2A2A' : colors.WHITE,
+                            borderColor: mode === 'dark' ? colors.WHITE : '#E2E9EC'
+                          }]}
+                        >
+                          <TouchableOpacity
+                            style={[styles.savedAddressContent, { flexDirection: 'row' }]}
+                            onPress={() => updateLocation(savedAddress)}
+                          >
+                            <View style={[
+                              styles.addressIcon,
+                              {
+                                marginRight: isRTL ? 0 : 12,
+                                marginLeft: isRTL ? 12 : 0
+                              }
+                            ]}>
+                              {isHome ? (
+                                <MaterialCommunityIcons name="home-outline" size={18} color={iconColor} />
+                              ) : isWork ? (
+                                <MaterialIcons name="domain" size={18} color={iconColor} />
+                              ) : (
+                                <Ionicons name="location-outline" size={18} color={iconColor} />
+                              )}
+                            </View>
+                            <View style={styles.addressInfo}>
+                              <Text style={[styles.addressName, {
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                textAlign: isRTL ? "right" : "left"
+                              }]}>
+                                {(savedAddress.name || '').charAt(0).toUpperCase() + (savedAddress.name || '').slice(1)}
+                              </Text>
+                              <Text style={[styles.addressDescription, {
+                                color: mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)',
+                                textAlign: isRTL ? "right" : "left"
+                              }]}>
+                                {savedAddress.description}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.deleteButton}
+                            onPress={() => onPressDelete(savedAddress)}
+                          >
+                            <MaterialCommunityIcons 
+                              name="delete-outline" 
+                              size={20} 
+                              color={colors.RED} 
+                            />
+                          </TouchableOpacity>
                         </View>
-                        
-                      </View>
-                    );
-                  })
-                : 
-                  <View style={[styles.nosavedadd,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-                    <Text style={{fontSize: 18,fontFamily:fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('no_saved_address')}</Text> 
-                  </View>
-                }
-              </ScrollView>
-            </View>
-          }
+                      );
+                    })
+                  ) : (
+                    <View style={styles.noAddressContainer}>
+                      <Text style={[styles.noAddressText, {
+                        color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                      }]}>
+                        {t('no_saved_address')}
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </ScrollView>
         </View>
       </Modal>
+
+      <WaygoDialog
+        visible={dialogVisible}
+        onClose={() => setDialogVisible(false)}
+        title={dialogData.title}
+        message={dialogData.message}
+        type={dialogData.type}
+        showButtons={!!dialogData.onConfirm}
+        onConfirm={dialogData.onConfirm}
+        confirmText={t('ok')}
+        cancelText={t('cancel')}
+      />
       </View>
     </View>
   );
@@ -678,6 +791,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 3,
+  },
+  okButtonContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  okButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  okButtonText: {
+    fontSize: 14,
+    fontFamily: fonts.Medium,
+    lineHeight: 18,
+    color: colors.WHITE,
   },
   loading: {
     position: 'absolute',
@@ -846,172 +980,200 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.PAGEBACK
   },
-  modalView: {
-    backgroundColor:  colors.WHITE,
-    shadowColor: colors.BLACK,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+  modalHeader: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    elevation: 0,
+    shadowOpacity: 0,
   },
-  modalViewDark: {
-    backgroundColor: colors.PAGEBACK,
-    shadowColor: colors.SHADOW,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start'
   },
-  button: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  vew1: {
-    backgroundColor: colors.WHITE,
-    borderRadius: 30,
-    marginHorizontal: 5,
-    padding: 5,
-    shadowColor: colors.BLACK,
-    shadowOffset: {
-        width:0,
-        height: 2,
-    },
-    shadowOpacity: 3,
-    shadowRadius: 2,
-    elevation: 2
-  },
-  vew1Dark: {
-    backgroundColor: colors.PAGEBACK,
-    borderRadius: 30,
-    marginHorizontal: 5,
-    padding: 5,
-    shadowColor: colors.SHADOW,
-    shadowOffset: {
-        width:0,
-        height: 2,
-    },
-    shadowOpacity: 3,
-    shadowRadius: 2,
-    elevation: 2
-  },
-  savedAddressesBox:{
-    fontFamily: fonts.Regular,
-    color: colors.BLACK,
-    fontSize: 16
-  },
-  savedAddressesBoxDark:{
-    fontFamily: fonts.Regular,
-    color: colors.WHITE,
-    fontSize: 16
-  },
-  buttonTitle: {
-    fontSize: 14,
-    fontFamily:fonts.Regular
-  },
-  registerButton: {
-    width: 120,
-    height: 45,
-    borderWidth: 0,
-    marginTop: 30,
-    borderRadius: 15,
-  },
-  floatButton: {
-    borderWidth: 1,
-    borderColor: colors.BLACK,
-    alignItems: "center",
-    justifyContent: "center",
-    width: 60,
-    position: "absolute",
-    right: 10,
-    height: 60,
-    backgroundColor: colors.PAGEBACK,
-    borderRadius: 30
-  },
-  savedbox:{
-    height: 45,
-    width: width-80,
-    justifyContent: 'center'
-  },
-  savesadd:{
-    textAlign: 'center',
+  headerTitle: {
+    fontFamily: fonts.Bold,
     fontSize: 20,
-    fontFamily:fonts.Bold,
+    marginTop: 8,
+    marginLeft: 0,
+    textAlign: 'left',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20
+  },
+  imageContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+    marginTop: 10
+  },
+  addressImage: {
+    width: width * 0.8,
+    height: height * 0.25,
+    maxHeight: 200
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingLeft: 10,
+    paddingRight: 10,
+    height: 50
+  },
+  searchInput: {
+    fontSize: 14,
+    fontFamily: fonts.Regular
+  },
+  inputLabel: {
+    width: '100%',
+    fontSize: 13,
+    color: '#A7A9AC',
+    marginBottom: 6,
+    fontFamily: fonts.Bold
+  },
+  categoryContainer: {
+    marginBottom: 20
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontFamily: fonts.Medium,
+    marginBottom: 12
+  },
+  categoryGrid: {
+    justifyContent: 'space-between'
+  },
+  categoryCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginHorizontal: 4,
+    minHeight: 80
+  },
+  categoryText: {
+    fontSize: 12,
+    fontFamily: fonts.Medium,
+    marginTop: 8,
+    textAlign: 'center'
+  },
+  nameInputContainer: {
+    marginBottom: 20,
+    width: "100%"
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 15,
+    paddingLeft: 10,
+    paddingRight: 10,
+    fontSize: 14,
+    fontFamily: fonts.Regular
+  },
+  buttonContainer: {
+    marginBottom: 20
+  },
+  saveButton: {
+    width: '100%',
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  buttonText: {
+    fontSize: 16,
+    fontFamily: fonts.Medium,
     color: colors.WHITE
   },
-  savedaddlist: {
-    flex: 1,
-    backgroundColor: colors.WHITE,
+  searchResultsWrapper: {
+    marginBottom: 20,
+    maxHeight: 200,
+    backgroundColor: 'transparent'
+  },
+  searchResults: {
+    maxHeight: 200
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1
+  },
+  searchResultText: {
+    fontSize: 14,
+    fontFamily: fonts.Regular,
+    marginLeft: 12,
+    flex: 1
+  },
+  savedAddressList: {
+    flex: 1
+  },
+  savedAddressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
     shadowColor: colors.BLACK,
     shadowOffset: {
-        width: 0,
-        height: 2,
+      width: 0,
+      height: 1,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-    borderTopRightRadius: 10,
-    borderTopLeftRadius: 10,
-    width: width
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  savedaddlistDark: {
+  savedAddressContent: {
     flex: 1,
-    backgroundColor: colors.PAGEBACK,
-    shadowColor: colors.SHADOW,
-    shadowOffset: {
-        width: 0,
-        height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 2,
-    borderTopRightRadius: 10,
-    borderTopLeftRadius: 10,
-    width: width
+    alignItems: 'center'
   },
-  nosavedadd:{
+  addressIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  addressInfo: {
+    flex: 1
+  },
+  addressName: {
+    fontSize: 16,
+    fontFamily: fonts.Bold,
+    marginBottom: 4
+  },
+  addressDescription: {
+    fontSize: 13,
+    fontFamily: fonts.Regular,
+    lineHeight: 18
+  },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8
+  },
+  noAddressContainer: {
     flex: 1,
-    width: width-15,
-    alignItems:'center',
-    marginTop: 50
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60
   },
+  noAddressText: {
+    fontSize: 16,
+    fontFamily: fonts.Medium,
+    textAlign: 'center'
+  },
+
   dropremove:{
     justifyContent: 'center',
     alignItems: 'center',
     borderBottomWidth: 1,
     height: 48
-  },
-  categoryBox: {
-    width: width-10,
-    height: 60,
-    marginTop: 5
-  },
-  categoryItem: {
-    height: 50,
-    width: 90,
-    marginVertical: 5,
-    paddingVertical: 5,
-    backgroundColor: colors.WHITE,
-    justifyContent: "center",
-    alignItems: "center",
-    justifyContent: "space-evenly",
-    borderRadius: 5,
-    borderColor: colors.SECONDARY,
-    borderWidth: 1
-  },
-  categoryLabel:{
-    fontFamily: fonts.Regular,
-    fontSize: 14,
   },
   multiAddressStyle: {
     borderBottomWidth: 1,
@@ -1029,5 +1191,43 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center'
+  },
+  optionLeftIcon:{
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems:'center',
+    justifyContent:'center',
+    marginRight: 10
+  },
+  optionCard:{
+    height: 56,
+    width: width-10,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    backgroundColor: colors.WHITE,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E9EC',
+    shadowColor: colors.BLACK,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1
+  },
+  optionCardDark:{
+    height: 56,
+    width: width-10,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    backgroundColor: colors.PAGEBACK,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.WHITE,
+    shadowColor: colors.SHADOW,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1
   }
 })

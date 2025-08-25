@@ -71,15 +71,15 @@ export default function PaymentDetails(props) {
   const [mode, setMode] = useState();
 
   useEffect(() => {
-      if (auth && auth.profile && auth.profile.mode) {
-          if (auth.profile.mode === 'system'){
-              setMode(colorScheme);
-          }else{
-              setMode(auth.profile.mode);
-          }
-      } else {
-          setMode(colorScheme);
+    if (auth?.profile?.mode) {
+      if (auth.profile.mode === 'system'){
+        setMode(colorScheme);
+      }else{
+        setMode(auth.profile.mode);
       }
+    } else {
+      setMode('light');
+    }
   }, [auth, colorScheme]);
 
   const [payDetails, setPayDetails] = useState({

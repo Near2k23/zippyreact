@@ -67,6 +67,7 @@ export default function RegistrationPage(props) {
                   );
                 }else{
                   Alert.alert(t('alert'),t('reg_error'));
+                  console.log('🔐 AUTH DEBUG - Error en mainSignUp:', res.error);
                 }
               })
             }else{
@@ -96,6 +97,7 @@ export default function RegistrationPage(props) {
               );
             }else{
               Alert.alert(t('alert'),t('reg_error'));
+              console.log('🔐 AUTH DEBUG - Error en mainSignUp:', res.error);
             }
           })
         }

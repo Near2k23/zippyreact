@@ -823,8 +823,10 @@ exports.userDelete = onValueDeleted(
     let settings = settingdata.val();
     const allowedOrigins = ['https://' + config.firebaseProjectId + '.web.app', settings.CompanyWebsite, 'http://localhost:3000'];
     const origin = request.headers.origin;
-    if (allowedOrigins.includes(origin)) {
-        response.set("Access-Control-Allow-Origin", origin);
+    
+    // Permitir todas las solicitudes de aplicaciones móviles (que no envían origin header)
+    if (!origin || allowedOrigins.includes(origin)) {
+        response.set("Access-Control-Allow-Origin", origin || "*");
         response.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }
     if (request.method === 'OPTIONS') {
@@ -834,7 +836,10 @@ exports.userDelete = onValueDeleted(
         return;
     }
     let arr = [];
+    console.log('🔐 AUTH DEBUG - Headers authorization:', request.headers.authorization);
+    console.log('🔐 AUTH DEBUG - Config projectId:', config.firebaseProjectId);
     const user = await rgf.validateBasicAuth(request.headers.authorization, config);
+    console.log('🔐 AUTH DEBUG - validateBasicAuth result:', user);
     if(user){
         if (request.body.email || request.body.mobile) {
             if (request.body.email) {
@@ -899,31 +904,44 @@ exports.user_signup = onRequest(async (request, response) => {
     let settings = settingData.val();
 
     try {
-        const regData = await rgf.valSignupData(config, userDetails, settings);
+        console.log('🔐 SIGNUP DEBUG - User details:', JSON.stringify(userDetails, null, 2));
+        console.log('🔐 SIGNUP DEBUG - Settings:', JSON.stringify(settings, null, 2));
+        
+        const regData = await rgf.validateSignupData(config, userDetails, settings);
+        console.log('🔐 SIGNUP DEBUG - RegData result:', JSON.stringify(regData, null, 2));
 
         if (regData.error) {
-            response.send(regData);
+            console.log('🔐 SIGNUP DEBUG - Validation error:', regData.error);
+            return response.send(regData);
         } else {
+            console.log('🔐 SIGNUP DEBUG - Creating user with auth...');
             const userRecord = await auth.createUser({
                 email: userDetails.email,
                 phoneNumber: userDetails.mobile,
                 password: userDetails.password,
                 emailVerified: true
             });
+            console.log('🔐 SIGNUP DEBUG - User created:', userRecord.uid);
 
             if (userRecord && userRecord.uid) {
+                console.log('🔐 SIGNUP DEBUG - Saving user data to database...');
                 await db.ref('users/' + userRecord.uid).set(regData);
+                
                 if (userDetails.signupViaReferral && settings.bonus > 0) {
+                    console.log('🔐 SIGNUP DEBUG - Adding referral bonus...');
                     await addToWallet(userDetails.signupViaReferral, settings.bonus, "Admin Credit", null);
                     await addToWallet(userRecord.uid, settings.bonus, "Admin Credit", null);
                 }
-                response.send({ uid: userRecord.uid });
+                console.log('🔐 SIGNUP DEBUG - Registration completed successfully');
+                return response.send({ uid: userRecord.uid });
             } else {
-                response.send({ error: "User Not Created" });
+                console.log('🔐 SIGNUP DEBUG - User record is null or missing uid');
+                return response.send({ error: "User Not Created" });
             }
         }
     } catch (error) {
-        response.send({ error: "User Not Created" });
+        console.log('🔐 SIGNUP DEBUG - Catch error:', error);
+        return response.send({ error: "User Not Created" });
     }
 });
 
@@ -1138,7 +1156,7 @@ exports.verify_mobile_otp = onRequest(async (request, response) => {
         let check = await rgf.otpCheck(config, mobile, listData);
         if(check.errorStr){
             await db.ref(`/otp_auth_requests/${check.key}`).remove();
-            response.send({ error:check.errorStr });
+            return response.send({ error:check.errorStr });
         } else{
             if(check.data.mobile){
                 if(parseInt(check.data.otp) === parseInt(otp)){
@@ -1152,22 +1170,22 @@ exports.verify_mobile_otp = onRequest(async (request, response) => {
                     }
                     try{
                         const customToken =  await admin.auth().createCustomToken(userRecord.uid);
-                        response.send({ token: customToken });  
+                        return response.send({ token: customToken });  
                     } catch (error){
                         console.log(error);
-                        response.send({ error: "Error creating custom token" });
+                        return response.send({ error: "Error creating custom token" });
                     }
                 } else {
                     check.data['count'] = check.data.count? check.data.count + 1: 1;
                     await db.ref(`/otp_auth_requests/${check.key}`).update(check.data);
-                    response.send({ error: "OTP mismatch" });
+                    return response.send({ error: "OTP mismatch" });
                 }
             }else{
-                response.send({ error: "Request mobile not found" });
+                return response.send({ error: "Request mobile not found" });
             }
         }
     }else{ 
-        response.send({ error: "Request mobile not found" });
+        return response.send({ error: "Request mobile not found" });
     }
 });
 

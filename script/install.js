@@ -111,7 +111,7 @@ async function install() {
   const config = await readJson(path.join(workDir, 'functions/config.json'));
 
   // AccessKey (encriptado localmente, sin llamadas de licencia)
-  const accessKeyCipher = CryptoJS.AES.encrypt(config.encryptionKey || '', 'c5moP9246_6D1[VQ').toString();
+  const accessKeyCipher = CryptoJS.AES.encrypt(config.encryptionKey || '', config.encryptionKey).toString();
   await writeText(path.join(workDir, 'common/src/other/AccessKey.js'), `export default "${accessKeyCipher}";\n`);
 
   // .firebaserc

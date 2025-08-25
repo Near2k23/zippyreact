@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Dimensions, FlatList, StyleSheet, TouchableOpacity, Alert, useColorScheme, Animated } from 'react-native';
+import { View, Text, Dimensions, FlatList, StyleSheet, TouchableOpacity, useColorScheme, Animated } from 'react-native';
 import { Icon } from 'react-native-elements'
 import { colors } from '../common/theme';
 import { useSelector } from 'react-redux';
@@ -8,6 +8,7 @@ import moment from 'moment/min/moment-with-locales';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SECONDORY_COLOR, MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import { fonts } from '../common/font';
+import WaygoDialog from '../components/WaygoDialog';
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
 
@@ -19,16 +20,18 @@ export default function Notifications(props) {
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
     const fadeAnim = useRef({}).current;
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedNotification, setSelectedNotification] = useState(null);
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
@@ -58,40 +61,35 @@ export default function Notifications(props) {
     }, [notificationdata.notifications]);
 
     const show = (item) => {
-        Alert.alert(
-            item.title,
-            item.msg,
-            [
-                {
-                    text: "ok",
-                    onPress: () => { },
-                    style: "ok",
-                },
-            ],
-            { cancelable: false }
-        );
+        setSelectedNotification(item);
+        setModalVisible(true);
+    };
+
+    const closeModal = () => {
+        setModalVisible(false);
+        setSelectedNotification(null);
     };
 
     const getNotificationIcon = (msg) => {
         const lowerMsg = msg.toLowerCase();
         if (lowerMsg.includes('booking') || lowerMsg.includes('ride')) {
-            return 'car';
+            return 'car-outline';
         } else if (lowerMsg.includes('payment') || lowerMsg.includes('wallet') || lowerMsg.includes('paid')) {
-            return 'cash';
+            return 'cash-outline';
         } else if (lowerMsg.includes('cancel')) {
-            return 'close-circle';
+            return 'close-circle-outline';
         } else if (lowerMsg.includes('driver') || lowerMsg.includes('captain')) {
-            return 'account-check';
+            return 'account-outline';
         } else if (lowerMsg.includes('chat') || lowerMsg.includes('message')) {
-            return 'message-text';
+            return 'message-text-outline';
         } else if (lowerMsg.includes('rating') || lowerMsg.includes('review')) {
-            return 'star';
+            return 'star-outline';
         } else if (lowerMsg.includes('location') || lowerMsg.includes('address')) {
-            return 'map-marker';
+            return 'map-marker-outline';
         } else if (lowerMsg.includes('offer') || lowerMsg.includes('discount')) {
-            return 'tag-percent';
+            return 'tag-outline';
         } else {
-            return 'bell-ring';
+            return 'bell-outline';
         }
     };
 
@@ -113,7 +111,7 @@ export default function Notifications(props) {
         
         const onPressIn = () => {
             Animated.spring(scale, {
-                toValue: 0.95,
+                toValue: 0.98,
                 useNativeDriver: true,
             }).start();
         };
@@ -128,8 +126,9 @@ export default function Notifications(props) {
         return (
             <Animated.View 
                 style={[
-                    styles.card, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack,
+                    styles.notificationCard,
                     { 
+                        backgroundColor: mode === 'dark' ? '#272A2C' : colors.WHITE,
                         opacity: fadeAnim[index] || 1,
                         transform: [
                             { scale },
@@ -149,34 +148,62 @@ export default function Notifications(props) {
                     onPressIn={onPressIn}
                     onPressOut={onPressOut}
                     activeOpacity={0.9}
-                    style={[styles.cardContent,{flexDirection: isRTL ? 'row-reverse' : 'row', alignItems :'center' }]}
+                    style={[styles.cardContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                 >
-                    <View style={[styles.iconContainer, { backgroundColor: getIconColor(item.msg) + '20', marginRight:  isRTL ? 0 : 5, marginLeft:  isRTL ? 5 : 0}]}>
+                    {/* Icono principal */}
+                    <View style={[styles.mainIconContainer, { 
+                        marginRight: isRTL ? 0 : 15, 
+                        marginLeft: isRTL ? 15 : 0 
+                    }]}>
                         <MaterialCommunityIcons 
                             name={getNotificationIcon(item.msg)} 
-                            size={26} 
-                            color={getIconColor(item.msg)} 
+                            size={24} 
+                            color={mode === 'dark' ? colors.WHITE : colors.BLACK} 
                         />
                     </View>
 
-                    <View style={{ flex: 1 }}>
-                        <Text numberOfLines={1} style={[styles.titleText, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {item.title} </Text>
-                        <Text style={[styles.messageText, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {item.msg} </Text>
-                        <View style={[styles.timeContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    {/* Contenido de la notificación */}
+                    <View style={styles.contentContainer}>
+                        <Text numberOfLines={1} style={[styles.titleText, { 
+                            textAlign: isRTL ? 'right' : 'left', 
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK 
+                        }]}>
+                            {item.title}
+                        </Text>
+                        <Text numberOfLines={1} style={[styles.subtitleText, { 
+                            textAlign: isRTL ? 'right' : 'left', 
+                            color: mode === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)' 
+                        }]}>
+                            {item.msg}
+                        </Text>
+                        <View style={[styles.timeRow, { 
+                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                            justifyContent: isRTL ? 'flex-end' : 'flex-start' 
+                        }]}>
                             <Icon
                                 name='clock'
                                 type='octicon'
-                                size={14}
-                                color={mode === 'dark' ? colors.WHITE : colors.GREY}
+                                size={12}
+                                color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
                             />
                             <Text style={[styles.timeText, { 
                                 marginLeft: isRTL ? 0 : 5,
                                 marginRight: isRTL ? 5 : 0,
-                                color: mode === 'dark' ? colors.WHITE : colors.GREY
+                                color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'
                             }]}>
-                                {moment(item.dated).format('lll')}
+                                {moment(item.dated).format('DD MMM YYYY HH:mm')}
                             </Text>
                         </View>
+                    </View>
+
+                    {/* Flecha derecha */}
+                    <View style={styles.arrowContainer}>
+                        <Icon
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            type='octicon'
+                            size={16}
+                            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                        />
                     </View>
                 </TouchableOpacity>
             </Animated.View>
@@ -184,7 +211,7 @@ export default function Notifications(props) {
     };
 
     return (
-         <View style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
+         <View style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
             <AnimatedFlatList
                 data={data}
                 renderItem={newData}
@@ -195,6 +222,20 @@ export default function Notifications(props) {
                 maxToRenderPerBatch={10}
                 windowSize={10}
             />
+            
+            {/* WaygoDialog para notificaciones */}
+            <WaygoDialog
+                visible={modalVisible}
+                onClose={closeModal}
+                title={selectedNotification?.title || ''}
+                message={selectedNotification ? 
+                    `${selectedNotification.msg}\n\n${moment(selectedNotification.dated).format('DD MMM YYYY HH:mm')}` : 
+                    ''
+                }
+                icon={selectedNotification ? getNotificationIcon(selectedNotification.msg) : 'bell-outline'}
+                iconColor={selectedNotification ? getIconColor(selectedNotification.msg) : undefined}
+                type="info"
+            />
          </View>
     );
 }
@@ -202,86 +243,63 @@ export default function Notifications(props) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 20,
-        paddingTop: 40,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.BORDER_BACKGROUND,
-    },
-    headerText: {
-        fontSize: 20,
-        fontFamily: fonts.Bold,
-        marginLeft: 10,
+        paddingTop: 10,
     },
     listContainer: {
-        padding: 5,
+        paddingHorizontal: 16,
+        paddingBottom: 20,
     },
     notificationCard: {
-        marginBottom: 10,
-        borderRadius: 5,
-        overflow: 'hidden',
-    },
-    lightCard: {
-        backgroundColor: colors.WHITE,
+        marginVertical: 6,
+        borderRadius: 16,
         shadowColor: colors.BLACK,
-        borderBottomWidth: 1,
-        borderColor: colors.SHADOW,
-    },
-    darkCard: {
-        backgroundColor: colors.PAGEBACK,
-        borderBottomWidth: 1,
-        borderColor: colors.SHADOW,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
     },
     cardContent: {
-        padding: 5,
-    },
-    iconContainer: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
         alignItems: 'center',
+    },
+    mainIconContainer: {
+        width: 48,
+        height: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    contentContainer: {
+        flex: 1,
+        justifyContent: 'center',
     },
     titleText: {
         fontSize: 16,
         fontFamily: fonts.Bold,
         marginBottom: 4,
+        lineHeight: 20,
     },
-    messageText: {
+    subtitleText: {
         fontSize: 14,
         fontFamily: fonts.Regular,
-        opacity: 0.8,
         marginBottom: 8,
+        lineHeight: 18,
     },
-    timeContainer: {
-        flexDirection: 'row',
+    timeRow: {
         alignItems: 'center',
+        marginTop: 2,
     },
     timeText: {
         fontSize: 12,
         fontFamily: fonts.Regular,
-        opacity: 0.6,
+        lineHeight: 16,
     },
-    card: {
-        marginVertical: 5,
-        borderRadius: 10,
-        padding: 5,
-        shadowColor: colors.BLACK,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 2,
-        elevation: 3,
-        gap: 2
-    },
-    shadowBack: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.WHITE,
-    },
-    shadowBackDark: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.PAGEBACK,
+    arrowContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingLeft: 8,
     },
 });

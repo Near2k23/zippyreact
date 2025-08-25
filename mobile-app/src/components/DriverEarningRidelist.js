@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, FlatList, StyleSheet, Dimensions, Animated } from 'react-native';
 import { colors } from '../common/theme';
 import i18n from 'i18n-js';
@@ -11,14 +11,21 @@ import { fonts } from '../common/font';
 import { Ionicons, AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+
 export default function DriverEarningRidelist(props) {
     const { t } = i18n;
     const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
     const settings = useSelector(state => state.settingsdata.settings);
     const [tabIndex, setTabIndex] = useState(props.tabIndex);
     const auth = useSelector(state => state.auth);
-    let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
+    let colorScheme = useColorScheme();
+    
+    // Animation related states
+    const [scrollY] = useState(new Animated.Value(0));
+    const fadeAnim = useRef({}).current;
+    const [tabChangeAnim] = useState(new Animated.Value(1));
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -36,42 +43,110 @@ export default function DriverEarningRidelist(props) {
     }
 
     useEffect(() => {
-        if (auth && auth.profile && auth.profile.mode) {
+        if (auth?.profile?.mode) {
             if (auth.profile.mode === 'system'){
                 setMode(colorScheme);
             }else{
                 setMode(auth.profile.mode);
             }
         } else {
-            setMode(colorScheme);
+            setMode('light');
         }
     }, [auth, colorScheme]);
 
-    const [scaleAnim] = useState(new Animated.Value(0))
+    // Initialize animations when data changes
     useEffect(() => {
-        Animated.spring(
-            scaleAnim,
-            {
-                toValue: 1,
-                friction: 3,
-                useNativeDriver: true
-            }
-        ).start();
-    }, [])
-
-    const [role, setRole] = useState();
-
-    useEffect(() => {
-        if (auth.profile && auth.profile.usertype) {
-            setRole(auth.profile.usertype);
-        } else {
-            setRole(null);
+        if (props.data && props.data.length > 0) {
+            // Initialize animation values for each item
+            props.data.forEach((_, index) => {
+                fadeAnim[index] = new Animated.Value(0);
+            });
+            
+            // Start staggered animations
+            props.data.forEach((_, index) => {
+                Animated.sequence([
+                    Animated.delay(index * 100),
+                    Animated.timing(fadeAnim[index], {
+                        toValue: 1,
+                        duration: 500,
+                        useNativeDriver: true
+                    })
+                ]).start();
+            });
         }
-    }, [auth.profile]);
+    }, [props.data]);
+
+    const animateTabChange = () => {
+        // Reset animation values for new tab content
+        if(props.data) {
+            props.data.forEach((_, index) => {
+                fadeAnim[index] = new Animated.Value(0);
+            });
+        }
+
+        // Animate tab change
+        Animated.sequence([
+            Animated.timing(tabChangeAnim, {
+                toValue: 0,
+                duration: 150,
+                useNativeDriver: true
+            }),
+            Animated.timing(tabChangeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true
+            })
+        ]).start();
+
+        // Start staggered animations for new items
+        if(props.data) {
+            props.data.forEach((_, index) => {
+                Animated.sequence([
+                    Animated.delay(index * 70),
+                    Animated.spring(fadeAnim[index], {
+                        toValue: 1,
+                        friction: 6,
+                        tension: 40,
+                        useNativeDriver: true
+                    })
+                ]).start();
+            });
+        }
+    };
+
+    const handleTabPress = (index) => {
+        setTabIndex(index);
+        animateTabChange();
+    };
 
     const renderData = ({ item, index }) => {
+        const scale = scrollY.interpolate({
+            inputRange: [-1, 0, (80 * index), (80 * (index + 2))],
+            outputRange: [1, 1, 1, 0.98]
+        });
+
+        if (!fadeAnim[index]) {
+            fadeAnim[index] = new Animated.Value(0);
+        }
+
         return (
-            <View activeOpacity={0.8} style={[styles.BookingContainer, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]} >
+            <Animated.View style={[
+                styles.BookingContainer,
+                mode === 'dark' ? styles.shadowBackDark : styles.shadowBack,
+                {
+                    opacity: Animated.multiply(fadeAnim[index] || 1, tabChangeAnim),
+                    transform: [
+                        { scale },
+                        {
+                            translateY: fadeAnim[index] ? 
+                                fadeAnim[index].interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [50, 0]
+                                }) : 0
+                        }
+                    ]
+                }
+            ]}>
                 <View style={[styles.box,{  padding: 5 },]}>
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, margin: 10, justifyContent:'space-between'}}>
                         <View style={{justifyContent: 'center'}}>
@@ -130,7 +205,7 @@ export default function DriverEarningRidelist(props) {
                     </View>
 
                 </View>
-            </View>
+            </Animated.View>
         )
     }
 
@@ -139,7 +214,7 @@ export default function DriverEarningRidelist(props) {
             <SegmentedControlTab
                 values={[t('daily'), t('thismonth'), t('thisyear')]}
                 selectedIndex={tabIndex}
-                onTabPress={(index) => setTabIndex(index)}
+                onTabPress={handleTabPress}
                 borderRadius={0}
                 tabsContainerStyle={[styles.segmentcontrol, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                 tabStyle={{
@@ -153,11 +228,19 @@ export default function DriverEarningRidelist(props) {
             />
 
             <View style={{flex: 1}}>
-                <FlatList
+                <AnimatedFlatList
                     showsVerticalScrollIndicator={false}
-                    scrollEnabled={true}
+                    scrollEventThrottle={16}
+                    onScroll={Animated.event(
+                        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                        { useNativeDriver: true }
+                    )}
                     keyExtractor={(item, index) => index.toString()}
-                    data={tabIndex === 0 ? props.data.filter(item => ((new Date(item.endTime).getDate() == new Date().getDate()) && (item.status === 'PAID' || item.status === 'COMPLETE'))) : (tabIndex === 1 ? props.data.filter(item => ((new Date(item.endTime).getMonth() == new Date().getMonth()) && (item.status === 'PAID' || item.status === 'COMPLETE'))) : props.data.filter(item => ((new Date(item.endTime).getFullYear() == new Date().getFullYear()) && (item.status === 'PAID' || item.status === 'COMPLETE'))))}
+                    data={tabIndex === 0 
+                        ? props.data.filter(item => ((new Date(item.endTime).getDate() == new Date().getDate()) && (item.status === 'PAID' || item.status === 'COMPLETE'))) 
+                        : (tabIndex === 1 
+                            ? props.data.filter(item => ((new Date(item.endTime).getMonth() == new Date().getMonth()) && (item.status === 'PAID' || item.status === 'COMPLETE'))) 
+                            : props.data.filter(item => ((new Date(item.endTime).getFullYear() == new Date().getFullYear()) && (item.status === 'PAID' || item.status === 'COMPLETE'))))}
                     renderItem={renderData}
                     ListEmptyComponent={
                         <View style={{marginTop: height/3.5, justifyContent:'center', alignItems:'center' }}>
