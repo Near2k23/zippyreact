@@ -206,7 +206,7 @@ export default function AppContainer() {
                 />
             </TouchableOpacity>
             <Text style={{
-                fontFamily: fonts.Bold,
+                fontFamily: 'Inter-Bold',
                 color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                 fontSize: 20,
                 marginTop: 8,

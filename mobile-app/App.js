@@ -75,7 +75,8 @@ export default function App() {
         'Ubuntu-Bold': require('./assets/fonts/Ubuntu-Bold.ttf'),
         "DancingScript-Bold":require('./assets/fonts/DancingScript-Bold.ttf'),
         "DancingScript-Medium":require('./assets/fonts/DancingScript-Medium.ttf'),
-        "DancingScript-SemiBold":require('./assets/fonts/DancingScript-SemiBold.ttf')
+        "DancingScript-SemiBold":require('./assets/fonts/DancingScript-SemiBold.ttf'),
+        "Inter-Bold":require('./assets/fonts/Inter-Bold.otf'),
       }),
     ]);
   };
