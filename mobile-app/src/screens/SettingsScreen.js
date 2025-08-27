@@ -231,7 +231,7 @@ export default function SettingsScreen(props) {
                                 {auth.profile && (auth.profile.firstName && auth.profile.lastName) ? 
                                     auth.profile.firstName + " " + auth.profile.lastName : t('no_name')}
                             </Text>
-                            <Text style={[styles.profilePhone, { color: mode === 'dark' ? colors.WHITE + '80' : colors.BLACK + '80' }]}>
+                            <Text style={[styles.profilePhone, { color: mode === 'dark' ? colors.WHITE : colors.BLACK + '80' }]}>
                                 {auth.profile && auth.profile.mobile ? auth.profile.mobile : '300-000-0000'}
                             </Text>
                         </View>
@@ -362,7 +362,7 @@ export default function SettingsScreen(props) {
                                             <MaterialIcons 
                                                 name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
                                                 size={24} 
-                                                color={mode === 'dark' ? colors.WHITE + '60' : colors.BLACK + '60'} 
+                                                color={mode === 'dark' ? colors.WHITE : colors.BLACK + '60'} 
                                             />
                                         </View>
                                     </TouchableOpacity>

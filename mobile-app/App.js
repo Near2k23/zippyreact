@@ -60,8 +60,6 @@ export default function App() {
     return Promise.all([
       Asset.loadAsync([
         require('./assets/images/background.jpg'),
-        require('./assets/images/logo165x90white.png'),
-        require('./assets/images/bg.jpg'),
         require('./assets/images/intro.png'),
         require('./assets/images/g4.gif'),
         require('./assets/images/lodingDriver.gif')

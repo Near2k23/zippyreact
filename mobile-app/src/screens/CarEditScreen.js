@@ -275,19 +275,27 @@ export default function CarEditScreen(props) {
                         }
                         <View style={styles.containerStyle}>
                             {state.car_image ?
-                                <View style={{ alignSelf: 'center', marginVertical: 10, borderRadius: 10, overflow: 'hidden' }}>
+                                <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
                                     <RemoteImage
                                         uri={state.car_image}
                                         desiredWidth={width * 0.8}
                                     />
-                                </View>
+                                    <View style={styles.imageOverlay}>
+                                        <Feather name="edit-2" size={24} color={colors.WHITE} />
+                                    </View>
+                                </TouchableOpacity>
                                 :
                                 capturedImage ?
                                     <View style={styles.imagePosition}>
                                         <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
                                             <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
                                         </TouchableOpacity>
-                                        <Image source={{ uri: capturedImage }} style={styles.photoResult} resizeMode={'cover'} />
+                                        <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
+                                            <Image source={{ uri: capturedImage }} style={styles.photoResult} resizeMode={'cover'} />
+                                            <View style={styles.imageOverlay}>
+                                                <Feather name="edit-2" size={24} color={colors.WHITE} />
+                                            </View>
+                                        </TouchableOpacity>
                                     </View>
                                     :
                                     <View style={styles.capturePhoto}>
@@ -477,9 +485,7 @@ export default function CarEditScreen(props) {
                                         <Text style={styles.buttonStyle}>{t('save')}</Text>
                                     )}
                                 </TouchableOpacity>
-                            ) : null}
-                            
-                            {car && car.id && !car.active ? (
+                            ) : (
                                 <TouchableOpacity
                                     style={[
                                         styles.registerButton,
@@ -492,10 +498,10 @@ export default function CarEditScreen(props) {
                                     {loading ? (
                                         <ActivityIndicator size="small" color={colors.WHITE} />
                                     ) : (
-                                        <Text style={styles.buttonStyle}>{t('make_active')}</Text>
+                                        <Text style={styles.buttonStyle}>{t('save')}</Text>
                                     )}
                                 </TouchableOpacity>
-                            ) : null}
+                            )}
                         </View>
                         </View>
                     </View>
@@ -699,6 +705,23 @@ const styles = StyleSheet.create({
     },
     myView3: {
         flex: 2.2,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    imageContainer: {
+        alignSelf: 'center',
+        marginVertical: 10,
+        borderRadius: 10,
+        overflow: 'hidden',
+        position: 'relative'
+    },
+    imageOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.4)',
         alignItems: 'center',
         justifyContent: 'center'
     }

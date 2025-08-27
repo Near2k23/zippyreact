@@ -12,7 +12,8 @@ import {
     Alert,
     Share,
     ScrollView,
-    useColorScheme
+    useColorScheme,
+    TextInput
 } from 'react-native';
 import { TouchableOpacity as OldTouch } from 'react-native';
 import { Icon, Button } from 'react-native-elements';
@@ -36,6 +37,7 @@ import { fonts } from '../common/font';
 import { getLangKey } from 'common/src/other/getLangKey';
 import DeviceInfo from 'react-native-device-info';
 import customMapStyle from "../common/mapTheme.json";
+import WaygoDialog from '../components/WaygoDialog';
 
 const hasNotch = DeviceInfo.hasNotch();
 
@@ -57,6 +59,7 @@ export default function BookedCabScreen(props) {
     const [modalVisible, setModalVisible] = useState(false);
     const [confirmModalVisible, setConfirmModalVisible] = useState(false);
     const [searchModalVisible, setSearchModalVisible] = useState(false);
+    const [cancelDialogVisible, setCancelDialogVisible] = useState(false);
     const activeBookings = useSelector(state => state.bookinglistdata.active);
     const [curBooking, setCurBooking] = useState(null);
     const cancelReasons = useSelector(state => state.cancelreasondata.complex);
@@ -70,6 +73,8 @@ export default function BookedCabScreen(props) {
     const [lastCoords, setlastCoords] = useState();
     const [arrivalTime, setArrivalTime] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [messageText, setMessageText] = useState('');
+    const [isMessageFocused, setIsMessageFocused] = useState(false);
     const [purchaseInfoModalStatus, setPurchaseInfoModalStatus] = useState(false);
     const settings = useSelector(state => state.settingsdata.settings);
 
@@ -79,6 +84,13 @@ export default function BookedCabScreen(props) {
     const [role, setRole] = useState();
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
+    const [showBottomExpanded, setShowBottomExpanded] = useState(false);
+    const [touchY, setTouchY] = useState();
+    const [ratingVisible, setRatingVisible] = useState(false);
+    const [driverRatingValue, setDriverRatingValue] = useState(0);
+    const [driverFeedback, setDriverFeedback] = useState('');
+    const [tipOptions, setTipOptions] = useState([5,10,15]);
+    const [selectedTip, setSelectedTip] = useState(null);
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -114,6 +126,15 @@ export default function BookedCabScreen(props) {
             setRole(null);
         }
     }, [auth.profile]);
+
+    // Expandir por defecto para drivers; colapsar por defecto para riders
+    useEffect(() => {
+        if (role === 'driver') {
+            setShowBottomExpanded(true);
+        } else if (role === 'customer') {
+            setShowBottomExpanded(false);
+        }
+    }, [role]);
 
     useEffect(() => {
         setInterval(() => {
@@ -256,9 +277,10 @@ export default function BookedCabScreen(props) {
                 }
                 if (booking.status == 'PAID' & pageActive.current) {
                     if (role == 'customer') {
+                        // Mostrar diálogo de calificación en lugar de navegar
                         setTimeout(() => {
-                            props.navigation.navigate('DriverRating', { bookingId: booking });
-                        }, 1000);
+                            setRatingVisible(true);
+                        }, 800);
                     }
                     if (role == 'driver') {
                         props.navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'TabRoot' }] }));
@@ -516,76 +538,43 @@ export default function BookedCabScreen(props) {
         }
     },[cancelReasons])
 
-    const cancelModal = () => {
+    // Contenido personalizado para el modal de cancelación
+    const renderCancelContent = () => {
         return (
-            <Modal
-                animationType="none"
-                transparent={true}
-                visible={modalVisible}
-                onRequestClose={() => {
-                    setModalVisible(false);
-                }}
-            >
-                <View style={styles.cancelModalContainer}>
-                    <View style={[styles.cancelModalInnerContainer,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-
-                        <View style={styles.cancelContainer}>
-                            <View style={styles.cancelReasonContainer}>
-                                <Text style={[styles.cancelReasonText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('cancel_reason_modal_title')}</Text>
-                            </View>
-
-                            <ScrollView style={styles.radioScrollContainer}>
-                                <View style={styles.radioContainer}>
-                                    {cancellationReasonsObj ? 
-                                        <RadioForm
-                                            radio_props={cancellationReasonsObj}
-                                            initial={0}
-                                            animation={false}
-                                            buttonColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                            selectedButtonColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                            buttonSize={10}
-                                            buttonOuterSize={20}
-                                            style={styles.radioContainerStyle}
-                                            labelStyle={[styles.radioText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-                                            radioStyle={[styles.radioStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                                            onPress={(value) => { setCancelReasonSelected(value) }}
-                                        />
-                                    : null}
-                                </View>
-                            </ScrollView>
-
-                            <View style={[styles.cancelModalButtosContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                <Button
-                                    title={t('close')}
-                                    titleStyle={{ fontFamily: fonts.Bold }}
-                                    onPress={() => { setModalVisible(false) }}
-                                    buttonStyle={styles.cancelModalButttonStyle}
-                                    containerStyle={styles.cancelModalButtonContainerStyle}
-                                />
-
-                                <View style={styles.buttonSeparataor} />
-
-                                <Button
-                                    title={t('ok')}
-                                    titleStyle={{ fontFamily: fonts.Bold }}
-                                    onPress={() => {
-                                        if (cancelReasonSelected >= 0) {
-                                            dispatch(cancelBooking({ booking: curBooking, reason: cancelReasons[cancelReasonSelected].label, cancelledBy: role }));
-                                            props.navigation.replace('TabRoot', { screen: 'RideList', params: { fromBooking: true } });
-                                        } else {
-                                            Alert.alert(t('alert'), t('select_reason'));
-                                        }
-                                    }}
-                                    buttonStyle={[styles.cancelModalButttonStyle, { backgroundColor: colors.GREEN }]}
-                                    containerStyle={styles.cancelModalButtonContainerStyle}
-                                />
-                            </View>
-                        </View>
+            <View style={styles.cancelContentContainer}>
+                <ScrollView style={styles.radioScrollContainer} showsVerticalScrollIndicator={false}>
+                    <View style={styles.radioContainer}>
+                        {cancellationReasonsObj ? 
+                            <RadioForm
+                                radio_props={cancellationReasonsObj}
+                                initial={0}
+                                animation={false}
+                                buttonColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                selectedButtonColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                buttonSize={10}
+                                buttonOuterSize={20}
+                                style={styles.radioContainerStyle}
+                                labelStyle={[styles.radioText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
+                                radioStyle={[styles.radioStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                                onPress={(value) => { setCancelReasonSelected(value) }}
+                            />
+                        : null}
                     </View>
-                </View>
-            </Modal>
-        )
-    }
+                </ScrollView>
+            </View>
+        );
+    };
+
+    // Función para manejar la confirmación de cancelación
+    const handleCancelConfirm = () => {
+        if (cancelReasonSelected >= 0) {
+            dispatch(cancelBooking({ booking: curBooking, reason: cancelReasons[cancelReasonSelected].label, cancelledBy: role }));
+            setModalVisible(false);
+            props.navigation.replace('TabRoot', { screen: 'RideList', params: { fromBooking: true } });
+        } else {
+            Alert.alert(t('alert'), t('select_reason'));
+        }
+    };
 
     const confirmModalClose = () => {
         //setSearchModalVisible(true);
@@ -936,192 +925,489 @@ export default function BookedCabScreen(props) {
         )
     }
 
-    return (
-        <View style={styles.mainContainer}>
-            <View style={styles.mapcontainer}>
-                {curBooking ?
-                    <MapView
-                        ref={mapRef}
-                        style={styles.map}
-                        provider={PROVIDER_GOOGLE}
-                        initialRegion={{
-                            latitude: curBooking.pickup.lat,
-                            longitude: curBooking.pickup.lng,
-                            latitudeDelta: latitudeDelta,
-                            longitudeDelta: longitudeDelta
+    // Componente para el diseño cuando el estado es ACCEPTED
+    const AcceptedBookingView = () => {
+        return (
+            <View style={[styles.mainContainer, {flexDirection: 'column', backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                
+                <View style={{
+                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
+                    paddingTop: Platform.OS === 'ios' ? 45 : 25,
+                    paddingHorizontal: 20,
+                    paddingBottom: 8,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                }}>
+                    <TouchableOpacity 
+                        onPress={() => { goBack() }}
+                        style={{ 
+                            width: 40, 
+                            height: 40, 
+                            justifyContent: 'center', 
+                            alignItems: isRTL ? 'flex-end' : 'flex-start' 
                         }}
-                        minZoomLevel={3}
-                        customMapStyle={mode === 'dark' ? customMapStyle : []}
                     >
-
-                        {(curBooking.status == 'ACCEPTED' || curBooking.status == 'ARRIVED' || curBooking.status == 'STARTED') && lastLocation ?
-                            <Marker.Animated
-                                coordinate={new AnimatedRegion({
-                                    latitude: lastLocation.lat,
-                                    longitude: lastLocation.lng,
-                                    latitudeDelta: latitudeDelta,
-                                    longitudeDelta: longitudeDelta
-                                })}
-                            >
-                                <Image
-                                    source={carImageIcon}
-                                    style={{ height: 40, width: 40 }}
-                                />
-                            </Marker.Animated>
-                            : null}
-
-                        <Marker
-                            coordinate={{ latitude: (curBooking.pickup.lat), longitude: (curBooking.pickup.lng) }}
-                            title={curBooking.pickup.add}>
-                            <Image source={require("../../assets/images/green_pin.png")} style={{ height: 35, width: 35 }} />
-                        </Marker>
-                        {curBooking != null && curBooking.waypoints && curBooking.waypoints.length > 0 ? curBooking.waypoints.map((point, index) => {
-                            return (
-                                <Marker
-                                    coordinate={{ latitude: point.lat, longitude: point.lng }}
-                                    pinColor={colors.GREEN}
-                                    title={point.add}
-                                    key={point.add}
-                                >
-                                    <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{ height: 35, width: 35 }} />
-                                </Marker>
-                            )
-                        })
-                            : null}
-                        <Marker
-                            coordinate={{ latitude: (curBooking.drop.lat), longitude: (curBooking.drop.lng) }}
-                            title={curBooking.drop.add}>
-                            <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{ height: 35, width: 35 }} />
-                        </Marker>
-
-                        {liveRouteCoords && (curBooking.status == 'ACCEPTED' || curBooking.status == 'STARTED') ?
-                            <Polyline
-                                coordinates={liveRouteCoords}
-                                strokeWidth={5}
-                                strokeColor={colors.BLUE}
-                            />
-                            : null}
-
-                        {(curBooking.status == 'NEW' || curBooking.status == 'ARRIVED' || curBooking.status == 'REACHED') && curBooking.coords ?
-                            <Polyline
-                                coordinates={curBooking.coords}
-                                strokeWidth={4}
-                                strokeColor={colors.BLUE}
-                            />
-                            : null}
-                    </MapView>
-                    : null}
-                <View style={[styles.menuIcon, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, isRTL ? { right: 15 } : { left: 15 }]}>
-                    <TouchableOpacity onPress={() => { goBack() }} style={styles.menuIconButton} >
                         <Icon
-                            name={isRTL ? 'arrow-right' : 'arrow-left'}
-                            type='font-awesome'
+                            name={isRTL ? 'arrow-right' : 'arrow-back'}
+                            type='ionicon'
                             color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                            size={26}
+                            size={24}
                         />
                     </TouchableOpacity>
                 </View>
-                <View style={[isRTL ? styles.topTitle1 : styles.topTitle, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, { height: settings && settings.otp_secure ? 60 : 45 }]}>
-                    <Text style={[styles.cabText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('booking_status')}: <Text style={styles.cabBoldText}>{curBooking && curBooking.status ? t(curBooking.status) : null} </Text></Text>
-                    {curBooking && curBooking.status == 'ACCEPTED' ?
-                        <Text style={[styles.cabText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{curBooking && curBooking.status == 'ACCEPTED' || settings && settings.showLiveRoute ? '( ' + arrivalTime + ' ' + t('mins') + ' )' : ''}</Text>
-                    : null}
-                    {role == 'customer' && settings && settings.otp_secure ?
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', padding: 1, alignSelf: 'center' }}>
-                            <Text style={[styles.otpText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{curBooking ? t('otp') + curBooking.otp : null}</Text>
-                            <View>
-                                <TouchableOpacity onPress={() => onShare(curBooking)}>
-                                    <Icon
-                                        name="share-social"
-                                        type="ionicon"
-                                        size={22}
-                                        color={colors.BLUE} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
+
+                
+                <View style={[styles.acceptedStatusContainer, {marginBottom: 15}]}>
+                    <Text style={[styles.acceptedStatusText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize: 16}]}>
+                        {t('booking_status')}: <Text style={[styles.cabBoldText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize: 16}]}>{t('ACCEPTED')}</Text>
+                    </Text>
+                </View>
+
+                
+                <View style={[styles.acceptedMapContainer, {marginHorizontal: 15, flex: 1, marginBottom: 15, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                    {curBooking ?
+                        <MapView
+                            ref={mapRef}
+                            style={styles.acceptedMap}
+                            provider={PROVIDER_GOOGLE}
+                            initialRegion={{
+                                latitude: curBooking.pickup.lat,
+                                longitude: curBooking.pickup.lng,
+                                latitudeDelta: latitudeDelta,
+                                longitudeDelta: longitudeDelta
+                            }}
+                            minZoomLevel={3}
+                            customMapStyle={mode === 'dark' ? customMapStyle : []}
+                        >
+                            {lastLocation ?
+                                <Marker.Animated
+                                    coordinate={new AnimatedRegion({
+                                        latitude: lastLocation.lat,
+                                        longitude: lastLocation.lng,
+                                        latitudeDelta: latitudeDelta,
+                                        longitudeDelta: longitudeDelta
+                                    })}
+                                >
+                                    <Image
+                                        source={role === 'driver' ? carImageIcon : (curBooking && curBooking.carImage ? { uri: curBooking.carImage } : require('../../assets/images/microBlackCar.png'))}
+                                        style={{ width: 40, height: 40, alignSelf: 'center', resizeMode: 'contain', transform: [isRTL ? { scaleX: -1 } : { scaleX: 1 }] }}
+                                    />
+                                </Marker.Animated>
+                                : null}
+
+                            <Marker
+                                coordinate={{ latitude: (curBooking.pickup.lat), longitude: (curBooking.pickup.lng) }}
+                                title={curBooking.pickup.add}>
+                                <Image source={require("../../assets/images/green_pin.png")} style={{ height: 35, width: 35 }} />
+                            </Marker>
+                            
+                            {curBooking != null && curBooking.waypoints && curBooking.waypoints.length > 0 ? curBooking.waypoints.map((point, index) => {
+                                return (
+                                    <Marker
+                                        coordinate={{ latitude: point.lat, longitude: point.lng }}
+                                        pinColor={colors.GREEN}
+                                        title={point.add}
+                                        key={point.add}
+                                    >
+                                        <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{ height: 35, width: 35 }} />
+                                    </Marker>
+                                )
+                            }) : null}
+                            
+                            <Marker
+                                coordinate={{ latitude: (curBooking.drop.lat), longitude: (curBooking.drop.lng) }}
+                                title={curBooking.drop.add}>
+                                <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{ height: 35, width: 35 }} />
+                            </Marker>
+
+                            {liveRouteCoords ?
+                                <Polyline
+                                    coordinates={liveRouteCoords}
+                                    strokeWidth={5}
+                                    strokeColor={colors.BLUE}
+                                />
+                                : null}
+                        </MapView>
                         : null}
                 </View>
 
-                {(curBooking && curBooking.status && auth.profile && auth.profile.uid && ((['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED'].indexOf(curBooking.status) != -1))) && (settings && settings.panic && settings.panic.length > 0) && (role === 'driver' || appConsts.canCall) ?
-                    <TouchableOpacity style={[styles.floatButton,{backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}, isRTL ? { right: 10, bottom: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 285 : 360 } : { left: 10, bottom: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 300 : (role == 'customer' && (curBooking && curBooking.status == 'ACCEPTED')) ? 350 : 330 }]}
-                        onPress={() => submitComplain(curBooking)} >
-                        <Text style={[styles.driverNameText, { color: colors.WHITE }]}>{t('sos').toUpperCase()}</Text>
-                    </TouchableOpacity>
-                    : null}
-
-                {curBooking && !(curBooking.status == 'NEW') ?
-                    <TouchableOpacity
-                        style={[styles.floatButton,{backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}, isRTL ? { left: 10, bottom: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 345 : 410 } : { right: 10, bottom: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 360 : (role == 'customer' && (curBooking && curBooking.status == 'ACCEPTED')) ? 408 : 388 }]}
-                        // onPress={() => openWhatsApp()}
-                        onPress={settings && settings.chatViaWhatsApp===true ? () => openWhatsApp()  :()=>chat() }
-                    >
-                        <Icon
-                            name="chatbubbles"
-                            type="ionicon"
-                            size={30}
-                            color={colors.WHITE}
+                
+                <View style={{padding: 20, marginTop: 'auto'}}>
+                    
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 15,
+                    }}>
+                        <Image 
+                            source={curBooking.driver_image ? { uri: curBooking.driver_image } : require('../../assets/images/profilePic.png')} 
+                            style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: 30,
+                                marginRight: 15,
+                            }} 
                         />
-                    </TouchableOpacity>
-                    : null}
-                {curBooking && !(curBooking.status == 'NEW') ?
-                    <TouchableOpacity
-                        style={[styles.floatButton,{backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}, isRTL ? { left: 10, bottom: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 285 : 350 } : { right: 10, bottom: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 300 : (role == 'customer' && (curBooking && curBooking.status == 'ACCEPTED')) ? 350 : 330 }]}
-                        onPress={() => role == 'customer' ? onPressCall(curBooking.driver_contact) : (curBooking.otherPersonPhone && curBooking.otherPersonPhone.length > 0 ? onPressCall(curBooking.otherPersonPhone) : onPressCall(curBooking.customer_contact))}
-                    >
-                        <Icon
-                            name="call"
-                            type="ionicon"
-                            size={30}
-                            color={colors.WHITE}
-                        />
-                    </TouchableOpacity>
-                    : null}
+                        <View style={{ flex: 1 }}>
+                            <Text style={{
+                                fontSize: 18,
+                                fontWeight: '600',
+                                marginBottom: 4,
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                            }}>
+                                {curBooking.driver_name}
+                            </Text>
+                            <Text style={{
+                                fontSize: 14,
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK + '80'
+                            }}>
+                                {t('assigned_driver')}
+                            </Text>
+                        </View>
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                        }}>
+                            <StarRating
+                                maxStars={1}
+                                starSize={20}
+                                enableHalfStar={true}
+                                color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                emptyColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                rating={Math.round(parseFloat(curBooking.driverRating) * 2) / 2}
+                                style={[styles.ratingContainerStyle, isRTL ? { marginRight: 0, transform: [{ scaleX: -1 }] } : { scaleX: 1 }]}
+                                onChange={() => {}}
+                            />
+                            <Text style={{
+                                fontSize: 16,
+                                fontWeight: '600',
+                                marginLeft: 8,
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                            }}>
+                                {curBooking.driverRating}
+                            </Text>
+                        </View>
+                    </View>
 
+                    
+                    <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        marginBottom: 15,
+                    }}>
+                    <View style={{
+                        alignItems: 'center',
+                        flex: 1,
+                    }}>
+                        <Text style={{
+                            fontSize: 14,
+                            marginBottom: 4,
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK + '80'
+                        }}>
+                            {t('distance')}
+                        </Text>
+                        <Text style={{
+                            fontSize: 16,
+                            fontWeight: '600',
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                        }}>
+                            {parseFloat(curBooking.estimateDistance).toFixed(settings.decimal)} {settings.convert_to_mile ? t('mile') : t('km')}
+                        </Text>
+                    </View>
+                    <View style={{
+                        alignItems: 'center',
+                        flex: 1,
+                    }}>
+                        <Text style={{
+                            fontSize: 14,
+                            marginBottom: 4,
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK + '80'
+                        }}>
+                            {t('time')}
+                        </Text>
+                        <Text style={{
+                            fontSize: 16,
+                            fontWeight: '600',
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                        }}>
+                            {arrivalTime} {t('mins')}
+                        </Text>
+                    </View>
+                    <View style={{
+                        alignItems: 'center',
+                        flex: 1,
+                    }}>
+                        <Text style={{
+                            fontSize: 14,
+                            marginBottom: 4,
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK + '80'
+                        }}>
+                            {t('cost')}
+                        </Text>
+                        <Text style={{
+                            fontSize: 16,
+                            fontWeight: '600',
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                        }}>
+                            {settings && settings.swipe_symbol === false ?
+                                `${settings.symbol} ${curBooking && curBooking.trip_cost > 0 ? formatAmount(curBooking.trip_cost, settings.decimal, settings.country) : curBooking && curBooking.estimate ? formatAmount(curBooking.trip_cost, settings.decimal, settings.country) : 0}` :
+                                `${curBooking && curBooking.trip_cost > 0 ? formatAmount(curBooking.trip_cost, settings.decimal, settings.country) : curBooking && curBooking.estimate ? formatAmount(curBooking.trip_cost, settings.decimal, settings.country) : 0} ${settings.symbol}`
+                            }
+                        </Text>
+                    </View>
+                </View>
+
+                
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 10,
+                        marginTop: 10,
+                    }}>
+                        <TouchableOpacity 
+                            style={{
+                                flex: 1,
+                                marginRight: 10,
+                                height: 50,
+                                borderRadius: 12,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5',
+                                borderWidth: 1,
+                                borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC',
+                            }}
+                            onPress={() => {
+                                props.navigation.navigate("onlineChat", { bookingId: bookingId, status: curBooking.status });
+                            }}
+                        >
+                            <Text style={{
+                                fontSize: 14,
+                                fontWeight: '500',
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                            }}>
+                                {t('contact_form_message_placeholder')}
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                             style={[
+                                 {
+                                     width: 50,
+                                     height: 50,
+                                     borderRadius: 12,
+                                     justifyContent: 'center',
+                                     alignItems: 'center',
+                                     backgroundColor: colors.BLUE,
+                                     shadowColor: "#000",
+                                     shadowOffset: {
+                                         width: 0,
+                                         height: 2,
+                                     },
+                                     shadowOpacity: 0.1,
+                                     shadowRadius: 3,
+                                     elevation: 3,
+                                     marginRight: 10,
+                                 }
+                             ]}
+                             onPress={() => {
+                                 role == 'customer' ? 
+                                     onPressCall(curBooking.driver_contact) : 
+                                     (curBooking.otherPersonPhone && curBooking.otherPersonPhone.length > 0 ? 
+                                         onPressCall(curBooking.otherPersonPhone) : 
+                                         onPressCall(curBooking.customer_contact)
+                                     );
+                             }}
+                         >
+                             <Icon 
+                                 name="call" 
+                                 type="ionicon" 
+                                 size={24} 
+                                 color={colors.WHITE} 
+                             />
+                         </TouchableOpacity>
+                        <TouchableOpacity 
+                            style={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: 10,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: colors.RED,
+                                shadowColor: "#000",
+                                shadowOffset: {
+                                    width: 0,
+                                    height: 2,
+                                },
+                                shadowOpacity: 0.1,
+                                shadowRadius: 3,
+                                elevation: 3,
+                            }}
+                            onPress={() => {
+                                setCancelDialogVisible(true);
+                            }}
+                        >
+                            <Icon 
+                                name="close" 
+                                type="ionicon" 
+                                size={24} 
+                                color={colors.WHITE} 
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </View>
-            <View style={[styles.vew1,
-            { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE,paddingVertical: 5, minHeight: (role == 'customer' && (curBooking && curBooking.status == 'NEW')) ? 220 : (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'REACHED' || curBooking.status == 'PAID' || (curBooking && curBooking.status == 'STARTED'))) ? 240 : 285 }]}>
+        );
+    };
+
+    return (
+        <View style={styles.mainContainer}>
+            
+            {curBooking && curBooking.status === 'ACCEPTED' && role === 'customer' ? (
+                <AcceptedBookingView />
+            ) : (
+                /* Diseño original para otros estados */
+                <>
+                    <View style={styles.mapcontainer}>
+                        {curBooking ?
+                            <MapView
+                                ref={mapRef}
+                                style={styles.map}
+                                provider={PROVIDER_GOOGLE}
+                                initialRegion={{
+                                    latitude: curBooking.pickup.lat,
+                                    longitude: curBooking.pickup.lng,
+                                    latitudeDelta: latitudeDelta,
+                                    longitudeDelta: longitudeDelta
+                                }}
+                                minZoomLevel={3}
+                                customMapStyle={mode === 'dark' ? customMapStyle : []}
+                            >
+
+                                {(curBooking.status == 'ACCEPTED' || curBooking.status == 'ARRIVED' || curBooking.status == 'STARTED') && lastLocation ?
+                                    <Marker.Animated
+                                        coordinate={new AnimatedRegion({
+                                            latitude: lastLocation.lat,
+                                            longitude: lastLocation.lng,
+                                            latitudeDelta: latitudeDelta,
+                                            longitudeDelta: longitudeDelta
+                                        })}
+                                    >
+                                        <Image
+                                            source={role === 'driver' ? carImageIcon : (curBooking && curBooking.carImage ? { uri: curBooking.carImage } : require('../../assets/images/microBlackCar.png'))}
+                                            style={{ width: 40, height: 40, alignSelf: 'center', resizeMode: 'contain', transform: [isRTL ? { scaleX: -1 } : { scaleX: 1 }] }}
+                                        />
+                                    </Marker.Animated>
+                                    : null}
+
+                                <Marker
+                                    coordinate={{ latitude: (curBooking.pickup.lat), longitude: (curBooking.pickup.lng) }}
+                                    title={curBooking.pickup.add}>
+                                    <Image source={require("../../assets/images/green_pin.png")} style={{ height: 35, width: 35 }} />
+                                </Marker>
+                                {curBooking != null && curBooking.waypoints && curBooking.waypoints.length > 0 ? curBooking.waypoints.map((point, index) => {
+                                    return (
+                                        <Marker
+                                            coordinate={{ latitude: point.lat, longitude: point.lng }}
+                                            pinColor={colors.GREEN}
+                                            title={point.add}
+                                            key={point.add}
+                                        >
+                                            <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{ height: 35, width: 35 }} />
+                                        </Marker>
+                                    )
+                                })
+                                    : null}
+                                <Marker
+                                    coordinate={{ latitude: (curBooking.drop.lat), longitude: (curBooking.drop.lng) }}
+                                    title={curBooking.drop.add}>
+                                    <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{ height: 35, width: 35 }} />
+                                </Marker>
+
+                                {liveRouteCoords && (curBooking.status == 'ACCEPTED' || curBooking.status == 'STARTED') ?
+                                    <Polyline
+                                        coordinates={liveRouteCoords}
+                                        strokeWidth={5}
+                                        strokeColor={colors.BLUE}
+                                    />
+                                    : null}
+
+                                {(curBooking.status == 'NEW' || curBooking.status == 'ARRIVED' || curBooking.status == 'REACHED') && curBooking.coords ?
+                                    <Polyline
+                                        coordinates={curBooking.coords}
+                                        strokeWidth={4}
+                                        strokeColor={colors.BLUE}
+                                    />
+                                    : null}
+                            </MapView>
+                            : null}
+                        <View style={[styles.menuIcon, { backgroundColor: 'transparent', shadowOpacity: 0, elevation: 0 }, isRTL ? { right: 15 } : { left: 15 }]}>
+                            <TouchableOpacity onPress={() => { goBack() }} style={styles.menuIconButton} >
+                                <Icon
+                                    name={isRTL ? 'arrow-right' : 'arrow-back'}
+                                    type='ionicon'
+                                    color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                                    size={24}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                        
+
+                        
+
+                    </View>
+                </>
+            )}
+            
+            {!(curBooking && curBooking.status === 'ACCEPTED' && role === 'customer') && (
+                <View
+                    style={[styles.unifiedModal, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}
+                    onTouchStart={e => setTouchY(e.nativeEvent.pageY)}
+                    onTouchEnd={e => {
+                        if ((touchY - e.nativeEvent.pageY > 50) && !showBottomExpanded) setShowBottomExpanded(true);
+                        if ((e.nativeEvent.pageY - touchY > 50) && showBottomExpanded) setShowBottomExpanded(false);
+                    }}
+                >
+                <View style={[styles.bar, { backgroundColor: '#E2E6EA', marginVertical: 8, alignSelf: 'center' }]} />
+                <View style={{ paddingBottom: 15 }}>
+                
+                <View style={{ alignItems: 'flex-start', marginTop: 2, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 16, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                        {curBooking && curBooking.status ? (t(curBooking.status).charAt(0).toUpperCase() + t(curBooking.status).slice(1).toLowerCase()) : ''}
+                    </Text>
+                </View>
                 {curBooking && curBooking.status != "NEW" ?
                     <View style={{ minHeight: (role == 'customer' && ((curBooking && curBooking.status == 'ARRIVED') || curBooking.status == 'PAID' || curBooking.status == 'REACHED' || (curBooking && curBooking.status == 'STARTED'))) ? '10%' : '8%', justifyContent: 'center' }}>
                         {role == 'customer' ?
                             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', padding: 3, alignSelf: 'flex-start', width: '100%', borderTopRightRadius: 10, borderTopLeftRadius: 10 }}>
-                                <Image source={curBooking.driver_image ? { uri: curBooking.driver_image } : require('../../assets/images/profilePic.png')} style={{ height: 55, width: 55, borderRadius: 30, marginLeft: isRTL ? 0 : 1 }} />
+                                <Image source={curBooking.driver_image ? { uri: curBooking.driver_image } : require('../../assets/images/profilePic.png')} style={{ height: 46, width: 46, borderRadius: 23, marginLeft: isRTL ? 0 : 1 }} />
                                 <View style={{ width: '85%', flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
                                     <View style={{ width: '60%', justifyContent: 'center' }}>
-                                        <Text style={[styles.driverNameText, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>{curBooking.driver_name}</Text>
-                                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
-                                            <StarRating
-                                                maxStars={1}
-                                                starSize={20}
-                                                enableHalfStar={true}
-                                                color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                                emptyColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                                //rating={parseFloat(curBooking.driverRating)}
-                                                rating={Math.round(parseFloat(curBooking.driverRating) * 2) / 2}
-                                                style={[styles.ratingContainerStyle, isRTL ? { marginRight: 0, transform: [{ scaleX: -1 }] } : { scaleX: 1 }]}
-                                                onChange={() => {
-                                                    //console.log('hello')
-                                                }}
-                                            />
-                                            <Text style={[styles.driverNameText, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>{curBooking.driverRating}</Text>
-                                        </View>
+                                        <Text style={[styles.driverNameText, { fontSize: 14, textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>{curBooking.driver_name}</Text>
+                                        <Text style={{ fontSize: 12, fontFamily: fonts.Regular, color: colors.SHADOW, textAlign: isRTL ? 'right' : 'left', marginTop: 2, marginLeft: isRTL ? 0 : 4, marginRight: isRTL ? 4 : 0 }} numberOfLines={1}>
+                                            {t('assigned_driver')}
+                                        </Text>
+                                        
                                     </View>
                                     <View style={{ marginTop: 2, alignItems: 'center', marginLeft: isRTL ? 10 : 0, marginRight: isRTL ? 0 : 10, width: '40%' }}>
-                                        <Image source={{ uri: curBooking.carImage }} resizeMode={'contain'} style={{ height: 40, width: 60, }} />
-                                        <View style={{ marginTop: 2, alignItems: 'center', width: '100%' }}>
-                                            <Text numberOfLines={2} style={[styles.cabNameText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t(getLangKey(curBooking.carType))}</Text>
+                                        <View style={{ alignSelf: 'flex-end' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: mode === 'dark' ? '#2C2C2E' : '#F1F5F9', borderRadius: 12, paddingHorizontal: 8, height: 24 }}>
+                                                <Icon name="star" type="ionicon" size={14} color={colors.STAR} />
+                                                <Text style={{ marginLeft: 4, fontSize: 12, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                                                    {curBooking.driverRating}
+                                                </Text>
                                         </View>
-                                        <View style={{ marginTop: 2, alignItems: 'center', width: '100%' }}>
-                                            <Text numberOfLines={2} style={[styles.cabNameText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{curBooking.vehicle_number}</Text>
                                         </View>
+                                        <Text style={{ marginTop: 6, alignSelf: 'flex-end', fontSize: 12, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK }} numberOfLines={1}>
+                                            {curBooking.vehicle_number}
+                                        </Text>
                                     </View>
                                 </View>
                             </View>
                             :
                             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', padding: 3, alignSelf: 'flex-start', width: '100%', borderTopRightRadius: 10, borderTopLeftRadius: 10 }}>
-                                <Image source={curBooking.customer_image ? { uri: curBooking.customer_image } : require('../../assets/images/profilePic.png')} style={{ height: 55, width: 55, borderRadius: 25, marginLeft: isRTL ? 0 : 5 }} />
+                                <Image source={curBooking.customer_image ? { uri: curBooking.customer_image } : require('../../assets/images/profilePic.png')} style={{ height: 46, width: 46, borderRadius: 23, marginLeft: isRTL ? 0 : 5 }} />
                                 <View style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between' }}>
                                     <View style={{ flex: 1, justifyContent: 'center' }}>
-                                        <Text style={[styles.driverNameText, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{curBooking.customer_name}</Text>
+                                        <Text style={[styles.driverNameText, { fontSize: 14, textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{curBooking.customer_name}</Text>
                                     </View>
                                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginLeft: isRTL ? 5 : 0, marginRight: isRTL ? 0 : 5 }}>
 
@@ -1146,9 +1432,9 @@ export default function BookedCabScreen(props) {
                                                 }
                                             >
                                                 <Icon 
-                                                    name="navigate-circle"
-                                                    type="ionicon"
-                                                    size={30}
+                                                    name="google-maps"
+                                                    type="material-community"
+                                                    size={28}
                                                     color={colors.WHITE}
                                                 />
                                             </TouchableOpacity>
@@ -1160,35 +1446,43 @@ export default function BookedCabScreen(props) {
                         }
                     </View>
                     : null}
-                <View style={{
-                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, alignSelf: 'center', borderWidth: 1, borderColor: colors.SHADOW, color: colors.SHADOW, borderRadius: 10, height: 100
-                }}>
-                    <ScrollView style={{ flex: 1 }}>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 5, marginBottom: 8 }}>
-                            <View style={[styles.locationStyle,{borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderWidth: 2}]}>
-                                <Ionicons name="location-sharp" size={22} color={colors.GREEN} />
+                
+                {showBottomExpanded ? (
+                    <View style={[styles.addressRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginBottom: 15, marginTop: 10 }]}>
+                        <View style={styles.iconColumn}>
+                            <View style={[styles.pickupIconContainer, { 
+                                borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
+                                backgroundColor: colors.WHITE
+                            }]}>
+                                <View style={[styles.locationDot, { 
+                                    backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
+                                }]} />
                             </View>
-                            <Text numberOfLines={1} style={[styles.textStyle, { textAlign: isRTL ? 'right' : 'left', width: '85%', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{curBooking ? curBooking.pickup.add : ""}</Text>
+                            <View style={[styles.dashedLine, { borderColor: mode === 'dark' ? colors.WHITE : colors.SHADOW }]} />
+                            <View style={[styles.locationIcon, { backgroundColor: colors.WHITE }]}>
+                                <Icon 
+                                    name="location"
+                                    type="ionicon"
+                                    size={10}
+                                    color={colors.RED}
+                                />
                         </View>
-                        {curBooking != null && curBooking.waypoints && curBooking.waypoints.length > 0 ? curBooking.waypoints.map((point, index) => {
-                            return (
-                                <View key={"key" + index} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: 8 }}>
-                                    <View style={[styles.locationStyle,{borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderWidth: 2}]}>
-                                        <Ionicons name="location-sharp" size={24} color={colors.SHADOW}  />
                                     </View>
-                                    <Text numberOfLines={1} style={[styles.textStyle, { textAlign: isRTL ? 'right' : 'left', width: '85%', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{curBooking ? point.add : ""}</Text>
+                        <View style={styles.addressColumn}>
+                            <View style={styles.addressField}>
+                                <Text numberOfLines={1} style={[styles.addressText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                    {curBooking ? curBooking.pickup.add : ''}
+                                </Text>
                                 </View>
-                            )
-                        })
-                            : null}
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: 2 }}>
-                            <View style={[styles.locationStyle,{borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderWidth: 2}]}>
-                                <Ionicons name="location-sharp" size={24} color={colors.RED} />
+                            <View style={[styles.separator, { backgroundColor: mode === 'dark' ? colors.WHITE + '20' : colors.SHADOW + '20' }]} />
+                            <View style={styles.addressField}>
+                                <Text numberOfLines={1} style={[styles.addressText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                    {curBooking ? curBooking.drop.add : ''}
+                                </Text>
                             </View>
-                            <Text numberOfLines={1} style={[styles.textStyle, { textAlign: isRTL ? 'right' : 'left', width: '85%', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{curBooking ? curBooking.drop.add : ""}</Text>
                         </View>
-                    </ScrollView>
                 </View>
+                ) : null}
                 {(curBooking && curBooking.status == 'ARRIVED' || curBooking && curBooking.status == 'ACCEPTED' || curBooking && curBooking.status == 'REACHED' || curBooking && curBooking.status == 'PAID' || curBooking && curBooking.status == 'STARTED') ?
                     <View style={{ justifyContent: 'space-around', alignItems: 'center', flexDirection: isRTL ? 'row-reverse' : 'row', height: 55 }}>
                         <View style={{ alignItems: 'center' }}>
@@ -1201,7 +1495,7 @@ export default function BookedCabScreen(props) {
                         </View>
                         <View style={{ alignItems: 'center' }}>
                             <Text style={{fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{t('cost')}</Text>
-                            {/* <Text style={{fontWeight:'bold'}}>{curBooking? curBooking.distance:null}</Text> */}
+                            
                             {settings && settings.swipe_symbol === false ?
                                 <Text style={{ fontFamily:fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{settings.symbol} {curBooking && curBooking.trip_cost > 0 ? formatAmount(curBooking.trip_cost, settings.decimal, settings.country) : curBooking && curBooking.estimate ? formatAmount(curBooking.trip_cost, settings.decimal, settings.country) : 0}</Text>
                                 :
@@ -1224,16 +1518,54 @@ export default function BookedCabScreen(props) {
                         <Text style={{ fontFamily:fonts.Bold, fontSize: 16, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{moment(curBooking.tripdate).format('lll')}</Text>
                     </View>
                     : null}
+                
+                {curBooking && !(curBooking.status == 'NEW') ? (
+                    <View style={[styles.acceptedActionButtons, { marginTop: 10, marginBottom: 10 }]}>
+                        {(curBooking && curBooking.status && auth.profile && auth.profile.uid && ((['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED'].indexOf(curBooking.status) != -1))) && (settings && settings.panic && settings.panic.length > 0) && (role === 'driver' || appConsts.canCall) ? (
+                            <TouchableOpacity
+                                style={[styles.acceptedActionButton, { backgroundColor: colors.RED }]}
+                                onPress={() => submitComplain(curBooking)}
+                            >
+                                <Icon name="alarm-light" type="material-community" size={24} color={colors.WHITE} />
+                            </TouchableOpacity>
+                        ) : null}
+
+                        <TouchableOpacity
+                            style={[styles.acceptedActionButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                            onPress={settings && settings.chatViaWhatsApp===true ? () => openWhatsApp()  :()=>chat() }
+                        >
+                            <Icon name="chatbubbles" type="ionicon" size={26} color={colors.WHITE} />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.acceptedActionButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                            onPress={() => role == 'customer' ? onPressCall(curBooking.driver_contact) : (curBooking.otherPersonPhone && curBooking.otherPersonPhone.length > 0 ? onPressCall(curBooking.otherPersonPhone) : onPressCall(curBooking.customer_contact))}
+                        >
+                            <Icon name="call" type="ionicon" size={26} color={colors.WHITE} />
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
                 {
                     renderButtons()
                 }
+                </View>
             </View>
+            )}
             {
                 PurchaseInfoModal()
             }
-            {
-                cancelModal()
-            }
+            <WaygoDialog
+                visible={modalVisible}
+                onClose={() => setModalVisible(false)}
+                title={t('cancel_reason_modal_title')}
+                type="warning"
+                showButtons={true}
+                onConfirm={handleCancelConfirm}
+                confirmText={t('ok')}
+                cancelText={t('close')}
+                customContent={renderCancelContent()}
+                showIcon={false}
+            />
             {
                 alertModal()
             }
@@ -1243,6 +1575,97 @@ export default function BookedCabScreen(props) {
             {
                 confirmModal()
             }
+            
+            <WaygoDialog
+                visible={ratingVisible}
+                onClose={() => setRatingVisible(false)}
+                title={''}
+                type="confirm"
+                showButtons={false}
+                showIcon={false}
+                customContent={(
+                    <View>
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 }}>
+                            <View style={{ width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, backgroundColor: colors.PAGEBACK, alignItems: 'center', justifyContent: 'center' }}>
+                                <Image source={curBooking?.driver_image ? { uri: curBooking.driver_image } : require('../../assets/images/profilePic.png')} style={{ width: 58, height: 58, borderRadius: 29 }} />
+                            </View>
+                            <View style={{ marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0 }}>
+                                <Text style={{ fontSize: 18, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK }} numberOfLines={1}>
+                                    {curBooking ? curBooking.driver_name : ''}
+                                </Text>
+                                <Text style={{ fontSize: 14, fontFamily: fonts.Medium, color: colors.SHADOW }} numberOfLines={1}>
+                                    {t('assigned_driver')}
+                                </Text>
+                            </View>
+                        </View>
+                        <View style={{ alignItems: 'center', marginBottom: 10 }}>
+                            <Text style={{ fontSize: 18, fontFamily: fonts.Bold, textAlign: 'center', color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginBottom: 4 }}>{t('how_your_trip')}</Text>
+                            <Text style={{ fontSize: 13, fontFamily: fonts.Regular, textAlign: 'center', color: colors.SHADOW, marginBottom: 10 }}>{t('your_feedback_test')}</Text>
+                            <StarRating
+                                maxStars={5}
+                                starSize={32}
+                                enableHalfStar={true}
+                                color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                emptyColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                rating={driverRatingValue}
+                                onChange={(rating) => setDriverRatingValue(rating)}
+                                style={[isRTL ? { transform: [{ scaleX: -1 }] } : null]}
+                            />
+                        </View>
+                        <View style={{ borderColor: '#DEE5EA', borderWidth: 2, borderRadius: 16, backgroundColor: mode === 'dark' ? '#1E1E1E' : colors.WHITE, padding: 8, marginBottom: 14 }}>
+                            <TextInput
+                                multiline={true}
+                                style={{ minHeight: 110, padding: 8, fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left' }}
+                                placeholder={t('your_feedback') + '...'}
+                                placeholderTextColor={'#9AA3AB'}
+                                onChangeText={(text) => setDriverFeedback(text)}
+                                value={driverFeedback}
+                                numberOfLines={6}
+                            />
+                        </View>
+                        <Text style={{ fontSize: 18, fontFamily: fonts.Bold, textAlign: 'center', color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginBottom: 8 }}>{t('addtip')}</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            {tipOptions.map((percent, idx) => {
+                                const fare = curBooking?.trip_cost ? parseFloat(curBooking.trip_cost) : 0;
+                                const tipAmount = parseFloat((fare * (percent/100)).toFixed(settings?.decimal || 2));
+                                const isSelected = selectedTip === tipAmount;
+                                return (
+                                    <TouchableOpacity key={idx} onPress={() => setSelectedTip(tipAmount)} style={{ width: '30%', height: 42, borderRadius: 10, borderWidth: 1, borderColor: isSelected ? 'transparent' : '#CBD5DC', backgroundColor: isSelected ? '#F3BE12' : colors.WHITE, alignItems: 'center', justifyContent: 'center' }}>
+                                        <Text style={{ fontFamily: fonts.Bold, fontSize: 14, color: colors.BLACK }}>
+                                            {settings?.swipe_symbol === false 
+                                                ? `${settings?.symbol}${formatAmount(tipAmount, settings?.decimal, settings?.country)}`
+                                                : `${formatAmount(tipAmount, settings?.decimal, settings?.country)} ${settings?.symbol}`}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )
+                            })}
+                        </View>
+                        <View style={{ marginTop: 12 }}>
+                            <Button
+                                title={t('submit_rating')}
+                                titleStyle={{ fontFamily: fonts.Bold }}
+                                onPress={() => {
+                                    if (curBooking) {
+                                        let updated = { ...curBooking };
+                                        updated.rating = driverRatingValue;
+                                        updated.feedback = driverFeedback;
+                                        if (selectedTip) {
+                                            updated.tipamount = parseFloat(selectedTip);
+                                        }
+                                        updated.status = 'COMPLETE';
+                                        dispatch(updateBooking(updated));
+                                        setRatingVisible(false);
+                                        props.navigation.navigate('TabRoot', { name: 'RideList', params: { fromBooking: true } });
+                                    } else {
+                                        setRatingVisible(false);
+                                    }
+                                }}
+                                buttonStyle={{ height: 50, borderRadius: 12, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}
+                            />
+                        </View>
+                    </View>
+                )}
+            />
             <OtpModal
                 modalvisable={otpModalVisible}
                 requestmodalclose={() => { setOtpModalVisible(false) }}
@@ -1250,13 +1673,27 @@ export default function BookedCabScreen(props) {
                 onMatch={(value) => value ? appConsts.hasStartOtp ? startBooking() : endBooking() : null}
                 mode={mode}
             />
+            <WaygoDialog
+                visible={cancelDialogVisible}
+                onClose={() => setCancelDialogVisible(false)}
+                title="Cancelar viaje"
+                message="¿Estás seguro de que deseas cancelar este viaje?"
+                type="warning"
+                showButtons={true}
+                onConfirm={() => {
+                    setCancelDialogVisible(false);
+                    setModalVisible(true);
+                }}
+                confirmText="Sí, cancelar"
+                cancelText="No, mantener"
+            />
         </View>
     );
 
 }
 
 const styles = StyleSheet.create({
-    mainContainer: { flex: 1, backgroundColor: colors.WHITE, },
+    mainContainer: { flex: 1, backgroundColor: colors.WHITE },
     headerStyle: {
         backgroundColor: colors.HEADER,
         borderBottomWidth: 0,
@@ -1393,19 +1830,21 @@ const styles = StyleSheet.create({
     okButtonStyle: { flexDirection: 'row', backgroundColor: colors.SHADOW, alignItems: 'center', justifyContent: 'center' },
     okButtonContainerStyle: { flex: 1, width: (width * 0.85), backgroundColor: colors.SHADOW, },
 
-    cancelModalContainer: { flex: 1, justifyContent: 'center', backgroundColor: colors.BACKGROUND },
-    cancelModalInnerContainer: { height: 500, width: width * 0.85, padding: 0, alignItems: 'center', alignSelf: 'center', borderRadius: 7 },
-    cancelContainer: { flex: 1, justifyContent: 'space-between', width: (width * 0.85) },
-    cancelReasonContainer: { flex: 1 },
-    cancelReasonText: { top: 10, color: colors.BLACK, fontFamily:fonts.Bold, fontSize: 20, alignSelf: 'center' },
+    // Estilos para el contenido personalizado del modal de cancelación
+    cancelContentContainer: {
+        width: '100%',
+        maxHeight: 300,
+        paddingVertical: 10,
+    },
+    radioScrollContainer: {
+        maxHeight: 250,
+        paddingHorizontal: 10,
+    },
+    // Estilos mantenidos para el contenido del modal de cancelación
     radioContainer: { flex: 8, alignItems: 'center' },
     radioText: { fontSize: 16, fontFamily: fonts.Medium },
     radioContainerStyle: { paddingTop: 30, marginHorizontal: 10 },
     radioStyle: { paddingBottom: 25 },
-    cancelModalButtosContainer: { flex: 1, alignItems: 'center', justifyContent: 'space-evenly', marginBottom: 10 },
-    buttonSeparataor: { height: height / 35, width: 0.8, backgroundColor: colors.WHITE, alignItems: 'center', marginTop: 3 },
-    cancelModalButttonStyle: { backgroundColor: colors.RED, borderRadius: 0 },
-    cancelModalButtonContainerStyle: { minWidth: 140, alignSelf: 'center', borderRadius: 10 },
     textStyle: {
         fontFamily: fonts.Regular,
         fontSize: 16
@@ -1426,7 +1865,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         width: 50,
         height: 50,
-        borderRadius: 30
+        borderRadius: 12
     },
     centeredView: {
         flex: 1,
@@ -1602,5 +2041,207 @@ const styles = StyleSheet.create({
         maxHeight: 380,
         width: '100%',
         marginVertical: 5,
-    }
+    },
+    // Estilos para el diseño ACCEPTED
+    acceptedStatusContainer: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 100 : 80,
+        left: 20,
+        right: 20,
+        zIndex: 1000,
+        borderRadius: 25,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        backgroundColor: '#1369B466',
+    },
+    acceptedStatusText: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    acceptedMapContainer: {
+        height: 600,
+        width: '90%',
+        marginTop: 60,
+        marginBottom: 20,
+        marginHorizontal: 20,
+        borderRadius: 20,
+        overflow: 'hidden',
+        alignSelf: 'center',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 6,
+        elevation: 8,
+    },
+    acceptedMap: {
+        flex: 1,
+    },
+    acceptedBottomContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        borderTopLeftRadius: 25,
+        borderTopRightRadius: 25,
+        paddingTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 30,
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: -2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 5,
+    },
+    acceptedDriverInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    acceptedDriverImage: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        marginRight: 15,
+    },
+    acceptedDriverDetails: {
+        flex: 1,
+    },
+    acceptedDriverName: {
+        fontSize: 18,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    acceptedDriverSubtitle: {
+        fontSize: 14,
+    },
+    acceptedRatingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    acceptedRatingText: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    acceptedTripInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    acceptedTripInfoItem: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    acceptedTripInfoLabel: {
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    acceptedTripInfoValue: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    acceptedActionButtons: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingHorizontal: 40,
+    },
+    acceptedActionButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 3,
+    },
+    unifiedModal: {
+        width: '96%',
+        justifyContent: 'flex-start',
+        position: 'absolute',
+        bottom: 25,
+        alignSelf: 'center',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+        elevation: 6,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+        paddingHorizontal: 15,
+        paddingTop: 0,
+    },
+    bar: {
+        width: 100,
+        height: 6,
+        borderRadius: 3,
+    },
+    addressRow: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    iconColumn: {
+        width: 20,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        marginRight: 15,
+        paddingTop: 15,
+    },
+    pickupIconContainer: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    locationDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    locationIcon: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: colors.RED,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dashedLine: {
+        height: 25,
+        width: 2,
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        marginVertical: 8,
+    },
+    addressColumn: {
+        flex: 1,
+    },
+    addressField: {
+        paddingVertical: 12,
+    },
+    addressText: {
+        fontSize: 16,
+        fontFamily: fonts.Regular,
+    },
+    separator: {
+        height: 1,
+        marginVertical: 5,
+    },
 });

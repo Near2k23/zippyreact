@@ -272,6 +272,7 @@ export default function DriverTrips(props) {
                     if (settings.carType_required) {
                         if (!auth.profile.carType) {
                             Alert.alert(t('alert'), t("no_car_assign_text"));
+                            console.log(auth.profile)
                             return;
                         }
                         if (settings.carApproval && !auth.profile.carApproved) {
@@ -325,29 +326,9 @@ export default function DriverTrips(props) {
     }, [gps.error]);
 
 
-    const rCom = () => {
-        return (
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
-                <Text style={{ color: colors.WHITE, fontFamily: fonts.Bold, marginRight: Platform.OS == 'ios' ? 10 : 0, transform: [{ scaleX: isRTL ? -1 : 1 }] }}>{t('on_duty')}</Text>
-                <Switch
-                    value={auth?.profile?.driverActiveStatus}
-                    onValueChange={onChangeFunction}
-                    style={{ marginTop: Platform.OS == 'android' ? 3 : 0 }}
-                />
-            </View>
-        );
-    }
-
     const navEditUser = () => {
         props.navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'editUser', params: { fromPage: 'DriverTrips' } }] }));
     }
-
-
-    React.useEffect(() => {
-        props.navigation.setOptions({
-            headerRight: rCom,
-        });
-    }, [props.navigation, settings, auth, gps.error]);
 
     useEffect(() => {
         const unsubscribe = props.navigation.addListener('focus', () => {
@@ -717,6 +698,22 @@ export default function DriverTrips(props) {
                 />
                 </View>
                 <View style={[styles.report,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                    <View style={[styles.onDutyContainer, {
+                        backgroundColor: auth?.profile?.driverActiveStatus ? '#4CAF50' : '#F44336'
+                    }]}>
+                        <View style={styles.onDutyContent}>
+                            <Text style={[styles.onDutyLabel, {color: colors.WHITE, fontFamily: fonts.Bold}]}>{t('on_duty')}</Text>
+                            <Switch
+                                style={styles.onDutySwitch}
+                                value={auth?.profile?.driverActiveStatus}
+                                onValueChange={onChangeFunction}
+                                trackColor={{ false: colors.SHADOW, true: colors.WHITE }}
+                                thumbColor={auth?.profile?.driverActiveStatus ? colors.GREEN : colors.WHITE}
+                                ios_backgroundColor={colors.SHADOW}
+                            />
+                        </View>
+                    </View>
+                    
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', width: '90%', alignSelf: 'center', marginVertical:10}}>
                         <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize:windoHight > 1000? 30: 20, fontWeight: 'bold' }}>{t('today_text')}</Text>
                         <MaterialIcons
@@ -812,6 +809,28 @@ const styles = StyleSheet.create({
         shadowOpacity: Platform.OS == 'ios' ? 0.1 : 0.8,
         shadowRadius: 3,
         elevation: Platform.OS == 'ios' ? 2 : 8,
+    },
+    onDutyContainer: {
+        width: '90%',
+        alignSelf: 'center',
+        borderRadius: 10,
+        marginTop: 15,
+        marginBottom: 10,
+        overflow: 'hidden',
+    },
+    onDutyContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+    },
+    onDutyLabel: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+    },
+    onDutySwitch: {
+        transform: [{ scaleX: 1.2 }, { scaleY: 1.2 }],
     },
     locationStyle: {
         height: 35,

@@ -29,7 +29,6 @@ import rnauth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 var { width,height } = Dimensions.get('window');
 import ClientIds from '../../config/ClientIds';
-import { MAIN_COLOR, MAIN_COLOR_DARK } from "../common/sharedFunctions";
 import { fonts } from "../common/font";
 import { Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal, SelectBackdrop, SelectContent, SelectItem, ChevronDownIcon } from '@gluestack-ui/themed';
 import RNPickerSelect from '../components/RNPickerSelect';
@@ -675,7 +674,8 @@ const styles = StyleSheet.create({
         fontFamily: fonts.Regular,
         height: 44,
         lineHeight: Platform.OS === 'android' ? 44 : undefined,
-        textAlignVertical: Platform.OS === 'android' ? 'center' : undefined
+        textAlignVertical: Platform.OS === 'android' ? 'center' : undefined,
+        color: colors.BLACK
     },
     inputLabel: {
         width: '100%',

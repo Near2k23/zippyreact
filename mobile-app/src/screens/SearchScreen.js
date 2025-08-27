@@ -125,12 +125,10 @@ export default function SearchScreen(props) {
   }, [settingsdata]);
 
   const setAddressOnMap = (item)=>{
-    props.navigation.dispatch(StackActions.pop(1));
-    if(locationType == 'pickup'){
-      dispatch(updateTripPickup({...tripdata.pickup, source:"mapSelect"}));
-    }else{
-      dispatch(updateTripDrop({...tripdata.drop, source:"mapSelect"}));
-    }
+    props.navigation.navigate('Map', {
+      locationType: locationType,
+      selectFromMap: true
+    });
   }
 
   useEffect(() => {
@@ -312,7 +310,7 @@ export default function SearchScreen(props) {
 
   const saveLocation = (item)=>{
     if(item && saveNameValue && ((saveNameValue== t('other') && addressName) || saveNameValue!= t('other'))){
-      let name = saveNameValue== t('other') ? addressName : saveNameValueßß
+      let name = saveNameValue== t('other') ? addressName : saveNameValue
       if (saveNameValue === t('home') || saveNameValue === t('work')) {
         const existingAddress = savedAddresses.find(addr => addr.name === saveNameValue.toLowerCase());
         if (existingAddress) {

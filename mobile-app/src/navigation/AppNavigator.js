@@ -395,7 +395,7 @@ export default function AppContainer() {
                         <Stack.Screen name="PaymentDetails" component={PaymentDetails} options={screenOptions(t('payment'))} />
                         <Stack.Screen name="BookedCab" component={BookedCabScreen} options={{ headerShown: false }} />
                         <Stack.Screen name="RideDetails" component={RideDetails} options={screenOptions(t('ride_details_page_title'))} />
-                        <Stack.Screen name="onlineChat" component={OnlineChat} options={screenOptions(t('chat_title'))} />
+                        <Stack.Screen name="onlineChat" component={OnlineChat} options={{ headerShown: false }} />
                         <Stack.Screen name="addMoney" component={AddMoneyScreen} options={screenOptions(t('add_money'))} />
                         <Stack.Screen name="paymentMethod" component={SelectGatewayPage} options={screenOptions(t('payment'))} />
                         <Stack.Screen name="withdrawMoney" component={WithdrawMoneyScreen} options={screenOptions(t('withdraw_money'))} />

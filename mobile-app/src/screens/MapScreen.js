@@ -73,11 +73,20 @@ export default function MapScreen(props) {
     const activeBookings = useSelector(state => state.bookinglistdata.active);
     const addressdata = useSelector(state => state.addressdata);
     const [datePickerOpen, setDatePickerOpen] = useState(false)
-    const latitudeDelta = 0.0922;
-    const longitudeDelta = 0.0421;
+    const latitudeDelta = 0.0122;
+    const longitudeDelta = 0.0061;
 
     const [allCarTypes, setAllCarTypes] = useState([]);
     const [freeCars, setFreeCars] = useState([]);
+    const [selectFromMap, setSelectFromMap] = useState(false);
+    const [mapSelectionType, setMapSelectionType] = useState(null);
+
+    useEffect(() => {
+        if (props.route.params?.selectFromMap && props.route.params?.locationType) {
+            setSelectFromMap(true);
+            setMapSelectionType(props.route.params.locationType);
+        }
+    }, [props.route.params]);
     const [pickerConfig, setPickerConfig] = useState({
         selectedDateTime: new Date(),
         dateModalOpen: false,
@@ -338,9 +347,7 @@ export default function MapScreen(props) {
             }
         }
         
-        if (tripdata.pickup && tripdata.drop && showInitialScreen) {
-            setShowInitialScreen(false);
-            
+        if (tripdata.pickup && tripdata.drop && !showInitialScreen) {
             const requestEstimate = async () => {
                 if (tripdata.carType && drivers && drivers.length > 0) {
                     let result = await prepareEstimateObject(tripdata, instructionData);
@@ -402,6 +409,9 @@ export default function MapScreen(props) {
         if (bookingdata.loading) {
             setBookLoading(true);
             setBookLaterLoading(true);
+        } else {
+            setBookLoading(false);
+            setBookLaterLoading(false);
         }
     }, [bookingdata.booking, bookingdata.loading, bookingdata.error, bookingdata.error.flag]);
 
@@ -491,7 +501,27 @@ export default function MapScreen(props) {
 
   const setAddresses = async (pos, res, source) => {
     if (res) {
-      if (tripdata.selected == "pickup") {
+      if (selectFromMap && mapSelectionType) {
+        if (mapSelectionType === "pickup") {
+          dispatch(
+            updateTripPickup({
+              lat: pos.latitude,
+              lng: pos.longitude,
+              add: res,
+              source: "mapSelect",
+            })
+          );
+        } else if (mapSelectionType === "drop") {
+          dispatch(
+            updateTripDrop({
+              lat: pos.latitude,
+              lng: pos.longitude,
+              add: res,
+              source: "mapSelect",
+            })
+          );
+        }
+      } else if (tripdata.selected == "pickup") {
         dispatch(
           updateTripPickup({
             lat: pos.latitude,
@@ -572,6 +602,13 @@ export default function MapScreen(props) {
                     longitude: newregion.longitude
                 }, 'mapSelect');
             }
+        }
+        
+        if (selectFromMap && mapSelectionType && gesture && gesture.isGesture) {
+            updateAddresses({
+                latitude: newregion.latitude,
+                longitude: newregion.longitude
+            }, 'mapSelect');
         }
     }
 
@@ -1215,6 +1252,11 @@ const onMapSelectComplete = () => {
            dispatch(updateTripDrop({...tripdata.drop, source:"region-change"}))
        }
     }
+    if(selectFromMap && mapSelectionType){
+        setSelectFromMap(false);
+        setMapSelectionType(null);
+        props.navigation.goBack();
+    }
   }
 
     return (
@@ -1310,7 +1352,7 @@ const onMapSelectComplete = () => {
                         ) : (
                             <View style={styles.backButton} />
                         )}
-                        <TouchableOpacity onPress={() => props.navigation.navigate('Notifications')} style={styles.notificationButton}>
+                        <TouchableOpacity onPress={() => props.navigation.navigate('Notifications')} style={[styles.notificationButton, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>
                             <Icon 
                                 name="notifications-outline"
                                 type="ionicon"
@@ -1431,7 +1473,34 @@ const onMapSelectComplete = () => {
                 ) : null
             }
 
-            {(tripdata.pickup && tripdata.pickup.source =='mapSelect') || (tripdata.drop && tripdata.drop.source =='mapSelect') || showInitialScreen ? null: 
+            {showInitialScreen ? null: (tripdata.pickup && tripdata.pickup.source =='mapSelect') || (tripdata.drop && tripdata.drop.source =='mapSelect') ?
+            <View style={[styles.unifiedModal, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND, height: 120 }]}>
+                <View style={[styles.bar, { backgroundColor: '#E2E6EA', marginVertical: 8, alignSelf: 'center' }]} ></View>
+                <View style={{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND, paddingHorizontal: 15, flex: 1, justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 16, fontFamily: fonts.Bold, textAlign: 'center', marginBottom: 20, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                        {tripdata.selected === 'pickup' ? t('confirm_pickup_location') : t('confirm_drop_location')}
+                    </Text>
+                    <View style={[styles.buttonBar, { flexDirection: isRTL ? 'row-reverse' : 'row', paddingTop: 0, paddingBottom: 10 }]}>
+                        <View style={{width: '49.5%', borderRadius: 12, height: 45}}>
+                            <Button
+                                title={t('cancel')}
+                                buttonStyle={[styles.buttonTitleStyle, { color: colors.BLACK }]}
+                                btnClick={onMapSelectComplete}
+                                style={{ backgroundColor: '#E6E7E8', height: '100%', width: '100%' }}
+                            />
+                        </View>
+                        <View style={{width: '49.5%', borderRadius: 12, height: 45}}>
+                            <Button
+                                title={t('ok')}
+                                buttonStyle={[styles.buttonTitleStyle, { color: colors.WHITE }]}
+                                btnClick={onMapSelectComplete}
+                                style={{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, height: '100%', width: '100%' }}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </View>
+            : 
             <>
             {settings && settings.horizontal_view ?
                 <View style={styles.fullCarView}>
@@ -1669,7 +1738,6 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 3,
@@ -1769,13 +1837,6 @@ const styles = StyleSheet.create({
         bottom: 180,
         right: 10,
         borderRadius: Platform.OS == 'ios' ? 30 : 30,
-        elevation: 2,
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
-        shadowOffset: {
-            height: 0,
-            width: 0
-        },
     },
     locateButtonStyle: {
         height: Platform.OS == 'ios' ? 55 : 42,
@@ -1783,6 +1844,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: Platform.OS == 'ios' ? 27 : 21,
+        elevation: 2,
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        shadowOffset: {
+            height: 0,
+            width: 0
+        },
     },
     addressBar: {
         position: 'absolute',

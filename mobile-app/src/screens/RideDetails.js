@@ -1,697 +1,743 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     View,
     Text,
-    ImageBackground,
     ScrollView,
     Dimensions,
     Platform,
     Image,
     TouchableOpacity,
-    Modal,
     Linking,
     Alert,
     useColorScheme
 } from 'react-native';
 import MapView, { Polyline, PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import { Avatar } from 'react-native-elements';
-import * as DecodePolyLine from '@mapbox/polyline';
 import { colors } from '../common/theme';
 import i18n from 'i18n-js';
 import StarRating from 'react-native-star-rating-widget';
 import { useSelector } from 'react-redux';
-import { Ionicons, Entypo, Fontisto, AntDesign, Octicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { appConsts } from '../common/sharedFunctions';
+import { Ionicons, Fontisto, AntDesign, Octicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import moment from 'moment/min/moment-with-locales';
-var { width, height } = Dimensions.get('window');
 import Button from '../components/Button';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
 import { fonts } from '../common/font';
 import DownloadReceipt from '../components/DownloadReceipt';
 import { getLangKey } from 'common/src/other/getLangKey';
 import customMapStyle from "../common/mapTheme.json";
 
-export default function RideDetails(props) {
+const { width } = Dimensions.get('window');
 
+export default function RideDetails(props) {
     const { data } = props.route.params;
     const paramData = data;
     const settings = useSelector(state => state.settingsdata.settings);
     const auth = useSelector(state => state.auth);
     const { t } = i18n;
     const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
-    //const isRTL = true;
     const [coords, setCoords] = useState([]);
     const [role, setRole] = useState();
-    const [userInfoModalStatus, setUserInfoModalStatus] = useState(false);
-    let colorScheme = useColorScheme();
+    const colorScheme = useColorScheme();
     const [mode, setMode] = useState();
 
-    function formatAmount(value, decimal, country) {
+    const formatAmount = (value, decimal, country) => {
         const number = parseFloat(value || 0);
         if (country === "Vietnam") {
-          return number.toLocaleString("vi-VN", {
-            minimumFractionDigits: decimal,
-            maximumFractionDigits: decimal
-          });
-        } else {
-          return number.toLocaleString("en-US", {
-            minimumFractionDigits: decimal,
-            maximumFractionDigits: decimal
-          });
+            return number.toLocaleString("vi-VN", {
+                minimumFractionDigits: decimal,
+                maximumFractionDigits: decimal
+            });
         }
-    }
-  
+        return number.toLocaleString("en-US", {
+            minimumFractionDigits: decimal,
+            maximumFractionDigits: decimal
+        });
+    };
+
     useEffect(() => {
         if (auth?.profile?.mode) {
-            if (auth.profile.mode === 'system'){
-                setMode(colorScheme);
-            }else{
-                setMode(auth.profile.mode);
-            }
+            setMode(auth.profile.mode === 'system' ? colorScheme : auth.profile.mode);
         } else {
             setMode('light');
         }
     }, [auth, colorScheme]);
 
+    useEffect(() => {
+        setRole(auth.profile?.usertype || null);
+    }, [auth.profile]);
+
+    useEffect(() => {
+        const arr = [paramData.coords[0]];
+        if (paramData?.waypoints) {
+            paramData.waypoints.forEach(waypoint => {
+                arr.push({ latitude: waypoint.lat, longitude: waypoint.lng });
+            });
+        }
+        arr.push(paramData.coords[1]);
+        setCoords(arr);
+    }, []);
+
     const goToBooking = (id) => {
-        if (paramData.status == 'PAYMENT_PENDING') {
+        if (paramData.status === 'PAYMENT_PENDING') {
             props.navigation.navigate('PaymentDetails', { booking: paramData });
         } else {
             props.navigation.replace('BookedCab', { bookingId: id });
         }
     };
 
-    useEffect(() => {
-        if (auth.profile && auth.profile.usertype) {
-            setRole(auth.profile.usertype);
-        } else {
-            setRole(null);
-        }
-    }, [auth.profile]);
-
     const onPressCall = (phoneNumber) => {
-        if (['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING'].indexOf(paramData.status) != -1) {
-            let call_link = Platform.OS == 'android' ? 'tel:' + phoneNumber : 'telprompt:' + phoneNumber;
-            Linking.openURL(call_link);
+        const allowedStatuses = ['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING'];
+        if (allowedStatuses.includes(paramData.status)) {
+            const callLink = Platform.OS === 'android' ? `tel:${phoneNumber}` : `telprompt:${phoneNumber}`;
+            Linking.openURL(callLink);
         } else {
-            Alert.alert(t('alert'), t('booking_is') + paramData.status + "." + t('not_call'));
+            Alert.alert(t('alert'), `${t('booking_is')}${paramData.status}.${t('not_call')}`);
         }
-    }
+    };
 
-    const onChatAction = () => { 
-        if (['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'COMPLETE'].indexOf(paramData.status) != -1) {
-            props.navigation.navigate("onlineChat", { bookingId: paramData.id, status: paramData.status })
+    const onChatAction = () => {
+        const allowedStatuses = ['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'COMPLETE'];
+        if (allowedStatuses.includes(paramData.status)) {
+            props.navigation.navigate("onlineChat", { bookingId: paramData.id, status: paramData.status });
         } else {
-            Alert.alert(t('alert'), t('booking_is') + paramData.status + "." + t('not_chat'));
+            Alert.alert(t('alert'), `${t('booking_is')}${paramData.status}.${t('not_chat')}`);
         }
-    }
+    };
 
-    const onAlert = (item) => {
-        Alert.alert(t('alert'), t('booking_is') + item.status + "." + t('not_call'));
-    }
+    const onAlert = () => {
+        Alert.alert(t('alert'), `${t('booking_is')}${paramData.status}.${t('not_call')}`);
+    };
 
-    const onChatAlert = (item) => {
-        Alert.alert(t('alert'), t('booking_is') + item.status + "." + t('not_chat'));
-    }
+    const onChatAlert = () => {
+        Alert.alert(t('alert'), `${t('booking_is')}${paramData.status}.${t('not_chat')}`);
+    };
 
-    useEffect(() => {
-        let arr = [];
-        arr.push(paramData.coords[0]);
-        if (paramData && paramData.waypoints) {
-            for (let i = 0; i < paramData.waypoints.length; i++) {
-                arr.push({ latitude: paramData.waypoints[i].lat, longitude: paramData.waypoints[i].lng })
-            }
-        }
-        arr.push(paramData.coords[1]);
-        setCoords(arr);
-    }, []);
+    const isDark = mode === 'dark';
+    const mainColor = isDark ? MAIN_COLOR_DARK : MAIN_COLOR;
+    const backgroundColor = isDark ? colors.PAGEBACK : colors.SCREEN_BACKGROUND;
+    const cardBackgroundColor = isDark ? colors.PAGEBACK : colors.WHITE;
+    const textColor = isDark ? colors.WHITE : colors.BLACK;
+
+    const MapSection = () => (
+        <View style={styles.mapContainer}>
+            <MapView
+                style={styles.map}
+                provider={PROVIDER_GOOGLE}
+                customMapStyle={isDark ? customMapStyle : []}
+                region={{
+                    latitude: (paramData.pickup.lat + paramData.drop.lat) / 2,
+                    longitude: (paramData.pickup.lng + paramData.drop.lng) / 2,
+                    latitudeDelta: 0.1,
+                    longitudeDelta: 0.1
+                }}
+            >
+                <Marker
+                    coordinate={{ latitude: paramData.pickup.lat, longitude: paramData.pickup.lng }}
+                    title={t('marker_title_1')}
+                    description={paramData.pickup.add}
+                >
+                    <Image source={require("../../assets/images/green_pin.png")} style={styles.markerImage} />
+                </Marker>
+                
+                {paramData.waypoints?.map((point, index) => (
+                    <Marker
+                        key={index}
+                        coordinate={{ latitude: point.lat, longitude: point.lng }}
+                        title={t('marker_title_3')}
+                        description={point.add}
+                    >
+                        <Image source={require("../../assets/images/rsz_2red_pin.png")} style={styles.markerImage} />
+                    </Marker>
+                ))}
+                
+                <Marker
+                    coordinate={{ latitude: paramData.drop.lat, longitude: paramData.drop.lng }}
+                    title={t('marker_title_2')}
+                    description={paramData.drop.add}
+                >
+                    <Image source={require("../../assets/images/rsz_2red_pin.png")} style={styles.markerImage} />
+                </Marker>
+                
+                {paramData.coords && (
+                    <Polyline
+                        coordinates={paramData.coords}
+                        strokeWidth={4}
+                        strokeColor={colors.BLUE}
+                        geodesic
+                    />
+                )}
+            </MapView>
+        </View>
+    );
+
+    const RouteCard = () => (
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>{t('route_details')}</Text>
+            <View style={[styles.addressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={styles.iconColumn}>
+                    <View style={[styles.pickupIconContainer, {
+                        borderColor: mainColor,
+                        backgroundColor: cardBackgroundColor
+                    }]}>
+                        <View style={[styles.locationDot, { 
+                            backgroundColor: mainColor
+                        }]} />
+                    </View>
+                    {paramData?.waypoints?.map((_, index) => (
+                        <React.Fragment key={index}>
+                            <View style={[styles.dashedLine, { borderColor: isDark ? colors.WHITE : colors.SHADOW }]} />
+                            <View style={styles.waypointMarker}>
+                                <Text style={[styles.waypointText, { color: textColor }]}>{String.fromCharCode(65 + index)}</Text>
+                            </View>
+                        </React.Fragment>
+                    ))}
+                    <View style={[styles.dashedLine, { borderColor: isDark ? colors.WHITE : colors.SHADOW }]} />
+                    <View style={[styles.locationIcon, { backgroundColor: cardBackgroundColor }]}>
+                        <Ionicons 
+                            name="location"
+                            size={10}
+                            color={colors.RED}
+                        />
+                    </View>
+                </View>
+                <View style={styles.addressColumn}>
+                    <View style={styles.addressField}>
+                        <Text style={[styles.addressText, { color: textColor }]}>{paramData.pickup.add}</Text>
+                    </View>
+                    {paramData?.waypoints?.map((point, index) => (
+                        <React.Fragment key={index}>
+                            <View style={[styles.separator, { backgroundColor: isDark ? colors.WHITE + '20' : colors.SHADOW + '20' }]} />
+                            <View style={styles.addressField}>
+                                <Text style={[styles.addressText, { color: textColor }]}>{point.add}</Text>
+                            </View>
+                        </React.Fragment>
+                    ))}
+                    <View style={[styles.separator, { backgroundColor: isDark ? colors.WHITE + '20' : colors.SHADOW + '20' }]} />
+                    <View style={styles.addressField}>
+                        <Text style={[styles.addressText, { color: textColor }]}>{paramData.drop.add}</Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
+
+    const TripInfoCard = () => (
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>{t('trip_information')}</Text>
+            
+            <View style={[styles.vehicleDetails, { flexDirection: isRTL ? 'row-reverse' : 'row', marginBottom: 20 }]}>
+                <View style={styles.vehicleDetailItem}>
+                    <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('trip_cost')}</Text>
+                    <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
+                        {settings.symbol} {paramData?.deliveryWithBid && ['NEW', 'PAYMENT_PENDING'].includes(paramData.status)
+                            ? t('bid')
+                            : formatAmount(
+                                paramData?.trip_cost > 0 ? paramData.trip_cost : paramData?.estimate || 0,
+                                settings.decimal,
+                                settings.country
+                            )}
+                    </Text>
+                </View>
+                
+                <View style={styles.vehicleDetailItem}>
+                    <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('distance')}</Text>
+                    <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
+                        {parseFloat(paramData?.distance || 0).toFixed(settings.decimal)} {settings?.convert_to_mile ? t("mile") : t("km")}
+                    </Text>
+                </View>
+                
+                <View style={styles.vehicleDetailItem}>
+                    <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('duration')}</Text>
+                    <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
+                        {Math.max(1, Math.floor((paramData?.total_trip_time || paramData?.estimateTime || 0) / 60))} {t("mins")}
+                    </Text>
+                </View>
+            </View>
+            
+            <View style={[styles.statusContainer, { backgroundColor: mainColor, padding: 12, borderRadius: 8, marginBottom: 16 }]}>
+                 <Text style={[styles.statusText, { color: colors.WHITE, fontSize: 16, fontFamily: fonts.Bold }]}>
+                     {paramData?.reason ? t(getLangKey(paramData.reason)) : t(paramData.status).toUpperCase()}
+                 </Text>
+             </View>
+             
+             <Text style={[styles.bookingDate, { color: textColor, marginTop: 0, fontSize: 12, opacity: 0.7 }]}>
+                 {t('booking_date')} - {moment(paramData.bookingDate).format('lll')}
+             </Text>
+        </View>
+    );
+
+    const UserCard = () => {
+        const isCustomer = auth.profile.usertype === 'customer';
+        const userName = isCustomer ? paramData.driver_name : paramData.customer_name;
+        const userImage = isCustomer ? paramData.driver_image : paramData.customer_image;
+        const userContact = isCustomer ? paramData.driver_contact : paramData.customer_contact;
+        
+        if (!userName) return null;
+
+        return (
+            <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>
+                    {isCustomer ? t('driver_details') : t('customer_details')}
+                </Text>
+                <View style={[styles.userContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <Avatar
+                        size="medium"
+                        rounded
+                        source={userImage ? { uri: userImage } : require('../../assets/images/profilePic.png')}
+                    />
+                    
+                    <View style={styles.userInfo}>
+                        <Text style={[styles.userName, { color: textColor }]}>{userName}</Text>
+                        {paramData.rating > 0 && isCustomer && (
+                            <StarRating
+                                maxStars={5}
+                                starSize={15}
+                                enableHalfStar
+                                color={mainColor}
+                                emptyColor={mainColor}
+                                rating={Math.round(parseFloat(paramData.rating) * 2) / 2}
+                                style={isRTL ? { transform: [{ scaleX: -1 }] } : {}}
+                                onChange={() => {}}
+                            />
+                        )}
+                    </View>
+                    
+                    {userContact && (
+                        <View style={[styles.contactButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <TouchableOpacity
+                                onPress={() => ['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING'].includes(paramData.status)
+                                    ? onPressCall(userContact) : onAlert()}
+                                style={[styles.contactButton, { backgroundColor: mainColor }]}
+                            >
+                                <Ionicons name="call" size={20} color={colors.WHITE} />
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity
+                                onPress={() => ['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'COMPLETE'].includes(paramData.status)
+                                    ? onChatAction() : onChatAlert()}
+                                style={[styles.contactButton, { backgroundColor: mainColor }]}
+                            >
+                                <Ionicons name="chatbubble-ellipses-sharp" size={20} color={colors.WHITE} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+            </View>
+        );
+    };
+
+    const VehicleCard = () => {
+        if (!paramData.carType) return null;
+
+        return (
+            <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>{t('car_details_title')}</Text>
+                
+                <View style={[styles.vehicleHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[styles.carImageContainer, { backgroundColor: `${mainColor}20` }]}>
+                        <Image
+                            source={paramData.carImage ? { uri: paramData.carImage } : require('../../assets/images/microBlackCar.png')}
+                            style={[styles.carImage, { transform: [{ scaleX: isRTL ? -1 : 1 }] }]}
+                        />
+                    </View>
+                    <Text style={[styles.carType, { color: textColor }]}>{t(getLangKey(paramData.carType))}</Text>
+                </View>
+                
+                <View style={[styles.vehicleDetails, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    {paramData.vehicleModel && (
+                        <View style={styles.vehicleDetailItem}>
+                            <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('vehicle_model')}</Text>
+                            <Text style={[styles.vehicleDetailValue, { color: textColor }]}>{paramData.vehicleModel}</Text>
+                        </View>
+                    )}
+                    
+                    {paramData.vehicleMake && (
+                        <View style={styles.vehicleDetailItem}>
+                            <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('vehicle_make')}</Text>
+                            <Text style={[styles.vehicleDetailValue, { color: textColor }]}>{paramData.vehicleMake}</Text>
+                        </View>
+                    )}
+                    
+                    <View style={styles.vehicleDetailItem}>
+                        <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('vehicle_number')}</Text>
+                        <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
+                            {paramData.vehicle_number || t('car_no_not_found')}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        );
+    };
+
+    const BillCard = () => {
+        if (!['PENDING', 'PAID', 'COMPLETE'].includes(paramData.status)) return null;
+
+        return (
+            <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>{t('bill_details_title')}</Text>
+                
+                {paramData.payment_mode && (
+                    <View style={[styles.paymentMethodContainer, { marginBottom: 20 }]}>
+                        <View style={[styles.paymentMethodItem, { backgroundColor: `${mainColor}10`, borderColor: mainColor }]}>
+                            {paramData.payment_mode === 'cash' ? (
+                                <MaterialCommunityIcons name="cash" size={24} color={mainColor} />
+                            ) : paramData.payment_mode === 'card' ? (
+                                <Feather name="credit-card" size={20} color={mainColor} />
+                            ) : (
+                                <AntDesign name="wallet" size={20} color={mainColor} />
+                            )}
+                            <Text style={[styles.paymentMethodText, { color: textColor }]}>
+                                {t(paramData.payment_mode)}
+                            </Text>
+                        </View>
+                        <View style={[styles.statusBadge, { backgroundColor: mainColor }]}>
+                            <Text style={styles.statusBadgeText}>{t(paramData.status)}</Text>
+                        </View>
+                    </View>
+                )}
+                
+                <View style={[styles.billSummary, { marginBottom: 20 }]}>
+                    <View style={styles.billSummaryItem}>
+                        <Text style={[styles.billSummaryLabel, { color: textColor }]}>{t("your_trip")}</Text>
+                        <Text style={[styles.billSummaryValue, { color: textColor }]}>
+                            {settings?.swipe_symbol
+                                ? `${formatAmount(paramData.trip_cost, settings.decimal, settings.country)} ${settings.symbol}`
+                                : `${settings.symbol} ${formatAmount(paramData.trip_cost, settings.decimal, settings.country)}`}
+                        </Text>
+                    </View>
+                    
+                    {paramData?.discount > 0 && (
+                        <View style={styles.billSummaryItem}>
+                            <Text style={[styles.billSummaryLabel, { color: textColor }]}>{t('discount')}</Text>
+                            <Text style={[styles.billSummaryValue, { color: colors.GREEN }]}>
+                                -{formatAmount(paramData?.discount || 0, settings.decimal, settings.country)} {settings.symbol}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+                
+                <View style={[styles.totalContainer, { backgroundColor: `${mainColor}08`, borderColor: mainColor }]}>
+                    <Text style={[styles.totalLabel, { color: textColor }]}>{t("Customer_paid")}</Text>
+                    <Text style={[styles.totalValue, { color: mainColor }]}>
+                        {settings?.swipe_symbol
+                            ? `${formatAmount(paramData?.customer_paid || 0, settings.decimal, settings.country)} ${settings.symbol}`
+                            : `${settings.symbol} ${formatAmount(paramData?.customer_paid || 0, settings.decimal, settings.country)}`}
+                    </Text>
+                </View>
+                
+                <View style={[styles.receiptContainer, { marginTop: 16 }]}>
+                    <Text style={[styles.receiptLabel, { color: textColor }]}>{t("receipt")}</Text>
+                    <DownloadReceipt booking={paramData} settings={settings} />
+                </View>
+            </View>
+        );
+    };
+
+    const FeedbackCard = () => {
+        if (!paramData.feedback) return null;
+
+        return (
+            <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
+                <Text style={[styles.sectionTitle, { color: textColor }]}>{t('feedback')}</Text>
+                <Text style={[styles.feedbackText, { color: textColor }]}>{paramData.feedback}</Text>
+            </View>
+        );
+    };
+
+    const shouldShowButton = () => {
+        const customerStatuses = ['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'PAID'];
+        const driverStatuses = ['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED'];
+        
+        return (auth.profile.usertype === 'customer' && customerStatuses.includes(paramData.status)) ||
+               (auth.profile.usertype === 'driver' && driverStatuses.includes(paramData.status));
+    };
+
+    const getButtonTitle = () => {
+        if (paramData.status === 'PAID') return t('add_to_review');
+        if (paramData.status === 'PAYMENT_PENDING') return t('paynow_button');
+        return t('go_to_booking');
+    };
 
     return (
-         <View style={[styles.mainView,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, paddingBottom: 15}]}>
-            <ScrollView>
-                <View style={[styles.card, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1 }}>
-                        <View style={{ flexDirection: 'column', width: width - 20 }}>
-                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                <View style={{ width: 30, alignItems: 'center' }}>
-                                    <Ionicons name="location-outline" size={24} color={colors.GREEN} />
-                                    <View style={[styles.hbox2, { flex: 1, minHeight: 5, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
-                                </View>
-                                <View style={{ width: width - 70, marginBottom: 10 }}>
-                                    <Text style={[styles.textStyle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL ? { marginRight: 6, textAlign: 'right' } : { marginLeft: 6, textAlign: 'left' }]}>{paramData.pickup.add} </Text>
-                                </View>
-                            </View>
-                            {paramData && paramData.waypoints && paramData.waypoints.length > 0 ? paramData.waypoints.map((point, index) => {
-                                return (
-                                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                        <View style={{ width: 30, alignItems: 'center' }}>
-                                            <View style={styles.multiAddressChar}>
-                                                <Text style={{ fontWeight: 'bold', fontSize: 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{String.fromCharCode(65 + index)}</Text>
-                                            </View>
-
-                                            <View style={[styles.hbox2, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
-                                        </View>
-                                        <View style={{ width: width - 70, marginBottom: 10 }}>
-                                            <Text style={[styles.textStyle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL ? { marginRight: 6, textAlign: 'right' } : { marginLeft: 6, textAlign: 'left' }]}>{point.add}</Text>
-                                        </View>
-                                    </View>
-                                )
-                            })
-                            : null}
-
-                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                <View style={{ width: 30, alignItems: 'center' }}>
-                                    <Ionicons name="location-outline" size={24} color={colors.RED} />
-                                </View>
-                                <View style={{ width: width - 70 }}>
-                                    <Text style={[styles.textStyle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL ? { marginRight: 6, textAlign: 'right' } : { marginLeft: 6, textAlign: 'left' }]}>{paramData.drop.add}</Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-
-                    <View style={{ flexDirection: 'column', flex: 1, minHeight: 60 }}>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, minHeight: 60 }}>
-                            <View style={[styles.details, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor:  mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                                <Text style={{ fontFamily:fonts.Bold, fontSize: 24, color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, opacity: 0.7 }}>{settings.symbol}</Text>
-                                <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.deliveryWithBid && (['NEW','PAYMENT_PENDING'].indexOf(paramData.status) != -1) ? t('bid') : paramData && paramData.trip_cost > 0 ? formatAmount(paramData.trip_cost, settings.decimal, settings.country) : paramData && paramData.estimate ? formatAmount(paramData.estimate, settings.decimal, settings.country) : 0}</Text>
-                            </View>
-                            <View style={[styles.hbox2, { minHeight: 5, width: 1, margin: 2, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
-                            <View style={[styles.details, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor:  mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                                <Fontisto name="map" size={26} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} style={{ opacity: 0.8 }} />
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                    <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.distance > 0 ? parseFloat(paramData.distance).toFixed(settings.decimal) : 0}</Text>
-                                    <Text style={[styles.textStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {settings && settings.convert_to_mile ? t("mile") : t("km")} </Text>
-                                </View>
-
-                            </View>
-                        </View>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, minHeight: 60 }}>
-                            <View style={[styles.details, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomWidth: 0, borderBottomColor:  mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                                <Octicons name="clock" size={26} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} style={{ opacity: 0.8 }} />
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                    <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{(paramData && paramData.total_trip_time && paramData.total_trip_time > 0 ? parseFloat(paramData.total_trip_time / 60).toFixed(0) == 0 ? "1" : parseFloat(paramData.total_trip_time / 60).toFixed(0) : parseFloat(paramData.estimateTime / 60).toFixed(0))}</Text>
-                                    <Text style={[styles.textStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {t("mins")} </Text>
-                                </View>
-                            </View>
-                            <View style={[styles.hbox2, { minHeight: 5, width: 1, margin: 2, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
-                            <View style={[styles.clock,{flexDirection: isRTL ? 'row-reverse' : 'row'}]}>
-                                {paramData && paramData.trip_start_time && paramData.trip_end_time ?
-                                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                        <View style={[styles.section,{flexDirection: isRTL ? 'row-reverse' : 'row'}]}>
-                                            <Ionicons name="location-outline" size={28} color={colors.GREEN} />
-                                            <View>
-                                                <View style={{ flexDirection: 'row' }}>
-                                                    <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.trip_start_time ? (paramData.trip_start_time).substring(0, ((paramData.trip_start_time).indexOf(":"))).length == 2 ? (paramData.trip_start_time).substring(0, ((paramData.trip_start_time).indexOf(":"))) : "0" + (paramData.trip_start_time).substring(0, ((paramData.trip_start_time).indexOf(":"))) : ""}</Text>
-                                                    <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.trip_start_time ? (paramData.trip_start_time).substring(((paramData.trip_start_time).indexOf(":") + 1), ((paramData.trip_start_time).lastIndexOf(":"))).length == 2 ? (paramData.trip_start_time).substring(((paramData.trip_start_time).indexOf(":")), ((paramData.trip_start_time).lastIndexOf(":"))) : ":0" + (paramData.trip_start_time).substring(((paramData.trip_start_time).indexOf(":") + 1), ((paramData.trip_start_time).lastIndexOf(":"))) : ""}</Text>
-                                                </View>
-                                                <Text style={{ textAlign: isRTL ? "right" : "left", fontSize: 8,fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{paramData.startTime ? moment(paramData.startTime).format('ll') : ''}</Text>
-                                            </View>
-                                        </View>
-                                        <View style={[styles.section,{flexDirection: isRTL ? 'row-reverse' : 'row'}]}>
-                                            <Ionicons name="location-outline" size={28} color={colors.RED} />
-                                            <View>
-                                                <View style={{ flexDirection: 'row' }}>
-                                                    <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.trip_end_time ? (paramData.trip_end_time).substring(0, ((paramData.trip_end_time).indexOf(":"))).length == 2 ? (paramData.trip_end_time).substring(0, ((paramData.trip_end_time).indexOf(":"))) : "0" + (paramData.trip_end_time).substring(0, ((paramData.trip_end_time).indexOf(":"))) : ""}</Text>
-                                                    <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.trip_end_time ? (paramData.trip_end_time).substring(((paramData.trip_end_time).indexOf(":") + 1), ((paramData.trip_end_time).lastIndexOf(":"))).length == 2 ? (paramData.trip_end_time).substring(((paramData.trip_end_time).indexOf(":")), ((paramData.trip_end_time).lastIndexOf(":"))) : ":0" + (paramData.trip_end_time).substring(((paramData.trip_end_time).indexOf(":") + 1), ((paramData.trip_end_time).lastIndexOf(":"))) : ""}</Text>
-                                                </View>
-                                                <Text style={{ textAlign: isRTL ? "right" : "left", fontSize: 8,fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{paramData.endTime ? moment(paramData.endTime).format('ll') : ''}</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                    : paramData && paramData.trip_start_time ?
-                                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                            <View style={[styles.section,{flexDirection: isRTL ? 'row-reverse' : 'row'}]}>
-                                                <Ionicons name="location-outline" size={28} color={colors.GREEN} />
-                                                <View>
-                                                    <View style={{ flexDirection: 'row' }}>
-                                                        <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.trip_start_time ? (paramData.trip_start_time).substring(0, ((paramData.trip_start_time).indexOf(":"))).length == 2 ? (paramData.trip_start_time).substring(0, ((paramData.trip_start_time).indexOf(":"))) : "0" + (paramData.trip_start_time).substring(0, ((paramData.trip_start_time).indexOf(":"))) : ""}</Text>
-                                                        <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.trip_start_time ? (paramData.trip_start_time).substring(((paramData.trip_start_time).indexOf(":") + 1), ((paramData.trip_start_time).lastIndexOf(":"))).length == 2 ? (paramData.trip_start_time).substring(((paramData.trip_start_time).indexOf(":")), ((paramData.trip_start_time).lastIndexOf(":"))) : ":0" + (paramData.trip_start_time).substring(((paramData.trip_start_time).indexOf(":") + 1), ((paramData.trip_start_time).lastIndexOf(":"))) : ""}</Text>
-                                                    </View>
-                                                    <Text style={{ textAlign: isRTL ? "right" : "left", fontSize: 8, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{paramData.startTime ? moment(paramData.startTime).format('ll') : ''}</Text>
-                                                </View>
-                                            </View>
-                                            <View style={[styles.section,{flexDirection: isRTL ? 'row-reverse' : 'row'}]}>
-                                                <Ionicons name="location-outline" size={28} color={colors.RED} />
-                                                <Image source={require('../../assets/images/clock.gif')} style={{ width: 25, height: 25, alignSelf: 'center', resizeMode: 'center', borderRadius: 13 }} />
-                                            </View>
-                                        </View>
-                                        :
-                                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row' }}>
-                                            <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{paramData && paramData.reason ? t(getLangKey(paramData.reason)) : t(paramData.status).toUpperCase()}</Text>
-                                        </View>
-                                }
-                            </View>
-                        </View>
-                    </View>
-
-                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 10, marginHorizontal: 5 }}>
-                        <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('booking_date')}- {paramData && paramData.bookingDate ? moment(paramData.bookingDate).format('lll') : ""}</Text>
-                    </View>
-
-                    {paramData ?
-                        <View style={[styles.driverDetails,{flexDirection: isRTL ? 'row-reverse' : 'row', marginHorizontal: 5}]}>
-                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', flex: 1 }}>
-                                {paramData ?
-                                    (!(paramData.driver_image == '' || paramData.driver_image == null || paramData.driver_image == 'undefined') && auth.profile.usertype == 'customer') ?
-                                        <Avatar
-                                            size="medium"
-                                            rounded
-                                            source={{ uri: paramData.driver_image }}
-                                            activeOpacity={0.7}
-                                        />
-                                        : 
-                                        (!(paramData.customer_image == '' || paramData.customer_image == null || paramData.customer_image == 'undefined') && auth.profile.usertype == 'driver') ?
-                                        <Avatar
-                                            size="medium"
-                                            rounded
-                                            source={{ uri: paramData.customer_image }}
-                                            activeOpacity={0.7}
-                                        />
-                                        : paramData.driver_name != '' ?
-
-                                            <Avatar
-                                                size="medium"
-                                                rounded
-                                                source={require('../../assets/images/profilePic.png')}
-                                                activeOpacity={0.7}
-                                            /> : null
-                                    : null}
-                                <View style={[styles.userView, { flex: 1, marginHorizontal: 5 }]}>
-                                    {paramData && paramData.driver_name != '' && auth.profile.usertype == 'customer' ? <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.driver_name ? paramData.driver_name : t('no_name')}</Text> : null}
-
-                                    {paramData && paramData.customer_name != '' &&  auth.profile.usertype == 'driver'  ? <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.customer_name ? paramData.customer_name : t('no_name')}</Text> : null}
-
-                                    {paramData && paramData.rating > 0  && paramData.driver_name &&  auth.profile.usertype == 'customer' ?
-                                        <View>
-                                            <StarRating
-                                                maxStars={5}
-                                                starSize={15}
-                                                enableHalfStar={true}
-                                                color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                                emptyColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                                rating={paramData && paramData.rating ? (Math.round(parseFloat(paramData.rating) * 2) / 2) : 0}
-                                                style={[isRTL ? { marginRight: 0, transform: [{ scaleX: -1 }] } : { marginLeft: -8 }]}
-                                                onChange={() => {
-                                                    //console.log('hello')
-                                                }}
-                                            />
-                                        </View>
-                                        : null}
-                                </View>
-                            </View>
-                            {paramData && ((paramData.driver_contact || paramData.customer_contact)) ?
-                                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }}>
-                                   <TouchableOpacity onPress={() => (['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING'].indexOf(paramData.status) != -1) ? role == 'customer' ? 
-                                            onPressCall(paramData.driver_contact) : (paramData.otherPersonPhone && paramData.otherPersonPhone.length > 0 ? onPressCall(paramData.otherPersonPhone) : onPressCall(paramData.customer_contact)) : onAlert(paramData)} 
-                                            style={{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, height: 40, width: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', margin: 3 }}>
-                                        <Ionicons name="call" size={24} color={colors.WHITE} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={() => (['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'COMPLETE'].indexOf(paramData.status) != -1) ? onChatAction(paramData, paramData.id) : onChatAlert(paramData)} style={{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, height: 40, width: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', margin: 3 }}>
-                                        <Ionicons name="chatbubble-ellipses-sharp" size={24} color={colors.WHITE} />
-                                    </TouchableOpacity>
-                                </View>
-                                : null}
-                        </View>
-                    : null}
-
-                    {paramData && paramData.otherPerson && paramData.otherPersonPhone ?
-                        <View style={{ flexDirection: 'column', flex: 1 }}>
-                            <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('otherPerson_title')}</Text>
-                            <View style={{ flexDirection: 'column', flex: 1, marginBottom: 10, marginHorizontal: 2 }}>
-                                {paramData.vehicleModel ?
-                                    <View style={{alignItems:'center', flexDirection: isRTL ? 'row-reverse' : 'row', marginVertical: 0}}>
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('name')}</Text>
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}> : </Text>
-                                        <Text style={[styles.textStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.otherPerson}</Text>
-                                    </View>
-                                : null}
-                                {paramData.vehicleModel ?
-                                    <View style={{alignItems:'center', flexDirection: isRTL ? 'row-reverse' : 'row', marginVertical: 5}}>
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('phone')}</Text>
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}> : </Text>
-                                        <Text style={[styles.textStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.otherPersonPhone}</Text>
-                                    </View>
-                                : null}
-                            </View>
-                        </View>
-                    : null }
-
-                    {paramData && paramData.carType ?
-                    <View style={{ flexDirection: 'column', marginBottom: 10 }}>
-                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, alignItems: 'center', marginHorizontal: 5 }}>
-                            <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}> {isRTL ? ": " : null}{t('car_details_title')} {isRTL ? null : " :"}</Text>
-                            <View style={{ alignItems: 'center', flexDirection: isRTL ? 'row-reverse' : 'row', marginHorizontal: 10}}>
-                                <View style={{ minHeight: 35, backgroundColor: mode === 'dark' ? colors.WHITE + '70' : MAIN_COLOR + '20', borderRadius: 27, padding: 5 }} >
-                                    <Image source={paramData && paramData.carImage ? { uri: paramData.carImage } : require('../../assets/images/microBlackCar.png')} style={{ width: 40, height: 40, alignSelf: 'center', resizeMode: 'contain', transform: [isRTL ? { scaleX: -1 } : { scaleX: 1 }] }} />
-                                </View>
-                                {paramData.carType ?
-                                    <View style={{alignItems: 'center', marginHorizontal:10 }}>
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t(getLangKey(paramData.carType))}</Text>
-                                    </View>
-                                : null}
-                            </View>
-                        </View>
-
-                        <View style={[styles.vehicleDetails,{ flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            {paramData.vehicleModel ?
-                                <View style={{ flex: 1, alignItems:'center'}}>
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('vehicle_model')}</Text>
-                                    <Text style={[styles.textStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.vehicleModel}</Text>
-                                </View>
-                            : null}
-
-                            {paramData.vehicleMake ?
-                                <View style={[styles.hbox2, { minHeight: 35, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
-                            : null}
-                            {paramData.vehicleMake ?
-                                <View style={{ flex: 1, marginHorizontal: 3, alignItems:'center'}}>
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('vehicle_make')}</Text>
-                                    <Text style={[styles.textStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.vehicleMake}</Text>
-                                </View>
-                            : null}             
-                            {paramData.vehicle_number ?
-                                <View style={[styles.hbox2, { minHeight: 35, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
-                            : null}
-                            {paramData.vehicle_number ?
-                                <View style={{ flex: 1, marginHorizontal: 3, alignItems:'center'}}>
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('vehicle_number')}</Text>
-                                    <Text style={[styles.textStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData.vehicle_number}</Text>
-                                </View>
-                            :
-                                <View style={{ flex: 1}}>
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? "right" : "left" , marginBottom: 5, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}> {t('car_no_not_found')}</Text>
-                                </View>
-                            }
-                        </View>
-                    </View>
-                    : null}
-
-                    {paramData && ['PENDING', 'PAID', 'COMPLETE'].indexOf(paramData.status) != -1 ?
-                        <View style={{ height: 'auto', marginTop: 10 }}>
-                            <View style={[styles.billDetails,{ flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                                <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('bill_details_title')}</Text>
-                                {paramData && paramData.payment_mode && paramData.status ?
-                                    <View style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
-                                        {paramData.payment_mode == 'cash' ?
-                                            <MaterialCommunityIcons name="cash" size={28} color={mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                                            : paramData.payment_mode == 'card' ?
-                                                <Feather name="credit-card" size={24} color={mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                                                :
-                                                <AntDesign name="wallet" size={24} color={mode === 'dark' ? colors.WHITE : colors.BLACK} />
-                                        }
-                                        <View style={{ backgroundColor: colors.GREEN, padding: 3, borderRadius: 3, alignSelf: 'center', marginHorizontal: 5 }}>
-                                            <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: colors.WHITE, paddingHorizontal: 5 }]}>{t(paramData.status)}</Text>
-                                        </View>
-                                    </View>
-                                    : null}
-                            </View>
-                            <View style={[styles.payRow,{ flexDirection: isRTL ? "row-reverse" : "row", marginTop: 10, paddingBottom: 5 }]}>
-                                <Text style={[styles.textStyle,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t("receipt")}</Text>
-                                <DownloadReceipt booking={paramData} settings={settings}/>
-                            </View>
-                            <View style={[styles.payRow,{ flexDirection: isRTL ? "row-reverse" : "row", marginTop: 10, paddingBottom: 5 }]}>
-                                <Text style={[styles.textStyle,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{t("your_trip")}</Text>
-                                <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
-                                {settings && settings.swipe_symbol && settings.symbol ?
-                                    (formatAmount(paramData.trip_cost, settings.decimal, settings.country)) + " " + (settings.symbol)
-                                : 
-                                    (settings.symbol) + " " + (formatAmount(paramData.trip_cost, settings.decimal, settings.country))
-                                }
-                                </Text>
-                            </View>
-
-                            <View style={[styles.payRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: 'baseline', alignSelf:'center'}}>
-                                    <Text style={[styles.textStyle, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('discount')}</Text>
-                                    <Text style={[styles.textStyle, { textAlign: isRTL ? 'right' : 'left', fontSize: 10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}> {t('promo_apply')}</Text>
-                                </View>
-                                <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: colors.RED}]} >
-                                    {settings && settings.swipe_symbol && settings.symbol?
-                                        (isRTL ? '' : "-") + " " +(paramData && paramData.discount ? formatAmount(paramData.discount, settings.decimal, settings.country) : "0.00") + " " + (settings.symbol) + (isRTL ? "-" :'')
-                                    :
-                                        (isRTL ? '' : "-") +(settings.symbol) + " " +(paramData ? paramData.discount ? formatAmount(paramData.discount, settings.decimal, settings.country) : "0.00" : "0.00") + " " + (isRTL ? "-" :'')
-                                    } 
-                                </Text>
-                            </View>
-
-
-                            {paramData && paramData.cardPaymentAmount ? paramData.cardPaymentAmount > 0 ?
-                                <View style={[styles.payRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                                    <Text style={[styles.textStyle,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{t("CardPaymentAmount")}</Text>
-                                    <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
-                                    {settings && settings.swipe_symbol && settings.symbol ?
-                                        (formatAmount(paramData.cardPaymentAmount, settings.decimal, settings.country)) + " " + (settings.symbol)
-                                    : 
-                                        (settings.symbol) + " " + (formatAmount(paramData.cardPaymentAmount, settings.decimal, settings.country))
-                                    }
-                                    </Text>
-                                </View>
-                            : null : null}
-
-                            {paramData && paramData.cashPaymentAmount ? paramData.cashPaymentAmount > 0 ?
-                                <View style={[styles.payRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                                    <Text style={[styles.textStyle,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{t("CashPaymentAmount")}</Text>
-                                    <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
-                                    {settings && settings.swipe_symbol && settings.symbol ?
-                                        (formatAmount(paramData.cashPaymentAmount, settings.decimal, settings.country)) + " " + (settings.symbol)
-                                    : 
-                                        (settings.symbol) + " " + (formatAmount(paramData.cashPaymentAmount, settings.decimal, settings.country))
-                                    }
-                                    </Text>
-                                </View>
-                            : null : null}
-
-                            {paramData && paramData.usedWalletMoney ? paramData.usedWalletMoney > 0 ?
-                                <View style={[styles.payRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                                    <Text style={[styles.textStyle,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{t("WalletPayment")}</Text>
-                                    <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
-                                    {settings && settings.swipe_symbol && settings.symbol ?
-                                       (formatAmount(paramData.usedWalletMoney, settings.decimal, settings.country)) + " " + (settings.symbol)
-                                    : 
-                                        (settings.symbol) + " " + (formatAmount(paramData.usedWalletMoney, settings.decimal, settings.country))
-                                    }
-                                    </Text>
-                                </View>
-                            : null : null} 
-                            <View style={[styles.payRow,{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginHorizontal: 10 }]}>
-                                <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{t("Customer_paid")}</Text>
-                                <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
-                                {settings && settings.swipe_symbol && settings.symbol ?
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData && paramData.customer_paid ? formatAmount(paramData.customer_paid, settings.decimal, settings.country) : null} {settings.symbol}</Text>
-                                :
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{settings.symbol} {paramData && paramData.customer_paid ? formatAmount(paramData.customer_paid, settings.decimal, settings.country) : null}</Text>
-                                }
-                                <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                </Text>
-                                </Text>
-                            </View>
-                            {paramData && paramData.tipamount ? 
-                                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", marginHorizontal: 10 }}>
-                                    <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{t("tipamount")}</Text>
-                                    <Text style={[styles.textStyleBold,{textAlign: isRTL ? "right" : "left", lineHeight: 50, color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
-                                    {settings && settings.swipe_symbol && settings.symbol ?
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{paramData && paramData.tipamount ? formatAmount(paramData.customer_paid, settings.decimal, settings.country) : null} {settings.symbol}</Text>
-                                    :
-                                        <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{settings.symbol} {paramData && paramData.tipamount ? formatAmount(paramData.tipamount, settings.decimal, settings.country) : null}</Text>
-                                    }
-                                    <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                    </Text>
-                                    </Text>
-                                </View>
-                            : null}
-                        </View>
-                    : null}
-
-                    {paramData.feedback ?
-                        <View style={{flexDirection: isRTL ? 'row-reverse' : 'row', padding: 8}}>
-                            <View>
-                                <Text style={[styles.textStyleBold, { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}> {isRTL ? ": " : null}{t('feedback')} {isRTL ? null : " :"}</Text>
-                            </View>
-                            <View style={{flex: 1}}>
-                                <Text style={[styles.textStyle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL ? { marginRight: 6, textAlign: 'right' } : { marginLeft: 6, textAlign: 'left' }]}>{paramData.feedback}</Text>
-                            </View>
-                        </View>
-                    :null }
-
-                    <View style={styles.mapView}>
-                        <View style={styles.mapcontainer}>
-                            {paramData ?
-                                <MapView style={styles.map}
-                                    provider={PROVIDER_GOOGLE}
-                                    customMapStyle={mode === 'dark' ? customMapStyle : []}
-                                    region={{
-                                        latitude: ((paramData.pickup.lat + paramData.drop.lat) / 2),
-                                        longitude: ((paramData.pickup.lng + paramData.drop.lng) / 2),
-                                        latitudeDelta: 0.3,
-                                        longitudeDelta: 0.3
-                                    }}
-                                >
-                                    <Marker
-                                        coordinate={{ latitude: paramData ? (paramData.pickup.lat) : 0.00, longitude: paramData ? (paramData.pickup.lng) : 0.00 }}
-                                        title={t('marker_title_1')}
-                                        description={paramData ? paramData.pickup.add : null}>
-                                        <Image source={require("../../assets/images/green_pin.png")} style={{height: 35, width:35 }} />
-                                    </Marker>
-                                    {paramData.waypoints && paramData.waypoints.length > 0 ? paramData.waypoints.map((point, index) => {
-                                        return (
-                                            <Marker
-                                                coordinate={{ latitude: point.lat, longitude: point.lng }}
-                                                title={t('marker_title_3')}
-                                                description={point.add}
-                                                key={index}
-                                            >
-                                                 <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{height: 35, width:35 }} />
-                                            </Marker>
-                                        )
-                                    })
-                                    : null}
-                                    <Marker
-                                        coordinate={{ latitude: (paramData.drop.lat), longitude: (paramData.drop.lng) }}
-                                        title={t('marker_title_2')}
-                                        description={paramData.drop.add}>
-                                        <Image source={require("../../assets/images/rsz_2red_pin.png")} style={{height: 35, width:35 }} />
-                                    </Marker>
-                                    {paramData.coords ?
-                                        <Polyline
-                                            coordinates={paramData.coords}
-                                            strokeWidth={4}
-                                            strokeColor={colors.BLUE}
-                                            geodesic={true}
-                                        />
-                                    : null}
-                                </MapView>
-                                : null}
-                        </View>
-                    </View>
-                    {(paramData && paramData.status && auth.profile && auth.profile.uid &&
-                        (((['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'PAID'].indexOf(paramData.status) != -1) && auth.profile.usertype == 'customer') ||
-                            ((['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED'].indexOf(paramData.status) != -1) && auth.profile.usertype == 'driver'))) ?
-                            <Button
-                                title={paramData.status == 'PAID' ? t('add_to_review') : paramData.status == 'PAYMENT_PENDING' ? t('paynow_button') : t('go_to_booking')}
-                                loading={false}
-                                loadingColor={{ color: colors.GREEN }}
-                                buttonStyle={[styles.textStyleBold, { color: colors.WHITE }]}
-                                style={{ backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, marginTop: 10, height: 50}}
-                                btnClick={() => { goToBooking(paramData.id) }}
-                            />
-                    : null}
-                </View>
+        <View style={[styles.container, { backgroundColor }]}>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContainer}>
+                <MapSection />
+                <RouteCard />
+                <TripInfoCard />
+                <UserCard />
+                <VehicleCard />
+                <BillCard />
+                <FeedbackCard />
+                
             </ScrollView>
+            {shouldShowButton() && (
+                <Button
+                    title={getButtonTitle()}
+                    loading={false}
+                    style={[styles.actionButton, { backgroundColor: mainColor }]}
+                    buttonStyle={{ color: colors.WHITE }}
+                    btnClick={() => goToBooking(paramData.id)}
+                />
+            )}
         </View>
-    )
+    );
 }
 
 const styles = StyleSheet.create({
-    card: {
-        marginVertical: 5,
-        borderRadius: 10,
-        marginHorizontal: 5,
-        padding: 5,
-        shadowColor: colors.BLACK,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.4,
-        shadowRadius: 2,
-        elevation: 3,
-        gap: 2
-    },
-    shadowBack: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.WHITE,
-    },
-    shadowBackDark: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.PAGEBACK,
-    },
-    mapView: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 180,
-        marginTop: 10,
-        borderRadius: 5,
-        overflow: 'hidden'
-    },
-    mapcontainer: {
-        flex: 1,
-        width: width - 20,
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    map: {
-        flex: 1,
-        ...StyleSheet.absoluteFillObject,
-    },
-    userView: {
-        flexDirection: 'column'
-    },
-    mainView: {
+    container: {
         flex: 1
     },
-    hbox2: {
-        width: 1
+    scrollContainer: {
+        flex: 1
     },
-    multiAddressChar: {
-        height: 20,
-        width: 20,
+    mapContainer: {
+        height: 250,
+        margin: 16,
+        borderRadius: 16,
+        overflow: 'hidden'
+    },
+    map: {
+        flex: 1
+    },
+    markerImage: {
+        height: 35,
+        width: 35
+    },
+    card: {
+        margin: 16,
+        borderRadius: 16,
+        padding: 20,
         borderWidth: 1,
+        borderColor: '#E2E9EC'
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+        marginBottom: 16
+    },
+    addressRow: {
+        flexDirection: 'row',
+        alignItems: 'stretch',
+    },
+    iconColumn: {
+        width: 20,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        marginRight: 15,
+        paddingTop: 15,
+    },
+    pickupIconContainer: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    locationDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    locationIcon: {
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: colors.RED,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    dashedLine: {
+        height: 40,
+        width: 2,
+        borderStyle: 'dashed',
+        borderWidth: 1,
+        marginVertical: 8,
+    },
+    addressColumn: {
+        flex: 1,
+    },
+    addressField: {
+        paddingVertical: 12,
+    },
+    addressText: {
+        fontSize: 16,
+        fontFamily: fonts.Regular,
+    },
+    waypointMarker: {
+        height: 16,
+        width: 16,
+        borderRadius: 8,
         backgroundColor: colors.SECONDARY,
-        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center'
     },
-    textStyle: {
-        fontSize: 15,
-        fontFamily: fonts.Regular
-    },
-    textStyleBold: {
-        fontSize: 15,
+    waypointText: {
+        fontSize: 10,
         fontFamily: fonts.Bold
     },
-    VehicleDetails: {
-        width: "100%"
+    separator: {
+        height: 1,
+        marginVertical: 5,
     },
-    details:{
-        flex: 1,
-        justifyContent: 'space-around',
+    statusText: {
+        fontSize: 14,
+        fontFamily: fonts.Bold,
+        textAlign: 'center'
+    },
+    statusContainer: {
         alignItems: 'center',
-        borderBottomWidth: .6
+        justifyContent: 'center'
     },
-    section:{
-        flex: 1,
-        justifyContent: 'space-evenly',
+    bookingDate: {
+        fontSize: 14,
+        fontFamily: fonts.Bold,
+        textAlign: 'center',
+        marginTop: 16
+    },
+    userContainer: {
         alignItems: 'center'
     },
-    clock:{
-        flex: 1, 
-        justifyContent: 'space-around',
-        alignItems: 'center',
-        minHeight: 60
-    },
-    driverDetails:{
+    userInfo: {
         flex: 1,
-        alignItems: 'center',
-        marginTop: 10,
-        paddingVertical: 10 
+        marginHorizontal: 16
     },
-    vehicleDetails:{
+    userName: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+        marginBottom: 4
+    },
+    contactButtons: {
+        gap: 12
+    },
+    contactButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    vehicleHeader: {
+        alignItems: 'center',
+        marginBottom: 16
+    },
+    carImageContainer: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16
+    },
+    carImage: {
+        width: 40,
+        height: 40,
+        resizeMode: 'contain'
+    },
+    carType: {
+        fontSize: 16,
+        fontFamily: fonts.Bold
+    },
+    vehicleDetails: {
+        gap: 16
+    },
+    vehicleDetailItem: {
         flex: 1,
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBlockColor: colors.SHADOW,
-        paddingBottom: 10
+        alignItems: 'center'
     },
-    billDetails:{
+    vehicleDetailLabel: {
+        fontSize: 12,
+        fontFamily: fonts.Regular,
+        marginBottom: 4
+    },
+    vehicleDetailValue: {
+        fontSize: 14,
+        fontFamily: fonts.Bold
+    },
+    paymentMethodContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    paymentMethodItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 8
+    },
+    paymentMethodText: {
+        fontSize: 14,
+        fontFamily: fonts.Regular
+    },
+    statusBadge: {
+        backgroundColor: colors.GREEN,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12
+    },
+    statusBadgeText: {
+        color: colors.WHITE,
+        fontSize: 12,
+        fontFamily: fonts.Bold
+    },
+    billSummary: {
+        gap: 12
+    },
+    billSummaryItem: {
+        flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginHorizontal: 10
+        paddingVertical: 4
     },
-    payRow:{
-        justifyContent: "space-between",
-        borderBottomWidth: 1,
-        borderBottomColor: colors.SHADOW,
-        marginHorizontal: 10
+    billSummaryLabel: {
+        fontSize: 14,
+        fontFamily: fonts.Regular
+    },
+    billSummaryValue: {
+        fontSize: 14,
+        fontFamily: fonts.Bold
+    },
+    totalContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 8,
+        borderWidth: 1
+    },
+    totalLabel: {
+        fontSize: 16,
+        fontFamily: fonts.Bold
+    },
+    totalValue: {
+        fontSize: 18,
+        fontFamily: fonts.Bold
+    },
+    receiptContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    receiptLabel: {
+        fontSize: 14,
+        fontFamily: fonts.Regular
+    },
+    feedbackText: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        lineHeight: 20
+    },
+    actionButton: {
+        height: 50,
+        borderRadius: 12,
+        marginHorizontal: 16,
+        marginBottom: 16,
+        marginTop: 8
     }
 });

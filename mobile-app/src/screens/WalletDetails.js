@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { WTransactionHistory, WaygoDialog } from '../components';
 import {
   StyleSheet,
   View,
@@ -8,9 +7,28 @@ import {
   TouchableOpacity,
   Platform,
   ScrollView,
-  TextInput
+  TextInput,
+  Alert
 } from 'react-native';
+import { useSelector, useDispatch } from 'react-redux';
+import { CommonActions } from '@react-navigation/native';
+import { useColorScheme } from 'react-native';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Icon } from 'react-native-elements';
+import i18n from 'i18n-js';
 
+// Local imports
+import { WTransactionHistory, WaygoDialog } from '../components';
+import { colors } from '../common/theme';
+import { fonts } from '../common/font';
+import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
+import { api } from 'common';
+
+// Constants
+const { height, width } = Dimensions.get('window');
+const RECHARGE_AMOUNTS = [10000, 25000, 50000, 100000];
+
+// AutoResizeText Component
 const AutoResizeText = ({ children, style, maxFontSize = 24, minFontSize = 16, ...props }) => {
   const [fontSize, setFontSize] = useState(maxFontSize);
   const [textWidth, setTextWidth] = useState(0);
@@ -51,36 +69,41 @@ const AutoResizeText = ({ children, style, maxFontSize = 24, minFontSize = 16, .
     </View>
   );
 };
-import { colors } from '../common/theme';
-var { height } = Dimensions.get('window');
-import i18n from 'i18n-js';
-import { useSelector, useDispatch } from 'react-redux';
-import { CommonActions } from '@react-navigation/native';
-import { api } from 'common';
-import { MAIN_COLOR,MAIN_COLOR_DARK } from '../common/sharedFunctions';
-import { fonts } from '../common/font';
-import { useColorScheme } from 'react-native';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { Icon } from 'react-native-elements';
 
 export default function WalletDetails(props) {
-
+  // Redux hooks
   const { withdrawBalance } = api;
   const dispatch = useDispatch();
   const auth = useSelector(state => state.auth);
   const walletHistory = useSelector(state => state.auth.walletHistory);
   const settings = useSelector(state => state.settingsdata.settings);
   const providers = useSelector(state => state.paymentmethods.providers);
+
+  // State management
   const [profile, setProfile] = useState();
-  const { t } = i18n;
-  const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
-  var { height, width } = Dimensions.get('window');
-  let colorScheme = useColorScheme();
   const [mode, setMode] = useState();
+  
+  // Recharge states
   const [rechargeModalVisible, setRechargeModalVisible] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState(null);
+  
+  // Withdraw states
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState(null);
+  const [withdrawAmountFocus, setWithdrawAmountFocus] = useState(false);
+  
+  // Dialog states
+  const [errorDialogVisible, setErrorDialogVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successDialogVisible, setSuccessDialogVisible] = useState(false);
 
-  function formatAmount(value, decimal, country) {
+  // Localization and theme
+  const { t } = i18n;
+  const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
+  const colorScheme = useColorScheme();
+
+  // Utility functions
+  const formatAmount = (value, decimal, country) => {
     const number = parseFloat(value || 0);
     if (country === "Vietnam") {
       return number.toLocaleString("vi-VN", {
@@ -93,13 +116,14 @@ export default function WalletDetails(props) {
         maximumFractionDigits: decimal
       });
     }
-  }
+  };
 
+  // Effects
   useEffect(() => {
     if (auth?.profile?.mode) {
-      if (auth.profile.mode === 'system'){
+      if (auth.profile.mode === 'system') {
         setMode(colorScheme);
-      }else{
+      } else {
         setMode(auth.profile.mode);
       }
     } else {
@@ -115,20 +139,72 @@ export default function WalletDetails(props) {
     }
   }, [auth.profile]);
 
-  const doReacharge = () => {
+  // Transaction filter functions
+  const getCreditedTransactions = () => {
+    if (!walletHistory) return [];
+    return walletHistory.filter(transaction => 
+      transaction.type === 'Credit' || 
+      transaction.type === 'Deposit' ||
+      parseFloat(transaction.amount) > 0
+    );
+  };
+
+  const getDebitedTransactions = () => {
+    if (!walletHistory) return [];
+    return walletHistory.filter(transaction => 
+      transaction.type === 'Debit' ||
+      parseFloat(transaction.amount) < 0
+    );
+  };
+
+  const getWithdrawnTransactions = () => {
+    if (!walletHistory) return [];
+    return walletHistory.filter(transaction => 
+      transaction.type === 'Withdraw'
+    );
+  };
+
+  // Navigation functions
+  const showCreditedTransactions = () => {
+    props.navigation.navigate('TransactionHistory', {
+      transactions: getCreditedTransactions(),
+      title: t('credited') || 'Acreditado',
+      type: 'credited'
+    });
+  };
+
+  const showDebitedTransactions = () => {
+    props.navigation.navigate('TransactionHistory', {
+      transactions: getDebitedTransactions(),
+      title: t('debited') || 'Debitado',
+      type: 'debited'
+    });
+  };
+
+  const showWithdrawnTransactions = () => {
+    props.navigation.navigate('TransactionHistory', {
+      transactions: getWithdrawnTransactions(),
+      title: t('withdrawn') || 'Retirado',
+      type: 'withdrawn'
+    });
+  };
+
+  // Recharge functions
+  const doRecharge = () => {
     if (!(profile.mobile && profile.mobile.length > 6 && profile.email && profile.firstName)) {
       Alert.alert(t('alert'), t('profile_incomplete'));
-      props.navigation.dispatch(CommonActions.reset({ index: 0, routes:[{ name: 'Profile', params: { fromPage: 'Wallet'}}]}));
+      props.navigation.dispatch(CommonActions.reset({ 
+        index: 0, 
+        routes: [{ name: 'Profile', params: { fromPage: 'Wallet' } }] 
+      }));
     } else {
       if (providers) {
         setRechargeModalVisible(true);
       } else {
-        Alert.alert(t('alert'), t('provider_not_found'))
+        Alert.alert(t('alert'), t('provider_not_found'));
       }
     }
-  }
-
-  const rechargeAmounts = [10000, 25000, 50000, 100000];
+  };
 
   const handleRechargeConfirm = () => {
     if (!selectedAmount) {
@@ -139,10 +215,10 @@ export default function WalletDetails(props) {
     
     const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const reference = [...Array(4)].map(_ => c[~~(Math.random() * c.length)]).join('');
-    var d = new Date();
-    var time = d.getTime();
+    const d = new Date();
+    const time = d.getTime();
     
-    let payData = {
+    const payData = {
       email: profile.email,
       amount: selectedAmount,
       order_id: "wallet-" + profile.uid + "-" + reference,
@@ -163,6 +239,48 @@ export default function WalletDetails(props) {
     setSelectedAmount(null);
   };
 
+  // Withdraw functions
+  const doWithdraw = () => {
+    if (!(profile.mobile && profile.mobile.length > 6) && profile.email && profile.firstName) {
+      Alert.alert(t('alert'), t('profile_incomplete'));
+      props.navigation.dispatch(CommonActions.reset({ 
+        index: 0, 
+        routes: [{ name: 'Profile', params: { fromPage: 'Wallet' } }] 
+      }));
+    } else {
+      if (parseFloat(profile.walletBalance) > 0) {
+        setWithdrawModalVisible(true);
+      } else {
+        Alert.alert(t('alert'), t('wallet_bal_low'));
+      }
+    }
+  };
+
+  const handleWithdrawConfirm = () => {
+    if (!withdrawAmount || withdrawAmount <= 0) {
+      setErrorMessage(t('enter_valid_amount'));
+      setErrorDialogVisible(true);
+      return;
+    }
+    if (parseFloat(withdrawAmount) > parseFloat(profile.walletBalance)) {
+      setErrorMessage(t('wallet_bal_low'));
+      setErrorDialogVisible(true);
+      return;
+    }
+    
+    setWithdrawModalVisible(false);
+    
+    setTimeout(() => {
+      setWithdrawAmount(null);
+      dispatch(withdrawBalance(profile, withdrawAmount));
+      
+      setTimeout(() => {
+        setSuccessDialogVisible(true);
+      }, 100);
+    }, 300);
+  };
+
+  // Render functions
   const renderRechargeContent = () => (
     <View style={styles.rechargeContent}>
       <Text style={[styles.amountSelectionTitle, { 
@@ -171,7 +289,7 @@ export default function WalletDetails(props) {
         {t('select_recharge_amount')}
       </Text>
       <View style={styles.amountGrid}>
-        {rechargeAmounts.map((amount) => (
+        {RECHARGE_AMOUNTS.map((amount) => (
           <TouchableOpacity
             key={amount}
             style={[
@@ -203,51 +321,6 @@ export default function WalletDetails(props) {
       </View>
     </View>
   );
-
-  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState(null);
-  const [errorDialogVisible, setErrorDialogVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successDialogVisible, setSuccessDialogVisible] = useState(false);
-
-  const doWithdraw = () => {
-    if (!(profile.mobile && profile.mobile.length > 6) && profile.email && profile.firstName) {
-      Alert.alert(t('alert'), t('profile_incomplete'));
-      props.navigation.dispatch(CommonActions.reset({ index: 0, routes:[{ name: 'Profile', params: { fromPage: 'Wallet'}}]}));
-    } else {
-      if (parseFloat(profile.walletBalance) > 0) {
-        setWithdrawModalVisible(true);
-      } else {
-        Alert.alert(t('alert'), t('wallet_bal_low'))
-      }
-    }
-  }
-
-  const handleWithdrawConfirm = () => {
-    if (!withdrawAmount || withdrawAmount <= 0) {
-      setErrorMessage(t('enter_valid_amount'));
-      setErrorDialogVisible(true);
-      return;
-    }
-    if (parseFloat(withdrawAmount) > parseFloat(profile.walletBalance)) {
-      setErrorMessage(t('wallet_bal_low'));
-      setErrorDialogVisible(true);
-      return;
-    }
-    
-    setWithdrawModalVisible(false);
-    
-    setTimeout(() => {
-      setWithdrawAmount(null);
-      dispatch(withdrawBalance(profile, withdrawAmount));
-      
-      setTimeout(() => {
-        setSuccessDialogVisible(true);
-      }, 100);
-    }, 300);
-  };
-
-  const [withdrawAmountFocus, setWithdrawAmountFocus] = useState(false);
 
   const renderWithdrawContent = () => (
     <View style={styles.withdrawContent}>
@@ -285,172 +358,124 @@ export default function WalletDetails(props) {
     </View>
   );
 
-  const getCreditedTransactions = () => {
-    if (!walletHistory) return [];
-    return walletHistory.filter(transaction => 
-      transaction.type === 'Credit' || 
-      transaction.type === 'Deposit' ||
-      parseFloat(transaction.amount) > 0
-    );
-  };
-
-  const getDebitedTransactions = () => {
-    if (!walletHistory) return [];
-    return walletHistory.filter(transaction => 
-      transaction.type === 'Debit' ||
-      parseFloat(transaction.amount) < 0
-    );
-  };
-
-  const getWithdrawnTransactions = () => {
-    if (!walletHistory) return [];
-    return walletHistory.filter(transaction => 
-      transaction.type === 'Withdraw'
-    );
-  };
-
-  const showCreditedTransactions = () => {
-    props.navigation.navigate('TransactionHistory', {
-      transactions: getCreditedTransactions(),
-      title: t('credited') || 'Acreditado',
-      type: 'credited'
-    });
-  };
-
-  const showDebitedTransactions = () => {
-    props.navigation.navigate('TransactionHistory', {
-      transactions: getDebitedTransactions(),
-      title: t('debited') || 'Debitado',
-      type: 'debited'
-    });
-  };
-
-  const showWithdrawnTransactions = () => {
-    props.navigation.navigate('TransactionHistory', {
-      transactions: getWithdrawnTransactions(),
-      title: t('withdrawn') || 'Retirado',
-      type: 'withdrawn'
-    });
-  };
-
-  return (
-    <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Balance Card */}
-        <View style={styles.balanceCardContainer}>
-          <View style={[styles.balanceCard, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
-            <View style={styles.balanceCardHeader}>
-              <View style={styles.balanceInfo}>
-                <View style={styles.titleRow}>
-                  <View style={[styles.walletIconContainer, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                    <MaterialIcons name="account-balance-wallet" size={24} color={colors.WHITE} />
-                  </View>
-                  <Text style={[styles.balanceTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                    {t('wallet_balance')}
-                  </Text>
-                </View>
-                <View style={styles.balanceBottomSection}>
-                  <View style={styles.balanceLeftColumn}>
-                    <Text style={[styles.balanceSubtitle, { 
-                      color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
-                      marginTop: 10 
-                    }]}>
-                      {t('balance')}
-                    </Text>
-                    <AutoResizeText 
-                      style={[styles.balanceAmount, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
-                      maxFontSize={24}
-                      minFontSize={14}
-                    >
-                      {settings.swipe_symbol === false ?
-                        isRTL ?
-                          `${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}${settings.symbol}`
-                          :
-                          `${settings.symbol}${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}`
-                        :
-                        isRTL ?
-                          `${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}${settings.symbol}`
-                          :   
-                          `${settings.symbol} ${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}`
-                      }
-                    </AutoResizeText>
-                  </View>
-                  <View style={{flexDirection: 'row'}}>
-                    <TouchableOpacity 
-                      onPress={doReacharge}
-                      style={[styles.rechargeButton, { backgroundColor: colors.GREEN, width: 70, marginRight: 2 }]}
-                    >
-                      <Text style={styles.rechargeButtonText}>{t('Recharge')}</Text>
-                    </TouchableOpacity>
-                    {(profile?.usertype === 'driver' || (profile?.usertype === 'customer' && settings?.RiderWithDraw)) && (
-                      <TouchableOpacity 
-                        onPress={doWithdraw}
-                        style={[styles.rechargeButton, { backgroundColor: colors.RED, width: 70 }]}
-                      >
-                        <Text style={styles.rechargeButtonText}>{t('withdraw')}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
+  const renderBalanceCard = () => (
+    <View style={styles.balanceCardContainer}>
+      <View style={[styles.balanceCard, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}>
+        <View style={styles.balanceCardHeader}>
+          <View style={styles.balanceInfo}>
+            <View style={styles.titleRow}>
+              <View style={[styles.walletIconContainer, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                <MaterialIcons name="account-balance-wallet" size={24} color={colors.WHITE} />
+              </View>
+              <Text style={[styles.balanceTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                {t('wallet_balance')}
+              </Text>
+            </View>
+            <View style={styles.balanceBottomSection}>
+              <View style={styles.balanceLeftColumn}>
+                <Text style={[styles.balanceSubtitle, { 
+                  color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+                  marginTop: 10 
+                }]}>
+                  {t('balance')}
+                </Text>
+                <AutoResizeText 
+                  style={[styles.balanceAmount, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}
+                  maxFontSize={24}
+                  minFontSize={14}
+                >
+                  {settings.swipe_symbol === false ?
+                    isRTL ?
+                      `${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}${settings.symbol}`
+                      :
+                      `${settings.symbol}${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}`
+                    :
+                    isRTL ?
+                      `${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}${settings.symbol}`
+                      :   
+                      `${settings.symbol} ${profile && profile.hasOwnProperty('walletBalance') ? formatAmount(profile.walletBalance, settings.decimal, settings.country) : ''}`
+                  }
+                </AutoResizeText>
+              </View>
+              <View style={{ flexDirection: 'row' }}>
+                <TouchableOpacity 
+                  onPress={doRecharge}
+                  style={[styles.rechargeButton, { backgroundColor: colors.GREEN, width: 70, marginRight: 2 }]}
+                >
+                  <Text style={styles.rechargeButtonText}>{t('Recharge')}</Text>
+                </TouchableOpacity>
+                {(profile?.usertype === 'driver' || (profile?.usertype === 'customer' && settings?.RiderWithDraw)) && (
+                  <TouchableOpacity 
+                    onPress={doWithdraw}
+                    style={[styles.rechargeButton, { backgroundColor: colors.RED, width: 70 }]}
+                  >
+                    <Text style={styles.rechargeButtonText}>{t('withdraw')}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
         </View>
+      </View>
+    </View>
+  );
 
-        {/* Menu Options */}
-        <View style={styles.menuContainer}>
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}
-            onPress={showCreditedTransactions}
-          >
-            <View style={styles.menuItemContent}>
-              <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                {t('credited') || 'Acreditado'}
-              </Text>
-              <MaterialIcons 
-                name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
-                size={24} 
-                color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
-              />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}
-            onPress={showDebitedTransactions}
-          >
-            <View style={styles.menuItemContent}>
-              <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                {t('debited') || 'Debitado'}
-              </Text>
-              <MaterialIcons 
-                name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
-                size={24} 
-                color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
-              />
-            </View>
-          </TouchableOpacity>
-
-          {settings && settings.RiderWithDraw && (
-            <TouchableOpacity 
-              style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}
-              onPress={showWithdrawnTransactions}
-            >
-              <View style={styles.menuItemContent}>
-                <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                  {t('withdrawn') || 'Retirado'}
-                </Text>
-                <MaterialIcons 
-                  name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
-                  size={24} 
-                  color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
-                />
-              </View>
-            </TouchableOpacity>
-          )}
+  const renderMenuOptions = () => (
+    <View style={styles.menuContainer}>
+      <TouchableOpacity 
+        style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}
+        onPress={showCreditedTransactions}
+      >
+        <View style={styles.menuItemContent}>
+          <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+            {t('credited') || 'Acreditado'}
+          </Text>
+          <MaterialIcons 
+            name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
+            size={24} 
+            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
+          />
         </View>
-      </ScrollView>
+      </TouchableOpacity>
 
+      <TouchableOpacity 
+        style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}
+        onPress={showDebitedTransactions}
+      >
+        <View style={styles.menuItemContent}>
+          <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+            {t('debited') || 'Debitado'}
+          </Text>
+          <MaterialIcons 
+            name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
+            size={24} 
+            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
+          />
+        </View>
+      </TouchableOpacity>
+
+      {settings && settings.RiderWithDraw && (
+        <TouchableOpacity 
+          style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}
+          onPress={showWithdrawnTransactions}
+        >
+          <View style={styles.menuItemContent}>
+            <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+              {t('withdrawn') || 'Retirado'}
+            </Text>
+            <MaterialIcons 
+              name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
+              size={24} 
+              color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
+            />
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderDialogs = () => (
+    <>
       <WaygoDialog
         visible={rechargeModalVisible}
         onClose={() => {
@@ -510,9 +535,19 @@ export default function WalletDetails(props) {
         onConfirm={() => setSuccessDialogVisible(false)}
         message={t('withdraw_request_submitted')}
       />
-    </View>
+    </>
   );
 
+  // Main render
+  return (
+    <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {renderBalanceCard()}
+        {renderMenuOptions()}
+      </ScrollView>
+      {renderDialogs()}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -530,14 +565,8 @@ const styles = StyleSheet.create({
   balanceCard: {
     borderRadius: 16,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E9EC',
   },
   balanceCardHeader: {
     flexDirection: 'row',
@@ -655,14 +684,8 @@ const styles = StyleSheet.create({
   menuItem: {
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E9EC',
   },
   menuItemContent: {
     flexDirection: 'row',

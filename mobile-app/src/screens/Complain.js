@@ -117,14 +117,14 @@ export default function Complain() {
         }
     }
 
-    const renderInputField = (placeholder, value, onChangeText, multiline = false) => (
+    const renderInputField = (label, placeholder, value, onChangeText, multiline = false) => (
         <Animated.View 
             style={[
                 styles.textInputContainer,
-                mode === 'dark' ? styles.shadowBackDark : styles.shadowBack,
                 { transform: [{ scale: scaleAnim }] }
             ]}
         >
+            <Text style={[styles.inputLabel, { color: mode === 'dark' ? '#A7A9AC' : '#A7A9AC' }]}>{label}</Text>
             <TextInput
                 placeholder={placeholder}
                 value={value}
@@ -132,10 +132,11 @@ export default function Complain() {
                 multiline={multiline}
                 style={[
                     styles.textInput,
+                    mode === 'dark' ? styles.textInputDark : styles.textInputLight,
                     multiline && { height: 100, textAlignVertical: 'top' },
                     { textAlign: isRTL ? 'right' : 'left', color: mode === 'dark' ? colors.WHITE : colors.BLACK }
                 ]}
-                placeholderTextColor={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                placeholderTextColor={colors.SHADOW}
             />
         </Animated.View>
     );
@@ -182,15 +183,15 @@ export default function Complain() {
     return (
         <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
             <View style={styles.formContainer}>
-                {renderInputField(t('subject'), state.subject, (text) => setState({ ...state, subject: text }))}
-                {renderInputField(t('chat_blank'), state.body, (text) => setState({ ...state, body: text }), true)}
+                {renderInputField(t('subject'), '', state.subject, (text) => setState({ ...state, subject: text }))}
+                {renderInputField(t('message_text'), '', state.body, (text) => setState({ ...state, body: text }), true)}
                       
-                <View style={{ alignItems: 'center' }}>
+                <View style={styles.buttonContainer}>
                     <Button
                         onPress={submitComplain}
                         title={t('submit')}
-                        titleStyle={styles.buttonTitle}
-                        buttonStyle={[styles.goHomeButton,{backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}]}
+                        titleStyle={[styles.buttonTitle, {color: colors.WHITE}]}
+                        buttonStyle={[styles.submitButton,{backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}]}
                     />
                 </View> 
             </View>
@@ -212,39 +213,51 @@ const styles = StyleSheet.create({
         width: width,
     },
     formContainer: {
-        padding: 10,
+        padding: 20,
+        paddingBottom: 10,
+        gap: 10,
     },
     textInputContainer: {
-        borderRadius: 12,
-        marginBottom: 15,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
-        elevation: 3,
+        width: '100%',
+        marginBottom: 16,
+    },
+    inputLabel: {
+        width: '100%',
+        fontSize: 13,
+        marginBottom: 6,
+        fontFamily: fonts.Bold
     },
     textInput: {
-        padding: 15,
+        borderWidth: 1,
+        borderColor: '#E2E9EC',
+        borderRadius: 10,
+        paddingVertical: 15,
+        paddingLeft: 10,
+        paddingRight: 10,
         fontFamily: fonts.Regular,
-        fontSize: 16,
+        fontSize: 14,
         minHeight: 50,
     },
+    textInputDark: {
+        borderColor: '#2C2C2E',
+        backgroundColor: '#1C1C1E',
+    },
+    textInputLight: {
+        backgroundColor: colors.WHITE,
+    },
+    buttonContainer: {
+        width: '100%',
+        marginBottom: 30,
+        marginTop: 10,
+    },
     submitButton: {
-        height: 50,
-        borderRadius: 25,
-        justifyContent: 'center',
+        width: '100%',
+        borderRadius: 10,
+        paddingVertical: 14,
         alignItems: 'center',
-        marginVertical: 10,
-        shadowColor: colors.BLACK,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
+        justifyContent: 'center',
+        marginTop: 4,
+        marginBottom: 5,
     },
     submitButtonText: {
         color: colors.WHITE,
@@ -252,25 +265,26 @@ const styles = StyleSheet.create({
         fontFamily: fonts.Bold,
     },
     listContainer: {
-        padding: 10,
-        paddingTop: 0,
+        padding: 20,
+        paddingTop: 10,
     },
     complaintCard: {
-        borderRadius: 15,
-        padding: 10,
-        marginTop: 10,
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        shadowColor: colors.BLACK,
         shadowOffset: {
             width: 0,
-            height: 3,
+            height: 2,
         },
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 4,
+        elevation: 3,
     },
     complaintHeader: {
         justifyContent: 'space-between',
         alignItems: 'flex-start',
-        marginBottom: 10,
+        marginBottom: 12,
     },
     subjectContainer: {
         flex: 1,
@@ -309,20 +323,16 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     shadowBack: {
-        shadowColor: colors.SHADOW,
+        shadowColor: colors.BLACK,
         backgroundColor: colors.WHITE,
     },
     shadowBackDark: {
-        shadowColor: colors.SHADOW,
-        backgroundColor: colors.PAGEBACK,
+        shadowColor: colors.BLACK,
+        backgroundColor: '#1C1C1E',
     },
     buttonTitle: {
         fontFamily:fonts.Bold,
         fontSize: 18
     },
-    goHomeButton: {
-        width: 150,
-        minHeight: 50,
-        borderRadius: 10,
-    },
+
 })
