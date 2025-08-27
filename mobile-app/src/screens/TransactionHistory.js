@@ -83,20 +83,24 @@ export default function TransactionHistory(props) {
 
   const getTransactionIcon = (transaction) => {
     const amount = parseFloat(transaction.amount || 0);
-    if (amount > 0 || transaction.type === 'Credit' || transaction.type === 'Deposit') {
+    if (transaction.type === 'Credit' || transaction.type === 'Deposit') {
       return 'plus-circle-outline';
-    } else {
+    }
+    if (transaction.type === 'Debit' || transaction.type === 'Withdraw') {
       return 'minus-circle-outline';
     }
+    return amount > 0 ? 'plus-circle-outline' : 'minus-circle-outline';
   };
 
   const getTransactionColor = (transaction) => {
     const amount = parseFloat(transaction.amount || 0);
-    if (amount > 0 || transaction.type === 'Credit' || transaction.type === 'Deposit') {
+    if (transaction.type === 'Credit' || transaction.type === 'Deposit') {
       return colors.GREEN;
-    } else {
+    }
+    if (transaction.type === 'Debit' || transaction.type === 'Withdraw') {
       return colors.RED;
     }
+    return amount > 0 ? colors.GREEN : colors.RED;
   };
 
   const getTransactionTitle = (transaction) => {
@@ -115,7 +119,14 @@ export default function TransactionHistory(props) {
 
   const renderTransaction = ({ item, index }) => {
     const amount = parseFloat(item.amount || 0);
-    const isPositive = amount > 0 || item.type === 'Credit' || item.type === 'Deposit';
+    let isPositive = false;
+    if (item.type === 'Credit' || item.type === 'Deposit') {
+      isPositive = true;
+    } else if (item.type === 'Debit' || item.type === 'Withdraw') {
+      isPositive = false;
+    } else {
+      isPositive = amount > 0;
+    }
     
     return (
       <Animated.View 

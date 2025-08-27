@@ -139,54 +139,58 @@ export default function WalletDetails(props) {
     }
   }, [auth.profile]);
 
-  // Transaction filter functions
+
+
   const getCreditedTransactions = () => {
     if (!walletHistory) return [];
-    return walletHistory.filter(transaction => 
-      transaction.type === 'Credit' || 
-      transaction.type === 'Deposit' ||
-      parseFloat(transaction.amount) > 0
-    );
+    return walletHistory.filter((transaction) => {
+      return transaction.type === 'Credit' || transaction.type === 'Deposit';
+    });
   };
 
   const getDebitedTransactions = () => {
     if (!walletHistory) return [];
-    return walletHistory.filter(transaction => 
-      transaction.type === 'Debit' ||
-      parseFloat(transaction.amount) < 0
-    );
+    return walletHistory.filter((transaction) => {
+      return transaction.type === 'Debit';
+    });
   };
 
   const getWithdrawnTransactions = () => {
     if (!walletHistory) return [];
-    return walletHistory.filter(transaction => 
-      transaction.type === 'Withdraw'
-    );
+    return walletHistory.filter((transaction) => {
+      return transaction.type === 'Withdraw';
+    });
   };
 
-  // Navigation functions
   const showCreditedTransactions = () => {
+    const creditedTransactions = getCreditedTransactions();
     props.navigation.navigate('TransactionHistory', {
-      transactions: getCreditedTransactions(),
+      transactions: creditedTransactions,
       title: t('credited') || 'Acreditado',
       type: 'credited'
     });
   };
 
   const showDebitedTransactions = () => {
+    const debitedTransactions = getDebitedTransactions();
     props.navigation.navigate('TransactionHistory', {
-      transactions: getDebitedTransactions(),
+      transactions: debitedTransactions,
       title: t('debited') || 'Debitado',
       type: 'debited'
     });
   };
 
   const showWithdrawnTransactions = () => {
-    props.navigation.navigate('TransactionHistory', {
-      transactions: getWithdrawnTransactions(),
-      title: t('withdrawn') || 'Retirado',
-      type: 'withdrawn'
-    });
+    const withdrawnTransactions = getWithdrawnTransactions();
+    if (withdrawnTransactions.length > 0) {
+      props.navigation.navigate('TransactionHistory', {
+        transactions: withdrawnTransactions,
+        title: t('withdrawn') || 'Retirado',
+        type: 'withdrawn'
+      });
+    } else {
+      Alert.alert(t('alert'), t('no_withdrawn_transactions') || 'No hay transacciones retiradas');
+    }
   };
 
   // Recharge functions
@@ -420,7 +424,7 @@ export default function WalletDetails(props) {
     </View>
   );
 
-  const renderMenuOptions = () => (
+    const renderMenuOptions = () => (
     <View style={styles.menuContainer}>
       <TouchableOpacity 
         style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}
@@ -446,15 +450,15 @@ export default function WalletDetails(props) {
           <Text style={[styles.menuItemText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
             {t('debited') || 'Debitado'}
           </Text>
-          <MaterialIcons 
-            name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
-            size={24} 
-            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
-          />
+                      <MaterialIcons 
+              name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
+              size={24} 
+              color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
+            />
         </View>
       </TouchableOpacity>
 
-      {settings && settings.RiderWithDraw && (
+      {getWithdrawnTransactions().length > 0 && (
         <TouchableOpacity 
           style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}
           onPress={showWithdrawnTransactions}
