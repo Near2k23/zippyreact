@@ -13,7 +13,8 @@ import {
     Share,
     ScrollView,
     useColorScheme,
-    TextInput
+    TextInput,
+    Keyboard
 } from 'react-native';
 import { TouchableOpacity as OldTouch } from 'react-native';
 import { Icon, Button } from 'react-native-elements';
@@ -183,10 +184,12 @@ export default function BookedCabScreen(props) {
         }
         if (lastLocation && curBooking && curBooking.status == 'REACHED' && role == 'customer' && pageActive.current) {
             setTimeout(() => {
-                mapRef.current.fitToCoordinates([{ latitude: curBooking.pickup.lat, longitude: curBooking.pickup.lng }, { latitude: lastLocation.lat, longitude: lastLocation.lng }], {
-                    edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-                    animated: true,
-                })
+                if (mapRef.current) {
+                    mapRef.current.fitToCoordinates([{ latitude: curBooking.pickup.lat, longitude: curBooking.pickup.lng }, { latitude: lastLocation.lat, longitude: lastLocation.lng }], {
+                        edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+                        animated: true,
+                    })
+                }
             }, 1000);
         }
     }, [lastLocation, curBooking, pageActive.current])
@@ -225,10 +228,12 @@ export default function BookedCabScreen(props) {
 
             });
         } else {
-            mapRef.current.fitToCoordinates([{ latitude: point1.lat, longitude: point1.lng }, { latitude: point2.lat, longitude: point2.lng }], {
-                edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-                animated: true,
-            })
+            if (mapRef.current) {
+                mapRef.current.fitToCoordinates([{ latitude: point1.lat, longitude: point1.lng }, { latitude: point2.lat, longitude: point2.lng }], {
+                    edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+                    animated: true,
+                })
+            }
         }
     }
 
@@ -1621,6 +1626,11 @@ export default function BookedCabScreen(props) {
                                 onChangeText={(text) => setDriverFeedback(text)}
                                 value={driverFeedback}
                                 numberOfLines={6}
+                                returnKeyType="done"
+                                blurOnSubmit={true}
+                                onSubmitEditing={() => {
+                                    Keyboard.dismiss();
+                                }}
                             />
                         </View>
                         <Text style={{ fontSize: 18, fontFamily: fonts.Bold, textAlign: 'center', color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginBottom: 8 }}>{t('addtip')}</Text>

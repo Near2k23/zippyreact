@@ -115,6 +115,39 @@ export default function CarEditScreen(props) {
             setCars([]);
         }
     }, [carlistdata.cars, updateCalled]);
+    
+    // Crear blob para la imagen existente cuando se carga el componente
+    useEffect(() => {
+        const createBlobFromExistingImage = async () => {
+            if (state.car_image && !blob) {
+                setLoading(true);
+                try {
+                    const imageBlob = await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.onload = function () {
+                            resolve(xhr.response);
+                        };
+                        xhr.onerror = function () {
+                            Alert.alert(t('alert'), t('image_upload_error'));
+                            setLoading(false);
+                            reject(new Error('Error al cargar la imagen'));
+                        };
+                        xhr.responseType = 'blob';
+                        xhr.open('GET', state.car_image, true);
+                        xhr.send(null);
+                    });
+                    if (imageBlob) {
+                        setBlob(imageBlob);
+                    }
+                } catch (error) {
+                    console.error('Error al crear blob:', error);
+                }
+                setLoading(false);
+            }
+        };
+        
+        createBlobFromExistingImage();
+    }, [state.car_image]);
 
     const showActionSheet = () => {
         actionSheetRef.current?.setModalVisible(true);
@@ -125,13 +158,13 @@ export default function CarEditScreen(props) {
             <ActionSheet ref={actionSheetRef}>
                 <TouchableOpacity
                     style={{ width: '90%', alignSelf: 'center', paddingLeft: 20, paddingRight: 20, borderColor: colors.SHADOW, borderBottomWidth: 1, height: 60, alignItems: 'center', justifyContent: 'center' }}
-                    onPress={() => { _pickImage('CAMERA', ImagePicker.launchCameraAsync) }}
+                    onPress={() => { _pickImage('CAMERA') }}
                 >
                     <Text style={{ color: colors.BLUE,fontFamily:fonts.Bold }}>{t('camera')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={{ width: '90%', alignSelf: 'center', paddingLeft: 20, paddingRight: 20, borderBottomWidth: 1, borderColor: colors.SHADOW, height: 60, alignItems: 'center', justifyContent: 'center' }}
-                    onPress={() => { _pickImage('MEDIA', ImagePicker.launchImageLibraryAsync) }}
+                    onPress={() => { _pickImage('MEDIA') }}
                 >
                     <Text style={{ color: colors.BLUE,fontFamily:fonts.Bold}}>{t('medialibrary')}</Text>
                 </TouchableOpacity>
@@ -144,43 +177,52 @@ export default function CarEditScreen(props) {
         )
     }
 
-    const _pickImage = async (permissionType, res) => {
-        var pickFrom = res;
+    const _pickImage = async (permissionType) => {
         let permisions;
-        if (permissionType == 'CAMERA') {
+        if (permissionType === 'CAMERA') {
             permisions = await ImagePicker.requestCameraPermissionsAsync();
         } else {
             permisions = await ImagePicker.requestMediaLibraryPermissionsAsync();
         }
         const { status } = permisions;
 
-        if (status == 'granted') {
-
+        if (status === 'granted') {
+            setLoading(true);
+            actionSheetRef.current?.setModalVisible(false);
+            
+            let pickFrom = permissionType === 'CAMERA' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+            
             let result = await pickFrom({
                 allowsEditing: true,
-                aspect: [4, 3]
+                aspect: [4, 3],
+                quality: 0.8
             });
-
-            actionSheetRef.current?.setModalVisible(false);
-
-            if (!result.canceled) {
-                setCapturedImage(result.assets[0].uri);
-                const blob = await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.onload = function () {
-                        resolve(xhr.response);
-                    };
-                    xhr.onerror = function () {
-                        Alert.alert(t('alert'), t('image_upload_error'));
-                    };
-                    xhr.responseType = 'blob';
-                    xhr.open('GET', result.assets[0].uri, true);
-                    xhr.send(null);
+            
+            if (!result.canceled && result.assets && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+                setCapturedImage(imageUri);
+                setState({
+                    ...state,
+                    car_image: imageUri
                 });
-                setBlob(blob);
+
+                fetch(imageUri)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        if (blob) {
+                            setBlob(blob);
+                        }
+                        setLoading(false);
+                    })
+                    .catch(error => {
+                        Alert.alert(t('alert'), t('image_upload_error'));
+                        setLoading(false);
+                    });
+            } else {
+                setLoading(false);
             }
         } else {
-            Alert.alert(t('alert'), t('camera_permission_error'))
+            Alert.alert(t('alert'), t('camera_permission_error'));
         }
     }
 
@@ -190,7 +232,7 @@ export default function CarEditScreen(props) {
 
     const onSave = () => {
         if (state.carType && state.carType.length > 1 && state.vehicleNumber && state.vehicleNumber.length > 1 && state.vehicleMake && state.vehicleMake.length > 1 && state.vehicleModel && state.vehicleModel.length > 1) {
-            if (blob) {
+            if (state.car_image) {
                 setLoading(true);
                 setUpdateCalled(true);
                 let activeCar = null;
@@ -217,7 +259,28 @@ export default function CarEditScreen(props) {
                 } else {
                     newData['approved'] = false;
                 }
-                dispatch(updateUserCarWithImage(newData, blob));
+                
+                // Si tenemos blob, usamos updateUserCarWithImage, de lo contrario usamos updateUserCar
+                if (blob) {
+                    dispatch(updateUserCarWithImage(newData, blob));
+                } else {
+                    // Si no hay blob pero hay imagen, actualizamos sin imagen
+                    let updateData = {
+                        carType: newData.carType,
+                        vehicleNumber: newData.vehicleNumber,
+                        vehicleMake: newData.vehicleMake,
+                        vehicleModel: newData.vehicleModel,
+                        other_info: newData.other_info ? newData.other_info : "",
+                        car_image: newData.car_image,
+                        active: newData.active,
+                        approved: newData.approved,
+                        createdAt: newData.createdAt,
+                        driver: newData.driver,
+                        fleetadmin: newData.fleetadmin,
+                        updateAt: new Date().getTime()
+                    };
+                    dispatch(updateUserCar(auth.profile.uid, updateData));
+                }
             }
             else {
                 Alert.alert(t('alert'), t('proper_input_image'));
@@ -225,8 +288,6 @@ export default function CarEditScreen(props) {
         } else {
             Alert.alert(t('alert'), t('no_details_error'));
         }
-        // console.log(capturedImage)
-
     }
 
     const makeActive = () => {
@@ -274,7 +335,11 @@ export default function CarEditScreen(props) {
                             uploadImage()
                         }
                         <View style={styles.containerStyle}>
-                            {state.car_image ?
+                            {loading ? (
+                                <View style={styles.loaderContainer}>
+                                    <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                </View>
+                            ) : state.car_image ? (
                                 <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
                                     <RemoteImage
                                         uri={state.car_image}
@@ -284,35 +349,34 @@ export default function CarEditScreen(props) {
                                         <Feather name="edit-2" size={24} color={colors.WHITE} />
                                     </View>
                                 </TouchableOpacity>
-                                :
-                                capturedImage ?
-                                    <View style={styles.imagePosition}>
-                                        <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
-                                            <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
-                                            <Image source={{ uri: capturedImage }} style={styles.photoResult} resizeMode={'cover'} />
-                                            <View style={styles.imageOverlay}>
-                                                <Feather name="edit-2" size={24} color={colors.WHITE} />
+                            ) : capturedImage ? (
+                                <View style={styles.imagePosition}>
+                                    <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
+                                        <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
+                                        <Image source={{ uri: capturedImage }} style={styles.photoResult} resizeMode={'cover'} />
+                                        <View style={styles.imageOverlay}>
+                                            <Feather name="edit-2" size={24} color={colors.WHITE} />
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View style={styles.capturePhoto}>
+                                    <View>
+                                        <Text style={[styles.capturePhotoTitle, styles.fontStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('upload_car_image')}</Text>
+                                    </View>
+                                    <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                        <TouchableOpacity style={styles.flexView1} onPress={showActionSheet}>
+                                            <View>
+                                                <View style={styles.imageFixStyle}>
+                                                    <AntDesign name="clouduploado" size={100} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} style={styles.imageStyle2} />
+                                                </View>
                                             </View>
                                         </TouchableOpacity>
                                     </View>
-                                    :
-                                    <View style={styles.capturePhoto}>
-                                        <View>
-                                            <Text style={[styles.capturePhotoTitle, styles.fontStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('upload_car_image')}</Text>
-                                        </View>
-                                        <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <TouchableOpacity style={styles.flexView1} onPress={showActionSheet}>
-                                                <View>
-                                                    <View style={styles.imageFixStyle}>
-                                                        <AntDesign name="clouduploado" size={100} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} style={styles.imageStyle2} />
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                            }
+                                </View>
+                            )}
 
                         <View style={styles.containerStyle}>
                             <View style={styles.inputContainerStyle}>
@@ -724,6 +788,12 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.4)',
         alignItems: 'center',
         justifyContent: 'center'
+    },
+    loaderContainer: {
+        width: '100%',
+        height: 200,
+        alignItems: 'center',
+        justifyContent: 'center',
     }
 
 });

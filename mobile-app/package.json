@@ -1,6 +1,6 @@
 {
   "name": "mobile-app",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -12,21 +12,18 @@
     "update": "expo update",
     "doctor": "npx expo-doctor",
     "doctor:fix": "npx expo install --fix",
-    "upgrade-sdk": "npx expo install expo@^53.0.0 --fix"
+    "upgrade-sdak": "npx expo install expo@^53.0.0 --fix"
   },
   "dependencies": {
     "@expo/config-plugins": "~10.1.1",
     "@expo/prebuild-config": "~9.0.0",
-    "@gluestack-style/react": "^1.0.57",
+"@gluestack-style/react": "^1.0.57",
     "@gluestack-ui/button": "^1.0.14",
     "@gluestack-ui/config": "^1.1.20",
     "@gluestack-ui/input": "^0.1.38",
     "@gluestack-ui/provider": "^0.1.19",
     "@gluestack-ui/themed": "^1.1.73",
-    "@mapbox/polyline": "1.1.1",
-    "@react-native-aria/focus": "^0.2.9",
-    "@react-native-aria/interactions": "^0.2.16",
-    "@react-native-aria/utils": "^0.2.12",
+        "@mapbox/polyline": "1.1.1",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-firebase/app": "^22.2.0",
     "@react-native-firebase/auth": "^22.2.0",

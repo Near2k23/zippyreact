@@ -374,7 +374,7 @@ export default function DriverTrips(props) {
     return (
         <View style={styles.mainViewStyle}>
             <KeyboardAvoidingView behavior={Platform.OS == "ios" ? "padding" : (__DEV__ ? null : "padding")}>
-                <View style={{height:'80%', backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE}}>
+                <View style={{height:'70%', backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE}}>
                 <FlatList
                     data={auth.profile && auth.profile.uid && auth.profile.driverActiveStatus ?
                         (appConsts && appConsts.showBookingOptions ? tasks ? tasks : activeBookings : auth.profile.queue ? activeBookings : tasks) : []}
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     report: {
-        height:'30%',
+        height:'40%',
         width: '100%',
         alignSelf: 'center',
         borderTopRightRadius: 15,

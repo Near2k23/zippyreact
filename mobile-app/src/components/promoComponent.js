@@ -9,9 +9,9 @@ import {
   TextInput,
   ImageBackground,
   Alert,
-  useColorScheme
+  useColorScheme,
+  Image
 } from "react-native";
-import { Avatar, Button } from "react-native-elements";
 import { colors } from "../common/theme";
 import i18n from 'i18n-js';
 import { useSelector } from 'react-redux';
@@ -21,8 +21,8 @@ var { width, height } = Dimensions.get('window');
 
 export default function PromoComp(props) {
 
-  const settings = useSelector(state => state.settingsdata.settings);
-  const promos = useSelector(state => state.promodata.promos);
+  const settings = useSelector(state => state.settingsdata?.settings || {});
+  const promos = useSelector(state => state.promodata?.promos || []);
   const auth = useSelector(state => state.auth);
   let colorScheme = useColorScheme();
   const [mode, setMode] = useState();
@@ -77,6 +77,8 @@ export default function PromoComp(props) {
       if(count){
         Alert.alert(t('alert'),t('promo_not_found'));
       }
+    } else {
+      Alert.alert(t('alert'), 'No promos available');
     }
   };
 
@@ -87,36 +89,38 @@ export default function PromoComp(props) {
         <View style={[styles.fare, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, {height: 'auto', flexDirection: isRTL?'row-reverse':'row'}]}>
             <View style={[styles.textViewStyle, {justifyContent:'space-around'}]}>
               <View style={{flexDirection: 'column'}}>
-                <Text style={[styles.couponCode,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t(getLangKey(item.promo_name))}</Text>
-                <Text style={[styles.textStyle,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t(getLangKey(item.promo_description))}</Text>
+                <Text style={[styles.couponCode,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{item.promo_name}</Text>
+                <Text style={[styles.textStyle,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{item.promo_description}</Text>
                 <Text style={[styles.textStyleBold,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('code')}: {item.promo_code}</Text>
               </View>
-              {settings.swipe_symbol===false?
-                <Text style={[styles.timeTextStyle,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{ isRTL? settings.symbol : null}{ isRTL? formatAmount(item.min_order, settings.decimal, settings.country) : null}{isRTL? " - " : null}{t('min_order_value')}{!isRTL? " - " : null}{ !isRTL? settings.symbol : null}{ !isRTL? formatAmount(item.min_order, settings.decimal, settings.country) : null}</Text>
+              {settings?.swipe_symbol===false?
+                <Text style={[styles.timeTextStyle,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{ isRTL? (settings?.symbol || '') : null}{ isRTL? formatAmount(item.min_order, settings?.decimal || 2, settings?.country || 'US') : null}{isRTL? " - " : null}{t('min_order_value')}{!isRTL? " - " : null}{ !isRTL? (settings?.symbol || '') : null}{ !isRTL? formatAmount(item.min_order, settings?.decimal || 2, settings?.country || 'US') : null}</Text>
                 :
-                <Text style={[styles.timeTextStyle,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('min_order_value')} {formatAmount(item.min_order, settings.decimal, settings.country)}{settings.symbol}</Text> 
+                <Text style={[styles.timeTextStyle,{textAlign: isRTL? "right":"left", color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('min_order_value')} {formatAmount(item.min_order, settings?.decimal || 2, settings?.country || 'US')}{settings?.symbol || ''}</Text> 
               }
               
             </View>
             <View style={styles.applyBtnPosition} >
               <View style={[styles.avatarPosition,{justifyContent:isRTL?'flex-end':'flex-start', paddingVertical: 10}]}>
-                <Avatar
-                  size={40}
-                  rounded
-                  source={{
-                    uri: item.promo_discount_type ?
-                      item.promo_discount_type == 'flat' ? "https://cdn1.iconfinder.com/data/icons/service-maintenance-icons/512/tag_price_label-512.png" :
-                        "https://cdn4.iconfinder.com/data/icons/icoflat3/512/discount-512.png" : null
-                  }}
-                />
+                <View style={styles.promoIconContainer}>
+                  <Image
+                    style={styles.promoIcon}
+                    source={{
+                      uri: item.promo_discount_type ?
+                        item.promo_discount_type == 'flat' ? "https://cdn1.iconfinder.com/data/icons/service-maintenance-icons/512/tag_price_label-512.png" :
+                          "https://cdn4.iconfinder.com/data/icons/icoflat3/512/discount-512.png" : null
+                    }}
+                  />
+                </View>
               </View>
-              <Button
-                title={t('apply')}
-                TouchableComponent={TouchableOpacity}
-                titleStyle={[styles.buttonTitleStyle,{alignSelf:isRTL?'flex-start':'flex-end'}]}
-                buttonStyle={[styles.confButtonStyle,{alignSelf:isRTL?'flex-start':'flex-end'}]}
+              <TouchableOpacity
+                style={[styles.confButtonStyle,{alignSelf:isRTL?'flex-start':'flex-end'}]}
                 onPress={() => onPressButton(item, index)}
-              />
+              >
+                <Text style={[styles.buttonTitleStyle,{alignSelf:isRTL?'flex-start':'flex-end'}]}>
+                  {t('apply')}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
       </View>
@@ -125,25 +129,26 @@ export default function PromoComp(props) {
 
   return (
     <View style={{flex: 1, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}}>
-       <View style={[styles.fare, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack, {paddingHorizontal: 5, flexDirection:'row', alignItems: 'center', minHeight: 60, margin: 10, justifyContent: 'space-between'}]}>
-        <View style={[styles.boxView,{width: width - 155}]}>
-          <TextInput
-            style={[isRTL? styles.textInputRtl : styles.textInput,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-            placeholder={t('promo_code')}
-            onChangeText={(text) => setState(text)}
-            name={state}
-            placeholderTextColor={colors.SHADOW}
-          />
-        </View>
-        <View style={{width:135, alignItems: 'center'}}>
-          <Button
-            title={t('apply')}
-            TouchableComponent={TouchableOpacity}
-            titleStyle={[styles.buttonTitleStyle,{alignSelf:isRTL?'flex-start':'flex-end'}]}
-            buttonStyle={[styles.confButtonStyle,{alignSelf:isRTL?'flex-start':'flex-end'}]}
+      <View style={styles.promoInputContainer}>
+        <View style={[styles.inputWrapper, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
+          <View style={[styles.boxView, {flex: 1, marginRight: 20}]}>
+            <TextInput
+              style={[isRTL? styles.textInputRtl : styles.textInput,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
+              placeholder={t('promo_code')}
+              onChangeText={(text) => setState(text)}
+              name={state}
+              placeholderTextColor={colors.SHADOW}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.confButtonStyle,{opacity: state && state.length > 0 ? 1 : 0.5}]}
             onPress={() => onPromoButton()}
             disabled={ state && state.length > 0 ? false : true}
-          />
+          >
+            <Text style={styles.buttonTitleStyle}>
+              {t('apply')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
       <View style={{flex: 1, flexDirection:'row'}}>
@@ -191,23 +196,25 @@ const styles = StyleSheet.create({
   textViewStyle: {
     justifyContent: "center",
     flex: 1,
-    paddingLeft:10
+    paddingLeft: 16,
+    paddingRight: 12
   },
   fare:{
-    width:width-20,
-    marginTop: 5,
+    width:width-32,
+    marginTop: 8,
     backgroundColor: colors.WHITE,
-    margin: 5,
-    borderRadius:10,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius:16,
     justifyContent:"center",
-    padding: 5,
+    padding: 20,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 1,
-    elevation: 5,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   shadowBack: {
     shadowColor: colors.SHADOW,
@@ -242,11 +249,21 @@ const styles = StyleSheet.create({
     fontFamily:fonts.Bold
   },
   confButtonStyle: {
-    borderRadius: 6,
-    width: 100,
-    padding:5,
-    alignSelf: 'flex-end',
-    backgroundColor:colors.GREEN
+    borderRadius: 12,
+    minWidth: 80,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: colors.GREEN,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.GREEN,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   deleteButtonStyle: {
     backgroundColor: colors.WHITE,
@@ -267,23 +284,67 @@ const styles = StyleSheet.create({
   boxView:{
     height: 50,
     justifyContent: 'center',
-    borderRadius: 4,
-    marginVertical: 5
+    borderRadius: 12,
+    marginVertical: 5,
+    backgroundColor: colors.WHITE,
+    borderWidth: 1,
+    borderColor: colors.SHADOW + '20',
+    paddingHorizontal: 12
   },
   textInputRtl:{
     textAlign:'right',
-    fontSize: 14,
-    marginRight: 5,
-    fontFamily: fonts.Bold
+    fontSize: 16,
+    fontFamily: fonts.Regular,
+    flex: 1
   },
   textInput:{
       textAlign:'left',
-      fontSize: 14,
-      marginLeft: 5,
-      fontFamily: fonts.Bold
+      fontSize: 16,
+      fontFamily: fonts.Regular,
+      flex: 1
   },
   textStyleBold: {
     fontSize: 15,
     fontFamily: fonts.Bold
+  },
+  promoIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.WHITE,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.SHADOW,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  promoIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain'
+  },
+  promoInputContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 12
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.WHITE,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   }
 });

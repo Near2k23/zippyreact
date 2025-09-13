@@ -215,6 +215,7 @@ export default function SettingsScreen(props) {
             {/* Profile Section */}
             <Animated.View 
                 style={[styles.profileSection, {
+                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
                     opacity: profileAnim,
                     transform: [{
                         translateY: profileAnim.interpolate({
@@ -724,8 +725,20 @@ const styles = StyleSheet.create({
     },
     // Nuevos estilos para el diseño actualizado
     profileSection: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
+        marginHorizontal: 20,
+        marginTop: 20,
+        marginBottom: 32,
+        borderRadius: 20,
+        backgroundColor: '#FFFFFF',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 8,
+        },
+        shadowOpacity: 0.12,
+        shadowRadius: 24,
+        elevation: 12,
+        padding: 24,
     },
     profileContainer: {
         flexDirection: 'row',
@@ -742,40 +755,58 @@ const styles = StyleSheet.create({
     },
     profileImageWrapper: {
         position: 'relative',
-        width: 60,
-        height: 60,
-        borderRadius: 0,
-        overflow: 'hidden',
+        width: 70,
+        height: 70,
+        borderRadius: 35,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 6,
     },
     profileImage: {
-        width: 60,
-        height: 60,
-        borderRadius: 0,
+        width: 70,
+        height: 70,
+        borderRadius: 35,
         overflow: 'hidden',
     },
     editBadge: {
         position: 'absolute',
         bottom: -2,
         right: -2,
-        width: 20,
-        height: 20,
-        borderRadius: 10,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: colors.WHITE,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+        elevation: 4,
     },
     profileTextContainer: {
         flex: 1,
     },
     profileName: {
-        fontSize: 20,
+        fontSize: 22,
         fontFamily: fonts.Bold,
-        marginBottom: 4,
+        marginBottom: 6,
+        letterSpacing: 0.5,
     },
     profilePhone: {
-        fontSize: 14,
-        fontFamily: fonts.Regular,
+        fontSize: 15,
+        fontFamily: fonts.Medium,
+        opacity: 0.8,
+        letterSpacing: 0.3,
     },
     profileEditButton: {
         marginLeft: 12,

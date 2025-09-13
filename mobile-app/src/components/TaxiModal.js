@@ -34,10 +34,12 @@ export default function TaxiModal(props) {
     const mapRef = useRef(null);
 
     const runFitCoords = () => {
-        mapRef.current.fitToCoordinates([{ latitude: tripdata.pickup.lat, longitude: tripdata.pickup.lng }, { latitude: tripdata.drop.lat, longitude: tripdata.drop.lng }], {
-            edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
-            animated: true,
-        });
+        if (mapRef.current && tripdata && tripdata.pickup && tripdata.drop) {
+            mapRef.current.fitToCoordinates([{ latitude: tripdata.pickup.lat, longitude: tripdata.pickup.lng }, { latitude: tripdata.drop.lat, longitude: tripdata.drop.lng }], {
+                edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+                animated: true,
+            });
+        }
     };
 
     return (

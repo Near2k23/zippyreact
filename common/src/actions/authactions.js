@@ -420,13 +420,17 @@ export const updateProfileImage = (imageBlob) => {
 
   const uid = auth.currentUser.uid;
 
-  uploadBytesResumable( profileImageRef(uid), imageBlob).then(() => {
+  return uploadBytesResumable( profileImageRef(uid), imageBlob).then(() => {
     imageBlob.close()
     return getDownloadURL(profileImageRef(uid))
   }).then((url) => {
     update(singleUserRef(uid), {
       profile_image: url
     });
+    return url;
+  }).catch((error) => {
+    console.error('Error uploading profile image:', error);
+    throw error;
   })
 };
 

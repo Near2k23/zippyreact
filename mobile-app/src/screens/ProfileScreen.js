@@ -30,7 +30,7 @@ import { MaterialIcons, Ionicons, Entypo, MaterialCommunityIcons, Feather, AntDe
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import Dialog from "react-native-dialog";
 import { FontAwesome5 } from '@expo/vector-icons';
-import rnauth from '@react-native-firebase/auth';
+import auth from '@react-native-firebase/auth';
 import { fonts } from '../common/font';
 import { getLangKey } from 'common/src/other/getLangKey';
 
@@ -182,7 +182,13 @@ export default function ProfileScreen(props) {
                     xhr.send(null);
                 });
                 if (blob) {
-                    updateProfileImage(blob);
+                    try {
+                        await updateProfileImage(blob);
+                        Alert.alert(t('alert'), t('profile_updated'));
+                    } catch (error) {
+                        console.error('Error updating profile image:', error);
+                        Alert.alert(t('alert'), t('image_upload_error'));
+                    }
                 }
                 setLoader(false);
             }
@@ -363,7 +369,7 @@ export default function ProfileScreen(props) {
                             }
                             setmobileLoading(false)
                         } else {
-                            const snapshot = await rnauth()
+                            const snapshot = await auth()
                                 .verifyPhoneNumber(profileData.mobile)
                                 .on('state_changed', (phoneAuthSnapshot) => {
                                         if(phoneAuthSnapshot && phoneAuthSnapshot.state === "error"){
@@ -537,26 +543,51 @@ export default function ProfileScreen(props) {
             <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
                 <View style={styles.fieldContainer}>
                     <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
-                        {t('name')}
+                        {t('first_name')}
                     </Text>
-                                        <TextInput
+                    <TextInput
                         style={[styles.fieldInput, { 
                             color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                             backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                         }]}
-                        value={profileData ? `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() : ''}
+                        value={profileData?.firstName || ''}
                         onChangeText={(text) => {
-                            const nameParts = text.split(' ');
                             setProfileData({ 
                                 ...profileData, 
-                                firstName: nameParts[0] || '', 
-                                lastName: nameParts.slice(1).join(' ') || ''
+                                firstName: text
                             });
                         }}
-                        placeholder={t('name')}
+                        placeholder={t('first_name')}
                         placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
-                                        />
-                                        </View>
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        keyboardType="default"
+                    />
+                </View>
+
+                <View style={styles.fieldContainer}>
+                    <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                        {t('last_name')}
+                    </Text>
+                    <TextInput
+                        style={[styles.fieldInput, { 
+                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                            backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+                        }]}
+                        value={profileData?.lastName || ''}
+                        onChangeText={(text) => {
+                            setProfileData({ 
+                                ...profileData, 
+                                lastName: text
+                            });
+                        }}
+                        placeholder={t('last_name')}
+                        placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        keyboardType="default"
+                    />
+                </View>
 
                 {/* Email Field */}
                 <View style={styles.fieldContainer}>

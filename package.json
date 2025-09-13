@@ -1,7 +1,7 @@
 {
-  "name": "zippy",
+  "name": "waygo",
   "version": "4.7.0",
-  "description": "Exicube App Solutions",
+  "description": "Waygo App Solutions",
   "scripts": {
     "app": "yarn workspace mobile-app start",
     "app:publish": "cd mobile-app && eas update",
@@ -16,6 +16,7 @@
     "app:upgrade-sdk": "yarn workspace mobile-app upgrade-sdk",
     "web": "yarn workspace web-app start",
     "web:deploy": "yarn workspace web-app build && firebase deploy --only hosting",
+    "web:functions": "yarn workspace functions deploy --only functions",
     "deploy": "yarn workspace web-app build && firebase deploy && node script/install.js initialize",
     "postinstall": "patch-package && node script/install.js install",
     "android": "expo run:android",

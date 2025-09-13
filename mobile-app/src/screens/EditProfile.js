@@ -153,18 +153,14 @@ export default function EditProfilePage(props) {
                     setCapturedIdImage(result.assets[0].uri);
                 }
 
-                const blob = await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.onload = function () {
-                        resolve(xhr.response);
-                    };
-                    xhr.onerror = function () {
-                        Alert.alert(t('alert'), t('image_upload_error'));
-                    };
-                    xhr.responseType = 'blob';
-                    xhr.open('GET', result.assets[0].uri, true);
-                    xhr.send(null);
-                });
+                let blob;
+                try {
+                    const response = await fetch(result.assets[0].uri);
+                    blob = await response.blob();
+                } catch (error) {
+                    Alert.alert(t('alert'), t('image_upload_error'));
+                    return;
+                }
                 if (blob) {
                     if (check == 0) {
                         setState({ ...state, licenseImage: blob });

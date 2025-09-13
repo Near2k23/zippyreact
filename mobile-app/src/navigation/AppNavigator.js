@@ -180,43 +180,53 @@ export default function AppContainer() {
         },
     };
     
-    const CustomHeader = ({ title, navigation }) => (
-        <View style={{
-            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
-            paddingTop: Platform.OS === 'ios' ? 50 : 30,
-            paddingHorizontal: 20,
-            paddingBottom: 15,
-            elevation: 0,
-            shadowOpacity: 0,
-        }}>
-            <TouchableOpacity 
-                onPress={() => navigation.goBack()}
-                style={{ 
-                    width: 40, 
-                    height: 40, 
-                    justifyContent: 'center', 
-                    alignItems: isRTL ? 'flex-end' : 'flex-start' 
-                }}
-            >
-                <Icon
-                    name={isRTL ? 'arrow-right' : 'arrow-back'}
-                    type='ionicon'
-                    color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                    size={24}
-                />
-            </TouchableOpacity>
-            <Text style={{
-                fontFamily: 'Inter-Bold',
-                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                fontSize: 20,
-                marginTop: 8,
-                marginLeft: isRTL ? 0 : 0,
-                textAlign: isRTL ? 'right' : 'left',
+    const CustomHeader = ({ title, navigation }) => {
+        const handleBackPress = () => {
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+            } else {
+                navigation.navigate('TabRoot');
+            }
+        };
+
+        return (
+            <View style={{
+                backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
+                paddingTop: Platform.OS === 'ios' ? 50 : 30,
+                paddingHorizontal: 20,
+                paddingBottom: 15,
+                elevation: 0,
+                shadowOpacity: 0,
             }}>
-                {title}
-            </Text>
-        </View>
-    );
+                <TouchableOpacity 
+                    onPress={handleBackPress}
+                    style={{ 
+                        width: 40, 
+                        height: 40, 
+                        justifyContent: 'center', 
+                        alignItems: isRTL ? 'flex-end' : 'flex-start' 
+                    }}
+                >
+                    <Icon
+                        name={isRTL ? 'arrow-right' : 'arrow-back'}
+                        type='ionicon'
+                        color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                        size={24}
+                    />
+                </TouchableOpacity>
+                <Text style={{
+                    fontFamily: 'Inter-Bold',
+                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                    fontSize: 20,
+                    marginTop: 8,
+                    marginLeft: isRTL ? 0 : 0,
+                    textAlign: isRTL ? 'right' : 'left',
+                }}>
+                    {title}
+                </Text>
+            </View>
+        );
+    };
 
     const screenOptions = (title) => ({
         header: ({ navigation }) => <CustomHeader title={title} navigation={navigation} />
@@ -314,7 +324,28 @@ export default function AppContainer() {
                     <Tab.Screen 
                         name="DriverTrips" 
                         component={DriverTrips} 
-                        options={screenOptions(t('task_list'))}
+                        options={{
+                            header: () => (
+                                <View style={{
+                                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
+                                    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+                                    paddingHorizontal: 20,
+                                    paddingBottom: 15,
+                                    elevation: 0,
+                                    shadowOpacity: 0,
+                                }}>
+                                    <Text style={{
+                                        fontFamily: 'Inter-Bold',
+                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                        fontSize: 20,
+                                        marginTop: 8,
+                                        textAlign: isRTL ? 'right' : 'left',
+                                    }}>
+                                        {t('task_list')}
+                                    </Text>
+                                </View>
+                            )
+                        }}
                         listeners={({ navigation, route }) => ({
                             tabPress: e => {
                                 e.preventDefault()

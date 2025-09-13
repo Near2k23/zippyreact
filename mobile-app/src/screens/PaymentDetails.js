@@ -9,9 +9,10 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-  useColorScheme
+  useColorScheme,
+  Platform
 } from 'react-native';
-import { Header } from 'react-native-elements';
+
 import { colors } from '../common/theme';
 var { width, height } = Dimensions.get('window');
 import { PromoComp } from "../components";
@@ -20,7 +21,7 @@ import { useSelector,useDispatch } from 'react-redux';
 import { api } from 'common';
 import { MAIN_COLOR, MAIN_COLOR_DARK, appConsts } from '../common/sharedFunctions';
 import { CommonActions } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { fonts } from '../common/font';
 import DeviceInfo from 'react-native-device-info';
 
@@ -34,8 +35,8 @@ export default function PaymentDetails(props) {
   } = api;
   const dispatch = useDispatch();
   const auth = useSelector(state => state.auth);
-  const settings = useSelector(state => state.settingsdata.settings);
-  const providers = useSelector(state => state.paymentmethods.providers);
+  const settings = useSelector(state => state.settingsdata?.settings || {});
+  const providers = useSelector(state => state.paymentmethods?.providers || []);
   const { booking } = props.route.params;
   const [promodalVisible, setPromodalVisible] = useState(false);
   const { t } = i18n;
@@ -94,24 +95,47 @@ export default function PaymentDetails(props) {
   const promoModal = () => {
     return (
       <Modal
-        animationType="none"
+        animationType="slide"
         visible={promodalVisible}
         onRequestClose={() => {
           setPromodalVisible(false);
         }}
       >
-        <View style={{flex: 1, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}}>
-          <Header
-            backgroundColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-            centerComponent={
-              <Text style={styles.headerTitleStyle}>{t("your_promo")}</Text>
-            }
-            containerStyle={[
-              styles.headerStyle,
-              { height: hasNotch ? 85 : null, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR },
-            ]}
-            innerContainerStyles={{ marginLeft: 10, marginRight: 10 }}
-          />
+        <View style={[styles.modalContainer, {backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+          <View style={{
+            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
+            paddingTop: Platform.OS === 'ios' ? 50 : 30,
+            paddingHorizontal: 20,
+            paddingBottom: 15,
+            elevation: 0,
+            shadowOpacity: 0,
+          }}>
+            <TouchableOpacity 
+              onPress={() => setPromodalVisible(false)}
+              style={{ 
+                width: 40, 
+                height: 40, 
+                justifyContent: 'center', 
+                alignItems: isRTL ? 'flex-end' : 'flex-start' 
+              }}
+            >
+              <Ionicons
+                name={isRTL ? 'arrow-forward' : 'arrow-back'}
+                size={24}
+                color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+              />
+            </TouchableOpacity>
+            <Text style={{
+              fontFamily: 'Inter-Bold',
+              color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+              fontSize: 20,
+              marginTop: 8,
+              marginLeft: isRTL ? 0 : 0,
+              textAlign: isRTL ? 'right' : 'left',
+            }}>
+              {t("your_promo")}
+            </Text>
+          </View>
           
           <PromoComp
             onPressButton={(item, index) => {
@@ -122,9 +146,9 @@ export default function PaymentDetails(props) {
             onPress={() => {
               setPromodalVisible(false);
             }}
-            style={styles.vew3}
+            style={styles.modalCancelButton}
           >
-            <Text style={[styles.emailStyle, { color: colors.WHITE }]}>
+            <Text style={styles.modalCancelText}>
               {t("cancel")}
             </Text>
           </TouchableOpacity>
@@ -413,42 +437,31 @@ export default function PaymentDetails(props) {
   };
 
   return (
-    <View style={[styles.mainView,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+    <View style={[styles.mainView,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : '#f8f9fa'}]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         style={styles.scrollStyle}
+        contentContainerStyle={styles.scrollContent}
       >
-        <View style={{ flex: 1, flexDirection: "column" }}>
-          <View style={[styles.bill,{flexDirection: isRTL ? "row-reverse" : "row"}]}>
-            <Text style={[styles.billText,{ color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
-              {t("bill_details")}
-            </Text>
-            {profile &&
-            profile.usertype == "customer" &&
-            (booking.status == "PAYMENT_PENDING" ||
-              booking.status == "PENDING" ||
-              booking.status == "NEW") ? (
-              payDetails.promo_applied ? (
-                <TouchableOpacity onPress={() => {removePromo();}}>
-                  <Text style={[styles.promoText,{ color: colors.RED, textAlign: isRTL ? "right" : "left"}]}>
-                    {t("remove_promo")}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => {openPromoModal();}}>
-                  <Text style={[styles.promoText,{ color: colors.GREEN, textAlign: isRTL ? "right" : "left"}]}>
-                    {t("apply_promo")}
-                  </Text>
-                </TouchableOpacity>
-              )
-            ) : null}
-          </View>
 
-          {profile && profile.usertype == "driver" ? (
-            <View style={{ flex: 1, paddingLeft: 25, paddingRight: 25 }}>
+
+        {/* Trip Details Card for Driver */}
+        {profile && profile.usertype == "driver" ? (
+          <View style={[styles.tripCard, {
+            backgroundColor: mode === 'dark' ? colors.HEADER : colors.WHITE,
+            shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
+          }]}>
+            <View style={styles.tripHeader}>
+              <FontAwesome5 name="route" size={20} color={mode === 'dark' ? colors.WHITE : MAIN_COLOR} />
+              <Text style={[styles.tripTitle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
+                {t("trip_details")}
+              </Text>
+            </View>
+            
+            <View style={styles.tripDetailsContainer}>
               <View style={[ styles.location, { flexDirection: isRTL ? "row-reverse" : "row" }]} >
                 {booking && booking.trip_start_time ? (
-                  <View>
+                  <View style={styles.timeContainer}>
                     <Text style={[ styles.timeStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
                       {booking.trip_start_time}
                     </Text>
@@ -463,23 +476,25 @@ export default function PaymentDetails(props) {
                   </View>
                 ) : null}
               </View>
+              
               {booking && booking.waypoints && booking.waypoints.length > 0 ? 
                 booking.waypoints.map((point, index) => {
                   return (
                     <View key={"key" + index} style={[styles.location, isRTL?{flexDirection:'row-reverse'}:{flexDirection:'row'}, {justifyContent: 'center', alignItems:'center'}]}>
-                        <View>
-                            <MaterialIcons name="multiple-stop" size={32} color={colors.SHADOW}/> 
+                        <View style={styles.timeContainer}>
+                            <MaterialIcons name="multiple-stop" size={24} color={colors.SHADOW}/> 
                         </View>
-                        <View  style={[styles.address, isRTL?{flexDirection:'row-reverse', marginRight:65}:{flexDirection:'row', marginLeft:6}]}>
+                        <View  style={[styles.address, isRTL?{flexDirection:'row-reverse', marginRight:6}:{flexDirection:'row', marginLeft:6}]}>
                             <Text numberOfLines={2} style={[styles.adressStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}, isRTL?{marginRight:6, textAlign:'right'}:{marginLeft:6, textAlign:'left'}]}>{point.add}</Text>
                         </View>
                     </View>
                   ) 
                 })
               : null}
+              
               <View style={[styles.location, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
                 {booking && booking.trip_end_time ? (
-                  <View>
+                  <View style={styles.timeContainer}>
                     <Text style={[styles.timeStyle, { textAlign: isRTL ? "right" : "left", color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
                       {booking.trip_end_time}
                     </Text>
@@ -495,195 +510,224 @@ export default function PaymentDetails(props) {
                 ) : null}
               </View>
             </View>
-          ) : null}
-
-          {profile && profile.usertype == "driver" ? (
-            <View style={[styles.listView, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {t("distance")}
-              </Text>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {(booking && booking.distance ? booking.distance : "0") +
-                  " " +
-                  (settings && settings.convert_to_mile ? t("mile") : t("km"))}
-              </Text>
-            </View>
-          ) : null}
-
-          {profile && profile.usertype == "driver" ? (
-            <View style={[styles.listView, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {t("total_time")}
-              </Text>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {(booking && booking.total_trip_time
-                  ? Math.round(booking.total_trip_time / 60 * 10) / 10
-                  : "0") +
-                  " " +
-                  t("mins")}
-              </Text>
-            </View>
-          ) : null}
-
-          {profile && profile.usertype == "driver" ? (
-            <View
-              style={{
-                borderWidth: 0.5,
-                borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                borderRadius: 1,
-                marginBottom: 20,
-              }}
-            ></View>
-          ) : null}
-
-          {profile ? (
-            <View style={[styles.listView, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {profile.usertype == "customer"
-                  ? t("your_fare")
-                  : t("total_fare")}
-              </Text>
-              {settings.swipe_symbol === false ? (
-                <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                  {settings.symbol}{" "}
-                  {formatAmount(payDetails?.amount, settings.decimal, settings.country)}{" "}
+            
+            <View style={styles.tripStatsContainer}>
+              <View style={[styles.statItem, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
+                <Ionicons name="speedometer-outline" size={18} color={mode === 'dark' ? colors.WHITE : MAIN_COLOR} />
+                <Text style={[styles.statLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {t("distance")}
                 </Text>
-              ) : (
-                <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                   {formatAmount(payDetails?.amount, settings.decimal, settings.country)}{" "}
-                  {settings.symbol}
+                <Text style={[styles.statValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {(booking && booking.distance ? booking.distance : "0") +
+                    " " +
+                    (settings && settings.convert_to_mile ? t("mile") : t("km"))}
                 </Text>
-              )}
-            </View>
-          ) : null}
-
-          {profile ? (
-            <View style={[styles.listView, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {t("promo_discount")}
-              </Text>
-              {settings.swipe_symbol === false ? (
-                <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left", color: colors.RED}]}>
-                  {isRTL ? null : "-"} {settings.symbol}{" "}
-                  {payDetails  ? payDetails.discount ? formatAmount(payDetails.discount, settings.decimal, settings.country) : "0.00" : "0.00"}{" "}
-                  {isRTL ? "-" : null}
-                </Text>
-              ) : (
-                <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                  {isRTL ? null : "-"}{" "}
-                  {payDetails ? payDetails.discount ? formatAmount(payDetails.discount, settings.decimal, settings.country) : "0.00" : "0.00"}{" "}
-                  {settings.symbol} {isRTL ? "-" : null}
-                </Text>
-              )}
-            </View>
-          ) : null}
-
-          {profile ? (
-            <View
-              style={{
-                borderWidth: 0.5,
-                borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                borderRadius: 1,
-              }}
-            ></View>
-          ) : null}
-
-          {profile ? (
-            <View style={[styles.listView, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
-              <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                {t("payable_ammount")}
-              </Text>
-              {settings.swipe_symbol === false ? (
-                <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                  {settings.symbol}{" "}
-                  {payDetails.payableAmount ? formatAmount(payDetails.payableAmount, settings.decimal, settings.country) : 0.0}
-                </Text>
-              ) : (
-                <Text style={[mode === 'dark' ? styles.listViewTextDark : styles.listViewText, {textAlign: isRTL ? "right" : "left"}]}>
-                  {payDetails.payableAmount ? formatAmount(payDetails.payableAmount, settings.decimal, settings.country) : 0.0}{" "}
-                  {settings.symbol}
-                </Text>
-              )}
-            </View>
-          ) : null}
-        </View>
-
-        <View
-          style={[
-            styles.buttonContainer,
-            { flexDirection: isRTL ? "row-reverse" : "row" },
-          ]}
-        >
-          {profile &&
-          profile.usertype == "customer" &&
-          (booking.status == "PAYMENT_PENDING" || booking.status == "NEW") ? (
-            <TouchableOpacity
-              onPress={cancelCurBooking}
-              style={styles.buttonWrapper2}
-            >
-              <Text style={styles.buttonTitle}>{t("cancel")}</Text>
-            </TouchableOpacity>
-          ) : null}
-          {booking.payment_mode == "wallet" ? (
-            <TouchableOpacity
-              style={styles.buttonWrapper}
-              onPress={() => {
-                doPayment("wallet");
-              }}
-            >
-               <View style={styles.cardPayBtnInnner}>
-                {isLoading ? <ActivityIndicator size="small" color={colors.WHITE} /> :
-                <Text style={[styles.buttonTitle,{fontSize:16}]}>
-                  {t("complete_payment")}
-                </Text>
-                }
               </View>
-            </TouchableOpacity>
-          ) : null}
-          {booking.payment_mode == "cash" ? (
-            <TouchableOpacity
-              style={styles.buttonWrapper}
-              onPress={() => {
-                doPayment("cash");
-              }}
-            >
-              <View style={styles.cardPayBtnInnner}>
-                {isLoading ? <ActivityIndicator size="small" color={colors.WHITE} /> :
-                <Text style={styles.buttonTitle}>
-                  {booking.status == "PAYMENT_PENDING"
-                    ? t("cash_on_delivery")
-                    : booking.payment_mode == "cash"? t("pay_cash") : t("complete_payment")}
+              
+              <View style={[styles.statItem, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
+                <Ionicons name="time-outline" size={18} color={mode === 'dark' ? colors.WHITE : MAIN_COLOR} />
+                <Text style={[styles.statLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {t("total_time")}
                 </Text>
-                }
+                <Text style={[styles.statValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {(booking && booking.total_trip_time
+                    ? Math.round(booking.total_trip_time / 60 * 10) / 10
+                    : "0") +
+                    " " +
+                    t("mins")}
+                </Text>
               </View>
-            </TouchableOpacity>
-          ) : null}
+            </View>
+          </View>
+        ) : null}
 
-          {providers &&
-          providers.length > 0 &&
-          booking.payment_mode == "card" ? (
-            <TouchableOpacity
-              style={styles.buttonWrapper}
-              onPress={() => {
-                doPayment("card");
-              }}
-            >
-              <View style={styles.cardPayBtnInnner}>
-                {isLoading ? <ActivityIndicator size="small" color={colors.WHITE} /> :
-                <Text style={styles.buttonTitle}>
-                  {profile && profile.usertype == "customer"
-                    ? t("payWithCard")
-                    : t("complete_payment")}
+        {/* Payment Summary Card */}
+        {profile ? (
+          <View style={[styles.paymentCard, {
+            backgroundColor: mode === 'dark' ? colors.HEADER : colors.WHITE,
+            shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
+          }]}>
+            <View style={styles.paymentHeader}>
+              <FontAwesome5 name="money-bill-wave" size={20} color={mode === 'dark' ? colors.WHITE : MAIN_COLOR} />
+              <Text style={[styles.paymentTitle, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
+                {t("payment_summary")}
+              </Text>
+            </View>
+            
+            <View style={styles.paymentDetailsContainer}>
+              <View style={[styles.paymentRow, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
+                <Text style={[styles.paymentLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {profile.usertype == "customer"
+                    ? t("your_fare")
+                    : t("total_fare")}
                 </Text>
-                }
+                {settings.swipe_symbol === false ? (
+                  <Text style={[styles.paymentValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                    {settings.symbol}{" "}
+                    {formatAmount(payDetails?.amount, settings.decimal, settings.country)}{" "}
+                  </Text>
+                ) : (
+                  <Text style={[styles.paymentValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                     {formatAmount(payDetails?.amount, settings.decimal, settings.country)}{" "}
+                    {settings.symbol}
+                  </Text>
+                )}
               </View>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </ScrollView>
-      {promoModal()}
-    </View>
-  );
+
+              <View style={[styles.paymentRow, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
+                <Text style={[styles.paymentLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {t("promo_discount")}
+                </Text>
+                {settings.swipe_symbol === false ? (
+                  <Text style={[styles.paymentValue, styles.discountText, {textAlign: isRTL ? "right" : "left"}]}>
+                    {isRTL ? null : "-"} {settings.symbol}{" "}
+                    {payDetails  ? payDetails.discount ? formatAmount(payDetails.discount, settings.decimal, settings.country) : "0.00" : "0.00"}{" "}
+                    {isRTL ? "-" : null}
+                  </Text>
+                ) : (
+                  <Text style={[styles.paymentValue, styles.discountText, {textAlign: isRTL ? "right" : "left"}]}>
+                    {isRTL ? null : "-"}{" "}
+                    {payDetails ? payDetails.discount ? formatAmount(payDetails.discount, settings.decimal, settings.country) : "0.00" : "0.00"}{" "}
+                    {settings.symbol} {isRTL ? "-" : null}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={[styles.paymentRow, styles.totalRow, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
+                <Text style={[styles.totalLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                  {t("payable_ammount")}
+                </Text>
+                {settings.swipe_symbol === false ? (
+                  <Text style={[styles.totalValue, {color: mode === 'dark' ? colors.WHITE : MAIN_COLOR, textAlign: isRTL ? "right" : "left"}]}>
+                    {settings.symbol}{" "}
+                    {payDetails.payableAmount ? formatAmount(payDetails.payableAmount, settings.decimal, settings.country) : 0.0}
+                  </Text>
+                ) : (
+                  <Text style={[styles.totalValue, {color: mode === 'dark' ? colors.WHITE : MAIN_COLOR, textAlign: isRTL ? "right" : "left"}]}>
+                    {payDetails.payableAmount ? formatAmount(payDetails.payableAmount, settings.decimal, settings.country) : 0.0}{" "}
+                    {settings.symbol}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Promo Section */}
+         {profile &&
+         profile.usertype == "customer" &&
+         (booking.status == "PAYMENT_PENDING" ||
+           booking.status == "PENDING" ||
+           booking.status == "NEW") ? (
+           <View style={styles.promoTextContainer}>
+             {payDetails.promo_applied ? (
+               <TouchableOpacity onPress={() => {removePromo();}}>
+                 <Text style={[styles.promoTextSimple, {color: colors.RED, textAlign: isRTL ? "right" : "left"}]}>
+                   {t("remove_promo")}
+                 </Text>
+               </TouchableOpacity>
+             ) : (
+               <TouchableOpacity onPress={() => {openPromoModal();}}>
+                 <Text style={[styles.promoTextSimple, {color: colors.GREEN, textAlign: isRTL ? "right" : "left"}]}>
+                   {t("apply_promo")}
+                 </Text>
+               </TouchableOpacity>
+             )}
+           </View>
+         ) : null}
+
+         {/* Action Buttons */}
+         <View style={styles.actionButtonsContainer}>
+           {profile &&
+           profile.usertype == "customer" &&
+           (booking.status == "PAYMENT_PENDING" || booking.status == "NEW") ? (
+             <TouchableOpacity
+               onPress={cancelCurBooking}
+               style={[styles.actionButton, styles.cancelButton]}
+             >
+               <Ionicons name="close-circle-outline" size={20} color={colors.WHITE} />
+               <Text style={styles.buttonTitle}>{t("cancel")}</Text>
+             </TouchableOpacity>
+           ) : null}
+           
+           {booking.payment_mode == "wallet" ? (
+             <TouchableOpacity
+               style={[styles.actionButton, styles.walletButton]}
+               onPress={() => {
+                 doPayment("wallet");
+               }}
+             >
+               <View style={styles.buttonContent}>
+                 {isLoading ? (
+                   <ActivityIndicator size="small" color={colors.WHITE} />
+                 ) : (
+                   <>
+                     <Ionicons name="wallet-outline" size={20} color={colors.WHITE} />
+                     <Text style={styles.buttonTitle}>
+                       {t("complete_payment")}
+                     </Text>
+                   </>
+                 )}
+               </View>
+             </TouchableOpacity>
+           ) : null}
+           
+           {booking.payment_mode == "cash" ? (
+             <TouchableOpacity
+               style={[styles.actionButton, styles.cashButton]}
+               onPress={() => {
+                 doPayment("cash");
+               }}
+             >
+               <View style={styles.buttonContent}>
+                 {isLoading ? (
+                   <ActivityIndicator size="small" color={colors.WHITE} />
+                 ) : (
+                   <>
+                     <FontAwesome5 name="money-bill" size={18} color={colors.WHITE} />
+                     <Text style={styles.buttonTitle}>
+                       {booking.status == "PAYMENT_PENDING"
+                         ? t("cash_on_delivery")
+                         : booking.payment_mode == "cash"? t("pay_cash") : t("complete_payment")}
+                     </Text>
+                   </>
+                 )}
+               </View>
+             </TouchableOpacity>
+           ) : null}
+
+           {providers &&
+           providers.length > 0 &&
+           booking.payment_mode == "card" ? (
+             <TouchableOpacity
+               style={[styles.actionButton, styles.cardButton]}
+               onPress={() => {
+                 doPayment("card");
+               }}
+             >
+               <View style={styles.buttonContent}>
+                 {isLoading ? (
+                   <ActivityIndicator size="small" color={colors.WHITE} />
+                 ) : (
+                   <>
+                     <Ionicons name="card" size={20} color={colors.WHITE} />
+                     <Text style={styles.buttonTitle}>
+                       {profile && profile.usertype == "customer"
+                         ? t("payWithCard")
+                         : t("complete_payment")}
+                     </Text>
+                   </>
+                 )}
+               </View>
+             </TouchableOpacity>
+           ) : null}
+         </View>
+       </ScrollView>
+       {promoModal()}
+     </View>
+   );
 
 }
 
@@ -691,216 +735,116 @@ const styles = StyleSheet.create({
   mainView: {
     flex: 1
   },
-  headerStyle: {
-    borderBottomWidth: 0
+  scrollStyle: {
+    flex: 1
   },
-  headerTitleStyle: {
-    color: colors.WHITE,
-    fontFamily:fonts.Bold,
-    fontSize: 20,
-    marginTop: 15
-  }, scrollStyle: {
-    flex: 1,
-    height: height
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingBottom: 40
   },
-  container: {
-    flex: 1,
-    marginTop: 5,
-    backgroundColor: 'white',
+  
+  // Header Card Styles
+  headerCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8
   },
-  buttonContainer: {
-    width: '100%',
+  billHeader: {
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
+  billTitleContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop:20
+    alignItems: 'center'
   },
-  buttonWrapper: {
-    marginLeft: 8,
-    marginRight: 8,
-    marginTop: 20,
-    marginBottom: 10,
-    height: 55,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor:colors.GREEN,
-    borderRadius: 8,
-    flex:1,
+  billIcon: {
+    marginRight: 12
   },
-  buttonWrapper2: {
-    marginLeft: 8,
-    marginRight: 8,
-    marginBottom: 10,
-    marginTop: 20,
-    height: 55,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.RED,
-    borderRadius: 8,
-    minWidth:"45%",
-    paddingHorizontal:3
-  },
-  cardPayBtn: {
-    marginHorizontal: 6,
-    height: 55,
-    borderRadius: 8,
-    marginTop: 10
-  },
-  cardPayBtnInnner: {
-    height: 55,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    width:"100%",
-  },
-  buttonTitle: {
-    color: colors.WHITE,
-    fontSize: 18,
-    fontFamily: fonts.Regular,
-  },
-  newname: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emailInputContainer: {
-    borderTopRightRadius: 10,
-    borderTopLeftRadius: 10,
-    paddingLeft: 10,
-    backgroundColor: colors.WHITE,
-    paddingRight: 10,
-    paddingTop: 10,
-    width: width - 80
-  },
-  errorMessageStyle: {
-    fontSize: 15,
-    fontWeight: 'bold'
-  },
-  inputTextStyle: {
-    color: colors.BLACK,
-    fontSize: 16
-  },
-  inputContainer: { flex: 3, justifyContent: "center", marginTop: 40 },
-  forgotPassText: { textAlign: "center", color: colors.WHITE, fontSize: 20, width: "100%" },
-  pinContainer: { flexDirection: "row", justifyContent: "space-between" },
-  forgotStyle: { flex: 3, justifyContent: "center", alignItems: 'center' },
-  crossIconContainer: { flex: 1, left: '40%' },
-  forgot: { flex: 1 },
-  newname2: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  emailInputContainer2: {
-    borderTopRightRadius: 10,
-    borderTopLeftRadius: 10,
-    paddingLeft: 10,
-    backgroundColor: colors.WHITE,
-    paddingRight: 10,
-    paddingTop: 10,
-    width: width - 80,
-
-  },
-
-  inputTextStyle2: {
-    color: colors.BLACK,
-    fontSize: 14
-  },
-  buttonContainer2: { flex: 1, justifyContent: 'center', marginTop: 5 },
-  inputContainer2: { flex: 4, paddingBottom: 25 },
-  headerContainer2: { height: 380, backgroundColor: colors.WHITE, width: '80%', justifyContent: 'center' },
-  headerStyle2: { flex: 1, flexDirection: 'column', backgroundColor: colors.HEADER, justifyContent: "center" },
-  forgotPassText2: { textAlign: "center", color: colors.WHITE, fontSize: 16, width: "100%" },
-  forgotContainer2: { flexDirection: "row", justifyContent: "space-between" },
-  forgotStyle2: { flex: 3, justifyContent: "center" },
-  crossIconContainer2: { flex: 1, left: '40%' },
-  forgot2: { flex: 1 },
-  buttonTitle2: {
+  billText: {
+    fontSize: 24,
     fontFamily: fonts.Bold,
-    fontSize: 16,
-    width: '100%',
-    textAlign: 'center'
+    fontWeight: '700'
   },
-
-  containercvv: {
-    flex: 1,
-    width: "100%",
-    height: "80%",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-    paddingTop: 120
+  promoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    elevation: 2
   },
-  modalContainercvv: {
-    height: 200,
-    backgroundColor: colors.WHITE,
-    width: "80%",
-    borderRadius: 10,
-    elevation: 15
+  addPromoButton: {
+    backgroundColor: colors.GREEN
   },
-  crossIconContainercvv: {
-    flex: 1,
-    left: "40%"
+  removePromoButton: {
+    backgroundColor: colors.RED
   },
-  blankViewStylecvv: {
-    flex: 1,
-    flexDirection: "row",
-    alignSelf: 'flex-end',
-    marginTop: 15,
-    marginRight: 15
+  promoText: {
+    fontSize: 12,
+    fontFamily: fonts.Medium,
+    marginLeft: 6,
+    fontWeight: '600'
   },
-  blankViewStyleOTP: {
-    flex: 1,
-    flexDirection: "row",
-    alignSelf: 'flex-end',
-
+  
+  // Trip Card Styles
+  tripCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8
   },
-  modalHeaderStylecvv: {
-    textAlign: "center",
-    fontSize: 20,
-    paddingTop: 10
+  tripHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16
   },
-  modalContainerViewStylecvv: {
-    flex: 9,
-    alignItems: "center",
-    justifyContent: "center"
+  tripTitle: {
+    fontSize: 18,
+    fontFamily: fonts.Bold,
+    marginLeft: 12,
+    fontWeight: '600'
   },
-  itemsViewStylecvv: {
-    flexDirection: "column"
-  },
-  textStylecvv: {
-    fontSize: 20
+  tripDetailsContainer: {
+    marginBottom: 16
   },
   location: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginVertical: 6
+    marginVertical: 8,
+    paddingHorizontal: 4
+  },
+  timeContainer: {
+    minWidth: 60,
+    alignItems: 'center'
   },
   timeStyle: {
     fontFamily: fonts.Regular,
-    fontSize: 16,
-    marginTop: 1
+    fontSize: 14,
+    color: colors.SHADOW
   },
   greenDot: {
     backgroundColor: colors.GREEN,
-    width: 10,
-    height: 10,
-    borderRadius: 50,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     alignSelf: 'flex-start',
-    marginTop: 5
+    marginTop: 4
   },
   redDot: {
     backgroundColor: colors.RED,
-    width: 10,
-    height: 10,
-    borderRadius: 50,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     alignSelf: 'flex-start',
-    marginTop: 5
+    marginTop: 4
   },
   address: {
     flexDirection: 'row',
@@ -908,63 +852,208 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
     width: 0,
-    marginLeft: 6
+    marginLeft: 12
   },
   adressStyle: {
-    marginLeft: 6,
+    marginLeft: 8,
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 22,
     fontFamily: fonts.Regular,
+    flex: 1
   },
-  emailStyle: {
-    fontSize: 17,
-    fontFamily:fonts.Bold,
+  tripStatsContainer: {
+    borderTopWidth: 1,
+    borderTopColor: colors.SHADOW + '30',
+    paddingTop: 16
+  },
+  statItem: {
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  statLabel: {
+    fontSize: 14,
+    fontFamily: fonts.Regular,
+    marginLeft: 8,
+    flex: 1
+  },
+  statValue: {
+    fontSize: 14,
+    fontFamily: fonts.Medium,
+    fontWeight: '600'
+  },
+  
+  // Payment Card Styles
+  paymentCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8
+  },
+  paymentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  paymentTitle: {
+    fontSize: 18,
+    fontFamily: fonts.Bold,
+    marginLeft: 12,
+    fontWeight: '600'
+  },
+  paymentDetailsContainer: {
+    paddingHorizontal: 4
+  },
+  paymentRow: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12
+  },
+  paymentLabel: {
+    fontSize: 16,
+    fontFamily: fonts.Regular,
+    flex: 1
+  },
+  paymentValue: {
+    fontSize: 16,
+    fontFamily: fonts.Medium,
+    fontWeight: '600'
+  },
+  discountText: {
+    color: colors.RED
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.SHADOW + '30',
+    marginVertical: 8
+  },
+  totalRow: {
+    paddingTop: 16,
+    borderTopWidth: 2,
+    borderTopColor: colors.SHADOW + '20'
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontFamily: fonts.Bold,
+    fontWeight: '700',
+    flex: 1
+  },
+  totalValue: {
+    fontSize: 20,
+    fontFamily: fonts.Bold,
+    fontWeight: '700'
+  },
+  
+  // Payment Methods Card Styles
+  actionButtonsContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 20,
+      gap: 12,
+      justifyContent: 'space-between'
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      elevation: 3,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 6
+    },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  buttonTitle: {
+    color: colors.WHITE,
+    fontSize: 16,
+    fontFamily: fonts.Medium,
+    marginLeft: 8,
+    fontWeight: '600'
+  },
+  cancelButton: {
+    backgroundColor: colors.RED
+  },
+  walletButton: {
+    backgroundColor: '#8B5CF6'
+  },
+  cashButton: {
+    backgroundColor: colors.GREEN
+  },
+  cardButton: {
+    backgroundColor: MAIN_COLOR
+  },
+  
+  // Modal Styles
+  modalContainer: {
+    flex: 1
+  },
+  customHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4
+  },
+  customHeaderBackButton: {
+    padding: 8,
+    borderRadius: 20,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  customHeaderSpacer: {
+    width: 40
+  },
+  headerStyle: {
+    borderBottomWidth: 0,
+    elevation: 4
+  },
+  headerTitleStyle: {
+    color: colors.WHITE,
+    fontFamily: fonts.Bold,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
     textAlign: 'center'
   },
-  vew3: {
-    flexDirection: 'row',
-    height: 40,
-    width: 140,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
+  modalCancelButton: {
     backgroundColor: colors.RED,
-    borderRadius: 10,
-    marginBottom:15
+    marginHorizontal: 20,
+    marginVertical: 20,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 2
   },
-  bill: {
-    flex: 1,
-    justifyContent: "space-between",
-    paddingLeft: 20,
-    paddingRight: 20,
-    marginBottom: 4,
-  },
-  billText: {
-    lineHeight: 45,
-    fontSize: 22,
-    fontFamily:fonts.Medium
-  },
-  promoText: {
-    lineHeight: 45,
-    fontSize: 14,
-    fontFamily:fonts.Medium,
-  },
-  listView:{
-    flex: 1,
-    justifyContent: "space-between",
-    paddingLeft: 25,
-    paddingRight: 25,
-  },
-  listViewText:{
-    color: colors.BLACK,
-    lineHeight: 45,
-    fontSize: 16,
-    fontFamily: fonts.Regular,
-  },
-  listViewTextDark:{
-    color: colors.WHITE,
-    lineHeight: 45,
-    fontSize: 16,
-    fontFamily: fonts.Regular,
-  }
-});
+  modalCancelText: {
+     color: colors.WHITE,
+     fontSize: 16,
+     fontFamily: fonts.Bold,
+     fontWeight: '600'
+   },
+   
+   // Promo Text Styles
+   promoTextContainer: {
+     paddingHorizontal: 16,
+     paddingVertical: 12,
+     alignItems: 'center'
+   },
+   promoTextSimple: {
+     fontSize: 16,
+     fontFamily: fonts.Medium,
+     fontWeight: '600',
+     textDecorationLine: 'underline'
+   }
+ });

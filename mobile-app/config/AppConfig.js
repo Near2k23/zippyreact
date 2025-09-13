@@ -1,8 +1,8 @@
 module.exports.AppConfig = {
   app_name: 'WayGO',
   app_description: 'Viajes',
-  app_identifier: 'com.waygo.rides',
-  ios_app_version: '1.0.0',
+  app_identifier: 'com.tecnosoluciones.waygorides',
+  ios_app_version: '1.0.6',
   android_app_version: 100,
   expo_owner: 'tecnosoluciones',
   expo_slug: 'waygo',

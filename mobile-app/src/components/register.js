@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     View,
     Text,
@@ -11,7 +11,8 @@ import {
     TouchableOpacity,
     TextInput,
     SafeAreaView,
-    useColorScheme
+    useColorScheme,
+    Animated
 } from 'react-native';
 import { colors } from '../common/theme';
 var { height,width } = Dimensions.get('window');
@@ -68,6 +69,11 @@ export default function Registration(props) {
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState('');
 
+    const headerTranslateY = useRef(new Animated.Value(0)).current;
+    const formTranslateY = useRef(new Animated.Value(0)).current;
+    const headerOpacity = useRef(new Animated.Value(1)).current;
+    const headerScale = useRef(new Animated.Value(1)).current;
+
     useEffect(() => {
         AsyncStorage.getItem('theme', (err, result) => {
             if (result) {
@@ -83,24 +89,103 @@ export default function Registration(props) {
         });
     }, [colorScheme]);
 
+    useEffect(() => {
+        const keyboardWillShowListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (event) => {
+                const keyboardHeight = event.endCoordinates.height;
+                Animated.parallel([
+                    Animated.timing(headerTranslateY, {
+                        toValue: -50,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerOpacity, {
+                        toValue: 0.7,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerScale, {
+                        toValue: 0.8,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(formTranslateY, {
+                        toValue: Platform.OS === 'ios' ? -30 : -20,
+                        duration: 300,
+                        useNativeDriver: true,
+                    })
+                ]).start();
+            }
+        );
+
+        const keyboardWillHideListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                Animated.parallel([
+                    Animated.timing(headerTranslateY, {
+                        toValue: 0,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerOpacity, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(headerScale, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(formTranslateY, {
+                        toValue: 0,
+                        duration: 300,
+                        useNativeDriver: true,
+                    })
+                ]).start();
+            }
+        );
+
+        return () => {
+            keyboardWillShowListener.remove();
+            keyboardWillHideListener.remove();
+        };
+    }, []);
+
     const { loading } = props
 
 
     const formatCountries = useMemo(() => {
         let arr = [];
-        for (let i = 0; i < countries.length; i++) {
-            let txt = countries[i].label + " (+" + countries[i].phone + ")";
+        let countriesToShow = countries;
+        
+        if (settings?.restrictCountry) {
+            countriesToShow = countries.filter(country => country.code === "US" || country.code === "CO");
+        }
+        
+        for (let i = 0; i < countriesToShow.length; i++) {
+            let txt = countriesToShow[i].label + " (+" + countriesToShow[i].phone + ")";
             arr.push({ label: txt, value: txt, key: txt });
         }
         return arr;
-    }, [countries]); 
+    }, [countries, settings]); 
 
     useEffect(() => {
         if (settings) {
             // Set initial country code
-            for (let i = 0; i < countries.length; i++) {
-                if (countries[i].label == settings.country) {
-                    setCountryCode(countries[i].label + " (+" + countries[i].phone + ")");
+            if (settings.restrictCountry) {
+                for (let i = 0; i < countries.length; i++) {
+                    if (countries[i].code === "US" || countries[i].code === "CO") {
+                        setCountryCode(countries[i].label + " (+" + countries[i].phone + ")");
+                        break;
+                    }
+                }
+            } else {
+                for (let i = 0; i < countries.length; i++) {
+                    if (countries[i].label == settings.country) {
+                        setCountryCode(countries[i].label + " (+" + countries[i].phone + ")");
+                    }
                 }
             }
             // Set initial user type
@@ -210,13 +295,26 @@ export default function Registration(props) {
                         <Ionicons name={isRTL ? 'arrow-forward-outline' : "arrow-back-outline"} size={30} color={ mode === 'dark' ? colors.WHITE : colors.BLACK} />
                     </TouchableOpacity>
                 </View>
-                <View style={[styles.headerContainer, isRTL ? { alignItems: 'flex-end' } : null]}>
+                <Animated.View 
+                    style={[
+                        styles.headerContainer, 
+                        isRTL ? { alignItems: 'flex-end' } : null,
+                        {
+                            transform: [
+                                { translateY: headerTranslateY },
+                                { scale: headerScale }
+                            ],
+                            opacity: headerOpacity
+                        }
+                    ]}
+                >
                     <Text style={[styles.headerStyle, {color: mode === 'dark' ? colors.WHITE: colors.BLACK}]}>{t('registration_title')}</Text>
                     <Text style={styles.headerSubtitle}>{t('registration_subtitle')}</Text>
-                </View>
+                </Animated.View>
                 <View style={{ height: '85%' }}>
                     <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : (__DEV__ ? null : "padding")} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} >
-                        <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
+                        <Animated.View style={{ transform: [{ translateY: formTranslateY }] }}>
+                            <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
                             <View style={[styles.containerStyle,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
 
                                 <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -271,11 +369,11 @@ export default function Registration(props) {
                                         <Text style={styles.inputLabel}>{t('country')}</Text>
                                         <RNPickerSelect
                                             pickerRef={pickerRef1}
-                                            placeholder={{ label: '+', value: t('select_country') }}
+                                            placeholder={settings?.restrictCountry ? {} : { label: '+', value: t('select_country') }}
                                             value={countryCode}
                                             useNativeAndroidPickerStyle={false}
                                             onTap={() => {
-                                                if (!settings || !settings.AllowCountrySelection) {
+                                                if (!settings?.AllowCountrySelection && !settings?.restrictCountry) {
                                                     return;
                                                 }
                                                 Keyboard.dismiss();
@@ -286,16 +384,16 @@ export default function Registration(props) {
                                                 inputIOS: [
                                                     styles.countryPickerSmall, 
                                                     { textAlign: 'center' },
-                                                    (!settings || !settings.AllowCountrySelection) && { opacity: 0.5 }
+                                                    (!settings || (!settings.AllowCountrySelection && !settings.restrictCountry)) && { opacity: 0.5 }
                                                 ],
                                                 inputAndroid: [
                                                     styles.countryPickerSmall, 
                                                     { textAlign: 'center', textAlignVertical: 'center' },
-                                                    (!settings || !settings.AllowCountrySelection) && { opacity: 0.5 }
+                                                    (!settings || (!settings.AllowCountrySelection && !settings.restrictCountry)) && { opacity: 0.5 }
                                                 ]
                                             }}
                                             onValueChange={(text) => {
-                                                if (!settings?.AllowCountrySelection) return;
+                                                if (!settings?.AllowCountrySelection && !settings?.restrictCountry) return;
                                                 upDateCountry(text);
                                             }}
                                             items={formatCountries.map((it) => {
@@ -303,7 +401,7 @@ export default function Registration(props) {
                                                 const codePart = match && match[1] ? `+${match[1]}` : (it.label?.startsWith('+') ? it.label : `+${it.label}`);
                                                 return { ...it, label: codePart };
                                             })}
-                                            disabled={!settings?.AllowCountrySelection}
+                                            disabled={!settings?.AllowCountrySelection && !settings?.restrictCountry}
                                             mode={mode}
                                         />
                                     </View>
@@ -435,7 +533,8 @@ export default function Registration(props) {
                                    
                                 </View>
                             </View>
-                        </ScrollView>
+                            </ScrollView>
+                        </Animated.View>
                     </KeyboardAvoidingView>
                 </View>
             </SafeAreaView>
@@ -485,14 +584,15 @@ const styles = StyleSheet.create({
         fontSize: 13,
         width: '100%',
         paddingHorizontal: 12,
-        paddingVertical: 0,
-        lineHeight: 50,
+        paddingVertical: 12,
         borderRadius: 10,
         borderWidth: 1,
         borderColor: '#E2E9EC',
         backgroundColor: colors.WHITE,
         textAlignVertical: 'center',
-        textAlign: 'center'
+        textAlign: 'center',
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     contactInputWrap: {
         flex: 1

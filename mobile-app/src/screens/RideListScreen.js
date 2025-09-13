@@ -69,15 +69,27 @@ export default function RideListPage(props) {
         });
     }
 
+    const getActiveTrips = () => {
+        return bookingData.filter(item => item.status === 'ACCEPTED' || item.status === 'STARTED' || item.status === 'ARRIVED' || item.status === 'REACHED');
+    }
+
     const getFilteredData = () => {
+        const activeTrips = getActiveTrips();
         if (tabIndex === 0) {
-            return bookingData.filter(item => item.status === 'ACCEPTED' || item.status === 'STARTED' || item.status === 'ARRIVED' || item.status === 'REACHED');
-        } else if (tabIndex === 1) {
+            return activeTrips;
+        } else if (tabIndex === 1 || (activeTrips.length === 0 && tabIndex === 0)) {
             return bookingData.filter(item => item.status === 'COMPLETE');
         } else {
             return bookingData.filter(item => item.status === 'CANCELLED');
         }
     }
+
+    useEffect(() => {
+        const activeTrips = getActiveTrips();
+        if (activeTrips.length === 0 && tabIndex === 0) {
+            setTabIndex(1);
+        }
+    }, [bookingData]);
 
     const renderTripCard = ({ item }) => {
         const tripCost = item.trip_cost || item.estimate || 0;
@@ -170,12 +182,12 @@ export default function RideListPage(props) {
         );
     }
 
-    return (
-        <View style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : '#FFF' }]}>
-            <View style={[styles.tabContainer, { 
-                backgroundColor: mode === 'dark' ? '#1C1C1E' : colors.WHITE, 
-                borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' 
-            }]}>
+    const renderTabHeader = () => (
+        <View style={[styles.tabContainer, { 
+            backgroundColor: mode === 'dark' ? '#1C1C1E' : colors.WHITE, 
+            borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' 
+        }]}>
+            {getActiveTrips().length > 0 && (
                 <TouchableOpacity 
                     style={[styles.tab, tabIndex === 0 && styles.activeTab]}
                     onPress={() => setTabIndex(0)}
@@ -184,32 +196,37 @@ export default function RideListPage(props) {
                         {t('actives')}
                     </Text>
                 </TouchableOpacity>
-                
-                <TouchableOpacity 
-                    style={[styles.tab, tabIndex === 1 && styles.activeTab]}
-                    onPress={() => setTabIndex(1)}
-                >
-                    <Text style={[styles.tabText, tabIndex === 1 && styles.activeTabText]}>
-                        {t('complete')}
-                    </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                    style={[styles.tab, tabIndex === 2 && styles.activeTab]}
-                    onPress={() => setTabIndex(2)}
-                >
-                    <Text style={[styles.tabText, tabIndex === 2 && styles.activeTabText]}>
-                        {t('cancelled')}
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            )}
             
+            <TouchableOpacity 
+                style={[styles.tab, tabIndex === 1 && styles.activeTab]}
+                onPress={() => setTabIndex(1)}
+            >
+                <Text style={[styles.tabText, tabIndex === 1 && styles.activeTabText]}>
+                    {t('complete')}
+                </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+                style={[styles.tab, tabIndex === 2 && styles.activeTab]}
+                onPress={() => setTabIndex(2)}
+            >
+                <Text style={[styles.tabText, tabIndex === 2 && styles.activeTabText]}>
+                    {t('cancelled')}
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+
+    return (
+        <View style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : '#FFF' }]}>
             <FlatList
                 data={getFilteredData()}
                 renderItem={renderTripCard}
                 keyExtractor={(item, index) => index.toString()}
                 contentContainerStyle={styles.listContainer}
                 showsVerticalScrollIndicator={false}
+                ListHeaderComponent={renderTabHeader}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={[styles.emptyText, { color: colors.SHADOW }]}>
@@ -230,12 +247,20 @@ const styles = StyleSheet.create({
     tabContainer: {
         flexDirection: 'row',
         backgroundColor: colors.WHITE,
-        marginHorizontal: 20,
-        marginTop: 20,
+        marginHorizontal: 5,
+        marginBottom: 20,
         borderRadius: 25,
         padding: 4,
         gap: 8,
         borderWidth: 1,
+        shadowColor: colors.BLACK,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
     },
     tab: {
         flex: 1,
@@ -244,7 +269,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
     },
     activeTab: {
-        backgroundColor: '#007AFF',
+        backgroundColor: colors.BLUE,
     },
     tabText: {
         fontSize: 16,
@@ -262,6 +287,14 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         padding: 16,
         borderWidth: 1,
+        shadowColor: colors.BLACK,
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 8,
     },
     tripHeader: {
         marginBottom: 12,

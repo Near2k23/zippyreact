@@ -24,9 +24,10 @@ import i18n from 'i18n-js';
 import DatePicker from 'react-native-date-picker';
 import { useSelector, useDispatch } from 'react-redux';
 import { api, FirebaseContext } from 'common';
+import * as DecodePolyLine from '@mapbox/polyline';
 import { OptionModal } from '../components/OptionModal';
 import BookingModal, { appConsts, prepareEstimateObject } from '../common/sharedFunctions';
-import MapView, { PROVIDER_GOOGLE, Marker } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, Marker, Polyline } from 'react-native-maps';
 import { CommonActions } from '@react-navigation/native';
 import { MAIN_COLOR, MAIN_COLOR_DARK, CarHorizontal, CarVertical, validateBookingObj, SECONDORY_COLOR } from '../common/sharedFunctions';
 import { startActivityAsync, ActivityAction } from 'expo-intent-launcher';
@@ -45,6 +46,7 @@ export default function MapScreen(props) {
         updateTripDrop,
         updatSelPointType,
         getDistanceMatrix,
+        getDirectionsApi,
         updateTripCar,
         getEstimate,
         clearEstimate,
@@ -98,6 +100,8 @@ export default function MapScreen(props) {
     const [bookingModalStatus, setBookingModalStatus] = useState(false);
     const [bookLoading, setBookLoading] = useState(false);
     const [bookLaterLoading, setBookLaterLoading] = useState(false);
+    const [shouldOpenBookingModal, setShouldOpenBookingModal] = useState(false);
+    const [allCarTypeEstimates, setAllCarTypeEstimates] = useState({});
     const [initDate, setInitDate] = useState(new Date());
 
     const instructionInitData = {
@@ -144,7 +148,10 @@ export default function MapScreen(props) {
     const [showInitialScreen, setShowInitialScreen] = useState(true);
     const [savedAddresses, setSavedAddresses] = useState([]);
     const [showCarTypes, setShowCarTypes] = useState(false);
-    const [showCarTypesExpanded, setShowCarTypesExpanded] = useState(false);
+    const [showCarTypesExpanded, setShowCarTypesExpanded] = useState(true);
+    const [routeCoords, setRouteCoords] = useState([]);
+    const [hasAutoFitted, setHasAutoFitted] = useState(false);
+    const [shouldRequestEstimate, setShouldRequestEstimate] = useState(false);
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -158,6 +165,59 @@ export default function MapScreen(props) {
             minimumFractionDigits: decimal,
             maximumFractionDigits: decimal
           });
+        }
+    }
+
+    const fitMapToRoute = async (pickup, drop, forceAutoFit = false) => {
+        if (pickup && drop && mapRef.current) {
+            try {
+                if (settings && settings.showLiveRoute) {
+                    const startLoc = pickup.lat + ',' + pickup.lng;
+                    const destLoc = drop.lat + ',' + drop.lng;
+                    let waypoints = '';
+                    if (drop && drop.waypoints && drop.waypoints.length > 0) {
+                        const arr = drop.waypoints;
+                        for (let i = 0; i < arr.length; i++) {
+                            waypoints = waypoints + arr[i].lat + ',' + arr[i].lng;
+                            if (i < arr.length - 1) {
+                                waypoints = waypoints + '|';
+                            }
+                        }
+                    }
+                    
+                    const response = await getDirectionsApi(startLoc, destLoc, waypoints);
+                    if (response && response.polylinePoints) {
+                        const coords = DecodePolyLine.decode(response.polylinePoints);
+                        const routeCoordinates = coords.map(coord => ({
+                            latitude: coord[0],
+                            longitude: coord[1]
+                        }));
+                        setRouteCoords(routeCoordinates);
+                        
+                        if (!hasAutoFitted || forceAutoFit) {
+                            mapRef.current.fitToCoordinates(routeCoordinates, {
+                                edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+                                animated: true
+                            });
+                            setHasAutoFitted(true);
+                        }
+                    }
+                } else {
+                    const coordinates = [
+                        { latitude: pickup.lat, longitude: pickup.lng },
+                        { latitude: drop.lat, longitude: drop.lng }
+                    ];
+                    if (!hasAutoFitted || forceAutoFit) {
+                        mapRef.current.fitToCoordinates(coordinates, {
+                            edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+                            animated: true
+                        });
+                        setHasAutoFitted(true);
+                    }
+                }
+            } catch (error) {
+                console.log('Error fitting map to route:', error);
+            }
         }
     }
 
@@ -288,11 +348,12 @@ export default function MapScreen(props) {
 
     useEffect(() => {
         if (estimatedata.estimate) {
-            if (!bookingdata.loading) {
-                setBookingModalStatus(true);
-            }
             setBookLoading(false);
             setBookLaterLoading(false);
+            if (shouldOpenBookingModal) {
+                setBookingModalStatus(true);
+                setShouldOpenBookingModal(false);
+            }
         }
         if (estimatedata.estimate && settings && !settings.coustomerBidPrice) {
             let  price = estimatedata.estimate.estimateFare;
@@ -302,21 +363,24 @@ export default function MapScreen(props) {
         if (estimatedata.error && estimatedata.error.flag) {
             setBookLoading(false);
             setBookLaterLoading(false);
+            setShouldOpenBookingModal(false);
             Alert.alert(estimatedata.error.msg);
             dispatch(clearEstimate());
         }
-    }, [estimatedata.estimate, estimatedata.error, estimatedata.error.flag]);
+    }, [estimatedata.estimate, estimatedata.error, estimatedata.error.flag, shouldOpenBookingModal]);
 
     useEffect(() => {
         if (tripdata.selected && tripdata.selected == 'pickup' && tripdata.pickup && tripdata.pickup.source == 'search' && mapRef.current) {
             if (!locationRejected) {
                 setTimeout(() => {
-                    mapRef.current.animateToRegion({
-                        latitude: tripdata.pickup.lat,
-                        longitude: tripdata.pickup.lng,
-                        latitudeDelta: latitudeDelta,
-                        longitudeDelta: longitudeDelta
-                    });
+                    if (mapRef.current) {
+                        mapRef.current.animateToRegion({
+                            latitude: tripdata.pickup.lat,
+                            longitude: tripdata.pickup.lng,
+                            latitudeDelta: latitudeDelta,
+                            longitudeDelta: longitudeDelta
+                        });
+                    }
                 }, 1000);
             } else {
                 setRegion({
@@ -330,12 +394,14 @@ export default function MapScreen(props) {
         if (tripdata.selected && tripdata.selected == 'drop' && tripdata.drop && tripdata.drop.source == 'search' && mapRef.current) {
             if (!locationRejected) {
                 setTimeout(() => {
-                    mapRef.current.animateToRegion({
-                        latitude: tripdata.drop.lat,
-                        longitude: tripdata.drop.lng,
-                        latitudeDelta: latitudeDelta,
-                        longitudeDelta: longitudeDelta
-                    });
+                    if (mapRef.current) {
+                        mapRef.current.animateToRegion({
+                            latitude: tripdata.drop.lat,
+                            longitude: tripdata.drop.lng,
+                            latitudeDelta: latitudeDelta,
+                            longitudeDelta: longitudeDelta
+                        });
+                    }
                 }, 1000)
             } else {
                 setRegion({
@@ -359,6 +425,8 @@ export default function MapScreen(props) {
             
             setTimeout(() => {
                 requestEstimate();
+                calculateAllCarTypeEstimates();
+                fitMapToRoute(tripdata.pickup, tripdata.drop);
             }, 500);
         }
     }, [tripdata.selected, tripdata.pickup, tripdata.drop, mapRef.current, showInitialScreen, tripdata.carType, drivers, instructionData]);
@@ -419,7 +487,7 @@ export default function MapScreen(props) {
         if (gps.location) {
             if (gps.location.lat && gps.location.lng) {
                 setDragging(0);
-                if (region) {
+                if (region && mapRef.current) {
                     mapRef.current.animateToRegion({
                         latitude: gps.location.lat,
                         longitude: gps.location.lng,
@@ -464,10 +532,13 @@ export default function MapScreen(props) {
             let carWiseArr = [];
             const sorted = cars.sort((a, b) => a.pos - b.pos);
             for (let i = 0; i < sorted.length; i++) {
-                let temp = { ...sorted[i], minTime: '', available: false, active: false };
+                let temp = { ...sorted[i], minTime: '', available: false, active: i === 0 };
                 carWiseArr.push(temp);
             }
             setAllCarTypes(carWiseArr);
+            if (sorted.length > 0 && !tripdata.carType) {
+                dispatch(updateTripCar(sorted[0]));
+            }
         }
     }
 
@@ -612,6 +683,46 @@ export default function MapScreen(props) {
         }
     }
 
+    const calculateAllCarTypeEstimates = async () => {
+        if (tripdata.pickup && tripdata.drop && allCarTypes && allCarTypes.length > 0) {
+            const estimates = {};
+            
+            for (const carType of allCarTypes) {
+                try {
+                    const tempTripData = {
+                        ...tripdata,
+                        carType: carType
+                    };
+                    
+                    const result = await prepareEstimateObject(tempTripData, instructionData);
+                    if (!result.error && result.estimateObject) {
+                        const estimateResult = await new Promise((resolve) => {
+                            const tempDispatch = (action) => {
+                                if (action.type === 'FETCH_ESTIMATE_SUCCESS') {
+                                    resolve(action.payload);
+                                } else if (action.type === 'FETCH_ESTIMATE_FAILED') {
+                                    resolve(null);
+                                }
+                            };
+                            
+                            getEstimate(result.estimateObject)(tempDispatch);
+                        });
+                        
+                        if (estimateResult) {
+                            estimates[carType.name] = {
+                                estimate: estimateResult
+                            };
+                        }
+                    }
+                } catch (error) {
+                    console.log(`Error calculating estimate for ${carType.name}:`, error);
+                }
+            }
+            
+            setAllCarTypeEstimates(estimates);
+        }
+    };
+
     const selectCarType = (value, key) => {
         let carTypes = allCarTypes;
         for (let i = 0; i < carTypes.length; i++) {
@@ -633,6 +744,10 @@ export default function MapScreen(props) {
             }
         }
         dispatch(updateTripCar(value));
+        
+        setTimeout(() => {
+            calculateAllCarTypeEstimates();
+        }, 100);
     }
 
     const getDrivers = async () => {
@@ -761,7 +876,7 @@ export default function MapScreen(props) {
             }
         } else {
             setDragging(0)
-            if (selection == 'drop' && tripdata.selected && tripdata.selected == 'pickup' && mapRef.current) {
+            if (selection == 'drop' && tripdata.selected && tripdata.selected == 'pickup' && mapRef.current && tripdata.drop && tripdata.drop.lat && tripdata.drop.lng) {
                 mapRef.current.animateToRegion({
                     latitude: tripdata.drop.lat,
                     longitude: tripdata.drop.lng,
@@ -769,7 +884,7 @@ export default function MapScreen(props) {
                     longitudeDelta: longitudeDelta
                 });
             }
-            if (selection == 'pickup' && tripdata.selected && tripdata.selected == 'drop' && mapRef.current) {
+            if (selection == 'pickup' && tripdata.selected && tripdata.selected == 'drop' && mapRef.current && tripdata.pickup && tripdata.pickup.lat && tripdata.pickup.lng) {
                 mapRef.current.animateToRegion({
                     latitude: tripdata.pickup.lat,
                     longitude: tripdata.pickup.lng,
@@ -849,6 +964,7 @@ export default function MapScreen(props) {
                             if (driver_available) {
                                 setBookingDate(null);
                                 setBookingType(false);
+                                setShouldRequestEstimate(true);
                                 if (appConsts.hasOptions  &&
                                     (tripdata?.carType?.options?.length > 0 || tripdata?.carType?.parcelTypes?.length > 0)) {
                                     setOptionModalStatus(true);
@@ -859,6 +975,7 @@ export default function MapScreen(props) {
                                         setBookLoading(false);
                                         Alert.alert(t('alert'), result.msg);
                                     } else {
+                                        setShouldOpenBookingModal(true);
                                         dispatch(getEstimate((await result).estimateObject));
                                     }
                                 }
@@ -981,6 +1098,7 @@ export default function MapScreen(props) {
                 } else {
                     setBookingDate(date);
                     setBookingType(true);
+                    setShouldRequestEstimate(true);
                     if (appConsts.hasOptions) {
                         setOptionModalStatus(true);
                         setBookLaterLoading(false);
@@ -990,6 +1108,7 @@ export default function MapScreen(props) {
                             setBookLoading(false);
                             Alert.alert(t('alert'), result.msg);
                         } else {
+                            setShouldOpenBookingModal(true);
                             dispatch(getEstimate((await result).estimateObject));
                         }
                     }
@@ -1006,11 +1125,13 @@ export default function MapScreen(props) {
             setBookLaterLoading(true);
         }
         setOptionModalStatus(false);
+        setShouldRequestEstimate(true);
         let result = await prepareEstimateObject(tripdata, instructionData);
         if (result.error) {
             setBookLoading(false);
             Alert.alert(t('alert'), result.msg);
         } else {
+            setShouldOpenBookingModal(true);
             dispatch(getEstimate(result.estimateObject));
         }
     }
@@ -1275,6 +1396,11 @@ const onMapSelectComplete = () => {
                         onRegionChangeComplete={onRegionChangeComplete}
                         onPanDrag={() => setDragging(30)}
                         minZoomLevel={11}
+                        maxZoomLevel={20}
+                        zoomEnabled={true}
+                        scrollEnabled={true}
+                        pitchEnabled={true}
+                        rotateEnabled={true}
                         customMapStyle={mode === 'dark' ? customMapStyle : []}
                     >
                         {freeCars ? freeCars.map((item, index) => {
@@ -1293,9 +1419,32 @@ const onMapSelectComplete = () => {
                             )
                         })
                             : null}
+                        {routeCoords && routeCoords.length > 0 && (
+                            <Polyline
+                                coordinates={routeCoords}
+                                strokeWidth={5}
+                                strokeColor={colors.BLUE}
+                            />
+                        )}
+                        {tripdata.pickup && tripdata.pickup.lat && routeCoords && routeCoords.length > 0 && (
+                            <Marker
+                                coordinate={{ latitude: tripdata.pickup.lat, longitude: tripdata.pickup.lng }}
+                                title={tripdata.pickup.add}
+                            >
+                                <Image source={require('../../assets/images/green_pin.png')} style={{ height: 35, width: 35 }} />
+                            </Marker>
+                        )}
+                        {tripdata.drop && tripdata.drop.lat && routeCoords && routeCoords.length > 0 && (
+                            <Marker
+                                coordinate={{ latitude: tripdata.drop.lat, longitude: tripdata.drop.lng }}
+                                title={tripdata.drop.add}
+                            >
+                                <Image source={require('../../assets/images/rsz_2red_pin.png')} style={{ height: 35, width: 35 }} />
+                            </Marker>
+                        )}
                     </MapView>
                     : null}
-                {region ?
+                {region && (!routeCoords || routeCoords.length === 0) ?
                     tripdata.selected == 'pickup' ?
                         <View pointerEvents="none" style={styles.mapFloatingPinView}>
                             <Image pointerEvents="none" style={[styles.mapFloatingPin, { marginBottom: Platform.OS == 'ios' ? (hasNotch ? (-10 + dragging) : 33) : 40 }]} resizeMode="contain" source={require('../../assets/images/green_pin.png')} />
@@ -1341,7 +1490,11 @@ const onMapSelectComplete = () => {
                 <ImageBackground source={mode === 'dark' ? require('../../assets/images/black-grad6.png') : require('../../assets/images/white-grad6.png')} style={{ height: '100%', width: '100%' }}>
                     <View style={[styles.headerContainer, { marginTop: Platform.OS == 'android' ? (__DEV__ ? 20 : 40) : (hasNotch ? 48 : 20) }]}>
                         {!showInitialScreen ? (
-                            <TouchableOpacity onPress={() => setShowInitialScreen(true)} style={styles.backButton}>
+                            <TouchableOpacity onPress={() => {
+                                setShowInitialScreen(true);
+                                setRouteCoords([]);
+                                setHasAutoFitted(false);
+                            }} style={styles.backButton}>
                                 <Icon 
                                     name="arrow-back"
                                     type="ionicon"
@@ -1416,11 +1569,7 @@ const onMapSelectComplete = () => {
                             <Text style={[styles.homeHeaderText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
                                 {t('where_are_you_going')}
                             </Text>
-                            <TouchableOpacity onPress={handleAddAddress} style={styles.addButton}>
-                                <Text style={[styles.addButtonText, { color: mode === 'dark' ? '#9CA3AF' : '#6B7280' }]}>
-                                    {t('add_1').toUpperCase()}
-                                </Text>
-                            </TouchableOpacity>
+
                     </View>
 
                         <View style={[styles.destinationOptions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1593,11 +1742,14 @@ const onMapSelectComplete = () => {
                                                                 {prop.name}
                                                             </Text>
                                                             <Text style={[styles.carTypePrice, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                                                {settings?.swipe_symbol === false ? 
-                                                                    `${prop.rate_per_unit_distance ? formatAmount(prop.rate_per_unit_distance, settings?.decimal) : '0'} ${settings?.symbol}` :
-                                                                    `${settings?.symbol} ${prop.rate_per_unit_distance ? formatAmount(prop.rate_per_unit_distance, settings?.decimal) : '0'}`
-                                                                }
-                                                            </Text>
+                                                {allCarTypeEstimates[prop.name] && allCarTypeEstimates[prop.name].estimate ? (
+                                                    settings?.swipe_symbol === true ? 
+                                                        `${formatAmount(allCarTypeEstimates[prop.name].estimate.estimateFare, settings?.decimal)} ${settings?.symbol}` :
+                                                        `${settings?.symbol} ${formatAmount(allCarTypeEstimates[prop.name].estimate.estimateFare, settings?.decimal)}`
+                                                ) : (
+                                                    '...'
+                                                )}
+                                            </Text>
                                                             {prop.minTime && (
                                                                 <Text style={[styles.carTypeTime, { color: colors.SHADOW }]}>
                                                                     {prop.minTime}

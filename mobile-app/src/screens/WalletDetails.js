@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -8,7 +8,8 @@ import {
   Platform,
   ScrollView,
   TextInput,
-  Alert
+  Alert,
+  Animated
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { CommonActions } from '@react-navigation/native';
@@ -79,6 +80,11 @@ export default function WalletDetails(props) {
   const settings = useSelector(state => state.settingsdata.settings);
   const providers = useSelector(state => state.paymentmethods.providers);
 
+  // Animation refs
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
   // State management
   const [profile, setProfile] = useState();
   const [mode, setMode] = useState();
@@ -138,6 +144,26 @@ export default function WalletDetails(props) {
       setProfile(null);
     }
   }, [auth.profile]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim, scaleAnim]);
 
 
 
@@ -363,7 +389,18 @@ export default function WalletDetails(props) {
   );
 
   const renderBalanceCard = () => (
-    <View style={styles.balanceCardContainer}>
+    <Animated.View 
+      style={[
+        styles.balanceCardContainer,
+        {
+          opacity: fadeAnim,
+          transform: [
+            { translateY: slideAnim },
+            { scale: scaleAnim }
+          ]
+        }
+      ]}
+    >
       <View style={[styles.balanceCard, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}>
         <View style={styles.balanceCardHeader}>
           <View style={styles.balanceInfo}>
@@ -421,10 +458,10 @@ export default function WalletDetails(props) {
           </View>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 
-    const renderMenuOptions = () => (
+  const renderMenuOptions = () => (
     <View style={styles.menuContainer}>
       <TouchableOpacity 
         style={[styles.menuItem, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' }]}
@@ -557,6 +594,7 @@ export default function WalletDetails(props) {
 const styles = StyleSheet.create({
   mainView: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   scrollContainer: {
     flex: 1,
@@ -567,10 +605,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   balanceCard: {
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E9EC',
+    borderRadius: 24,
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 0,
   },
   balanceCardHeader: {
     flexDirection: 'row',
@@ -578,11 +624,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   walletIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: MAIN_COLOR,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   balanceInfo: {
     flex: 1,
@@ -590,106 +645,157 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   balanceTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: fonts.Bold,
-    marginLeft: 12,
+    marginLeft: 16,
+    letterSpacing: 0.5,
   },
   balanceBottomSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginTop: 0,
+    marginTop: 4,
   },
   balanceLeftColumn: {
     flex: 1,
   },
   balanceSubtitle: {
-    fontSize: 12,
-    fontFamily: fonts.Regular,
-    marginBottom: 0,
-    marginTop: 10,
+    fontSize: 13,
+    fontFamily: fonts.Medium,
+    marginBottom: 4,
+    marginTop: 12,
+    opacity: 0.7,
+    letterSpacing: 0.3,
   },
   balanceAmount: {
     fontFamily: fonts.Bold,
     flexShrink: 1,
+    letterSpacing: 0.5,
   },
   rechargeButton: {
-    width: 80,
-    height: 40,
-    borderRadius: 8,
+    width: 85,
+    height: 44,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 16,
-    marginTop: 10,
+    marginLeft: 12,
+    marginTop: 12,
+    backgroundColor: colors.GREEN,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   rechargeButtonText: {
     color: colors.WHITE,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: fonts.Bold,
+    letterSpacing: 0.3,
   },
   rechargeContent: {
-    paddingVertical: 10,
+    paddingVertical: 16,
   },
   amountSelectionTitle: {
-    fontSize: 14,
-    fontFamily: fonts.Regular,
-    marginBottom: 16,
+    fontSize: 16,
+    fontFamily: fonts.Medium,
+    marginBottom: 20,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   amountGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
   },
   amountButton: {
     width: '48%',
-    height: 48,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   selectedAmountButton: {
     borderWidth: 2,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   amountText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: fonts.Medium,
+    letterSpacing: 0.3,
   },
   withdrawContent: {
-    paddingVertical: 10,
+    paddingVertical: 16,
   },
   withdrawInputLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: fonts.Medium,
-    marginBottom: 8,
-    marginLeft: 4,
+    marginBottom: 12,
+    marginLeft: 6,
+    letterSpacing: 0.3,
   },
   withdrawTextInput: {
-    height: 50,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    height: 56,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    fontSize: 17,
     fontFamily: fonts.Regular,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    backgroundColor: '#F9FAFB',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   withdrawInputFocused: {
     borderWidth: 2,
+    backgroundColor: '#FFFFFF',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
   menuContainer: {
-    gap: 12,
+    gap: 16,
   },
   menuItem: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E9EC',
+    borderRadius: 16,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+    borderWidth: 0,
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -697,7 +803,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   menuItemText: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: fonts.Medium,
+    letterSpacing: 0.3,
   },
 });

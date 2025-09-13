@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
     StyleSheet,
     View,
@@ -14,7 +14,9 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     useColorScheme,
-    SafeAreaView
+    SafeAreaView,
+    KeyboardAvoidingView,
+    Animated
 } from "react-native";
 import { useDispatch, useSelector } from 'react-redux';
 import { api } from 'common';
@@ -25,7 +27,7 @@ import i18n from 'i18n-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import moment from 'moment/min/moment-with-locales';
-import rnauth from '@react-native-firebase/auth';
+import auth from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 var { width,height } = Dimensions.get('window');
 import ClientIds from '../../config/ClientIds';
@@ -55,9 +57,18 @@ export default function LoginScreen(props) {
 
     const formatCountries = () => {
         let arr = [];
-        for (let i = 0; i < countries.length; i++) {
-            let txt = countries[i].label + " (+" + countries[i].phone + ")";
-            arr.push({ label: txt, value: txt, key: txt });
+        if (settings?.restrictCountry) {
+            for (let i = 0; i < countries.length; i++) {
+                if (countries[i].code === "US" || countries[i].code === "CO") {
+                    let txt = countries[i].label + " (+" + countries[i].phone + ")";
+                    arr.push({ label: txt, value: txt, key: txt });
+                }
+            }
+        } else {
+            for (let i = 0; i < countries.length; i++) {
+                let txt = countries[i].label + " (+" + countries[i].phone + ")";
+                arr.push({ label: txt, value: txt, key: txt });
+            }
         }
         return arr;
     }
@@ -79,22 +90,83 @@ export default function LoginScreen(props) {
     const [isRTL, setIsRTL] = useState();
     const [langSelection, setLangSelection] = useState();
     const languagedata = useSelector(state => state.languagedata);
+    
+    const getLanguageFlag = (langLocale) => {
+        const flagMap = {
+            'en': '🇺🇸',
+            'es': '🇪🇸',
+            'fr': '🇫🇷',
+            'de': '🇩🇪',
+            'it': '🇮🇹',
+            'pt': '🇵🇹',
+            'ru': '🇷🇺',
+            'zh': '🇨🇳',
+            'ja': '🇯🇵',
+            'ko': '🇰🇷',
+            'ar': '🇸🇦',
+            'he': '🇮🇱',
+            'hi': '🇮🇳',
+            'th': '🇹🇭',
+            'vi': '🇻🇳',
+            'tr': '🇹🇷',
+            'nl': '🇳🇱',
+            'sv': '🇸🇪',
+            'da': '🇩🇰',
+            'no': '🇳🇴',
+            'fi': '🇫🇮',
+            'pl': '🇵🇱',
+            'cs': '🇨🇿',
+            'hu': '🇭🇺',
+            'ro': '🇷🇴',
+            'bg': '🇧🇬',
+            'hr': '🇭🇷',
+            'sk': '🇸🇰',
+            'sl': '🇸🇮',
+            'et': '🇪🇪',
+            'lv': '🇱🇻',
+            'lt': '🇱🇹',
+            'mt': '🇲🇹',
+            'cy': '🇨🇾',
+            'el': '🇬🇷'
+        };
+        return flagMap[langLocale] || '🌐';
+    };
     const [eyePass, setEyePass] = useState(true);
     const [isNewUser, setIsNewUser] = useState(false);
     const pickerRef1 = React.createRef();
     const pickerRef2 = React.createRef();
     const [keyboardStatus, setKeyboardStatus] = useState("Keyboard Hidden");
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+    const logoScale = useRef(new Animated.Value(1)).current;
+    const logoOpacity = useRef(new Animated.Value(1)).current;
+    const formTranslateY = useRef(new Animated.Value(0)).current;
+    const animationTimeoutRef = useRef(null);
+    const isAnimatingRef = useRef(false);
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
+
+    const handleContactChange = useCallback((value) => {
+        if (!settings.emailLogin) {
+            const numericValue = value.replace(/[^0-9]/g, '');
+            setState(prevState => ({ ...prevState, contact: numericValue }));
+        } else {
+            setState(prevState => ({ ...prevState, contact: value }));
+        }
+    }, [settings.emailLogin]);
 
     useEffect(() => {
         AsyncStorage.getItem('theme', (err, result) => {
             if (result) {
-                const theme = JSON.parse(result)['mode']
-                if (theme === 'system'){
-                    setMode(colorScheme);
-                }else{
-                    setMode(theme);
+                try {
+                    const theme = JSON.parse(result)['mode']
+                    if (theme === 'system'){
+                        setMode(colorScheme);
+                    }else{
+                        setMode(theme);
+                    }
+                } catch (error) {
+                    console.log('Error parsing theme data:', error);
+                    setMode('light');
                 }
             }else{
                 setMode('light');
@@ -105,9 +177,15 @@ export default function LoginScreen(props) {
     useEffect(() => {
         AsyncStorage.getItem('lang', (err, result) => {
             if (result) {
-                const langLocale = JSON.parse(result)['langLocale']
-                setIsRTL(langLocale == 'he' || langLocale == 'ar')
-                setLangSelection(langLocale);
+                try {
+                    const langLocale = JSON.parse(result)['langLocale']
+                    setIsRTL(langLocale == 'he' || langLocale == 'ar')
+                    setLangSelection(langLocale);
+                } catch (error) {
+                    console.log('Error parsing language data:', error);
+                    setIsRTL(i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0)
+                    setLangSelection(i18n.locale);
+                }
             } else {
                 setIsRTL(i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0)
                 setLangSelection(i18n.locale);
@@ -117,9 +195,19 @@ export default function LoginScreen(props) {
 
     useEffect(() => {
         if (settings) {
-            for (let i = 0; i < countries.length; i++) {
-                if (countries[i].label == settings.country) {
-                    setState({ ...state, countryCode: settings.country + " (+" + countries[i].phone + ")" })
+            const newCountryCodeList = formatCountries();
+            if (settings.restrictCountry) {
+                for (let i = 0; i < countries.length; i++) {
+                    if (countries[i].code === "US" || countries[i].code === "CO") {
+                        setState({ ...state, countryCodeList: newCountryCodeList, countryCode: countries[i].label + " (+" + countries[i].phone + ")" })
+                        break;
+                    }
+                }
+            } else {
+                for (let i = 0; i < countries.length; i++) {
+                    if (countries[i].label == settings.country) {
+                        setState({ ...state, countryCodeList: newCountryCodeList, countryCode: settings.country + " (+" + countries[i].phone + ")" })
+                    }
                 }
             }
         }
@@ -209,16 +297,29 @@ export default function LoginScreen(props) {
                                 if (settings.customMobileOTP) {
                                     dispatch(requestMobileOtp(formattedNum));
                                 } else {
-                                    rnauth().verifyPhoneNumber(formattedNum).then((confirmation) => {
+                                    auth().verifyPhoneNumber(formattedNum).then((confirmation) => {
                                         if (confirmation && confirmation.verificationId) {
                                             dispatch(requestPhoneOtpDevice(confirmation.verificationId));
                                         } else {
+                                            console.log('❌ LOGIN - No se recibió verificationId');
                                             Alert.alert(t('alert'), t('auth_error'));
                                             setLoading(false);
                                         }
                                     }).catch((error) => {
-                                        Alert.alert(t('alert'), t('auth_error'));
-                                        setLoading(false);
+                                        console.error('❌ LOGIN - Error en verifyPhoneNumber:', {
+                                            error: error,
+                                            errorCode: error?.code,
+                                            errorMessage: error?.message,
+                                            platform: Platform.OS
+                                        });
+                                        
+                                        if (Platform.OS === 'ios' && (error?.code === 'auth/missing-app-credential' || error?.code === 'auth/captcha-check-failed' || error?.code === 'auth/invalid-app-credential')) {
+                                            console.log('🔄 LOGIN - Fallback a customMobileOTP para iOS');
+                                            dispatch(requestMobileOtp(formattedNum));
+                                        } else {
+                                            Alert.alert(t('alert'), t('auth_error') + (error?.message ? ': ' + error.message : ''));
+                                            setLoading(false);
+                                        }
                                     });
                                 }
                             }
@@ -239,16 +340,29 @@ export default function LoginScreen(props) {
                                 if (settings.customMobileOTP) {
                                     dispatch(requestMobileOtp(formattedNum));
                                 } else {
-                                    rnauth().verifyPhoneNumber(formattedNum).then((confirmation) => {
+                                    auth().verifyPhoneNumber(formattedNum).then((confirmation) => {
                                         if (confirmation && confirmation.verificationId) {
                                             dispatch(requestPhoneOtpDevice(confirmation.verificationId));
                                         } else {
+                                            console.log('❌ LOGIN - No se recibió verificationId para usuario nuevo');
                                             Alert.alert(t('alert'), t('auth_error'));
                                             setLoading(false);
                                         }
                                     }).catch((error) => {
-                                        Alert.alert(t('alert'), t('auth_error'));
-                                        setLoading(false);
+                                        console.error('❌ LOGIN - Error en verifyPhoneNumber para usuario nuevo:', {
+                                            error: error,
+                                            errorCode: error?.code,
+                                            errorMessage: error?.message,
+                                            platform: Platform.OS
+                                        });
+                                        
+                                        if (Platform.OS === 'ios' && (error?.code === 'auth/missing-app-credential' || error?.code === 'auth/captcha-check-failed' || error?.code === 'auth/invalid-app-credential')) {
+                                            console.log('🔄 LOGIN - Fallback a customMobileOTP para iOS (usuario nuevo)');
+                                            dispatch(requestMobileOtp(formattedNum));
+                                        } else {
+                                            Alert.alert(t('alert'), t('auth_error') + (error?.message ? ': ' + error.message : ''));
+                                            setLoading(false);
+                                        }
                                     });
                                 }
                             }
@@ -393,83 +507,199 @@ export default function LoginScreen(props) {
     }
 
     useEffect(() => {
-
-        const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
-            setKeyboardStatus('Keyboard Shown');
-        });
-        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
-            setKeyboardStatus('Keyboard Hidden');
-        });
+        if (!settings?.mobileLogin) {
+            return;
+        }
+        
+        const showSubscription = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', 
+            (event) => {
+                if (isAnimatingRef.current) return;
+                
+                setKeyboardStatus('Keyboard Shown');
+                setKeyboardHeight(event.endCoordinates.height);
+                
+                if (animationTimeoutRef.current) {
+                    clearTimeout(animationTimeoutRef.current);
+                }
+                
+                isAnimatingRef.current = true;
+                Animated.parallel([
+                    Animated.timing(logoScale, {
+                        toValue: 0.7,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(logoOpacity, {
+                        toValue: 0.8,
+                        duration: 250,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(formTranslateY, {
+                        toValue: -15,
+                        duration: 250,
+                        useNativeDriver: true,
+                    })
+                ]).start(() => {
+                    isAnimatingRef.current = false;
+                });
+            }
+        );
+        
+        const hideSubscription = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', 
+            () => {
+                if (isAnimatingRef.current) return;
+                
+                setKeyboardStatus('Keyboard Hidden');
+                setKeyboardHeight(0);
+                
+                if (animationTimeoutRef.current) {
+                    clearTimeout(animationTimeoutRef.current);
+                }
+                
+                animationTimeoutRef.current = setTimeout(() => {
+                    isAnimatingRef.current = true;
+                    Animated.parallel([
+                        Animated.timing(logoScale, {
+                            toValue: 1,
+                            duration: 250,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(logoOpacity, {
+                            toValue: 1,
+                            duration: 250,
+                            useNativeDriver: true,
+                        }),
+                        Animated.timing(formTranslateY, {
+                            toValue: 0,
+                            duration: 250,
+                            useNativeDriver: true,
+                        })
+                    ]).start(() => {
+                        isAnimatingRef.current = false;
+                    });
+                }, 100);
+            }
+        );
 
         return () => {
-            showSubscription.remove();
-            hideSubscription.remove();
+            if (animationTimeoutRef.current) {
+                clearTimeout(animationTimeoutRef.current);
+            }
+            if (settings?.mobileLogin) {
+                showSubscription.remove();
+                hideSubscription.remove();
+            }
         };
     }, []);
 
     return (
         <SafeAreaView style={styles.safeArea}>
-            <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-                <View style={styles.header}> 
-                    {langSelection && languagedata && languagedata.langlist && languagedata.langlist.length > 1 ?
-                        <View style={[styles.headLanuage, [isRTL ? { left: 20 } : { right: 20 }]]}> 
-                            <Select selectedValue={langSelection} onValueChange={(text) => {
-                                let defl = null;
-                                for (const value of Object.values(languagedata.langlist)) {
-                                    if (value.langLocale == text) {
-                                        defl = value;
+            <KeyboardAvoidingView 
+                style={{flex:1}} 
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+                enabled={Platform.OS === 'ios'}
+            >
+                <ScrollView 
+                    contentContainerStyle={[
+                        styles.scrollContainer,
+                        keyboardStatus === 'Keyboard Shown' && {
+                            paddingBottom: Platform.OS === 'android' ? Math.max(keyboardHeight * 0.1, 20) : 20
+                        }
+                    ]} 
+                    keyboardShouldPersistTaps="handled" 
+                    keyboardDismissMode={settings?.mobileLogin ? "interactive" : "on-drag"}
+                    showsVerticalScrollIndicator={false}
+                    bounces={settings?.mobileLogin ? Platform.OS === 'ios' : false}
+                    scrollEventThrottle={settings?.mobileLogin ? 16 : 1}
+                    nestedScrollEnabled={false}
+                    overScrollMode={settings?.mobileLogin ? "auto" : "never"}
+                    removeClippedSubviews={!settings?.mobileLogin}
+                >
+                    <View style={styles.header}> 
+                        {langSelection && languagedata && languagedata.langlist && languagedata.langlist.length > 1 ?
+                            <View style={[styles.headLanuage, [isRTL ? { left: 20 } : { right: 20 }]]}> 
+                                <Select selectedValue={langSelection} onValueChange={(text) => {
+                                    let defl = null;
+                                    for (const value of Object.values(languagedata.langlist)) {
+                                        if (value.langLocale == text) {
+                                            defl = value;
+                                        }
                                     }
-                                }
-                                setLangSelection(text);
-                                i18n.locale = text;
-                                moment.locale(defl?.dateLocale || 'en');
-                                setIsRTL(text == 'he' || text == 'ar')
-                                AsyncStorage.setItem('lang', JSON.stringify({ langLocale: text, dateLocale: defl?.dateLocale || 'en' }));
-                            }}>
-                                <SelectTrigger size="sm" variant="outline" bg={colors.WHITE} borderColor="#E2E9EC" borderRadius={8} style={{ alignItems: 'center', paddingHorizontal: 8, minWidth: 120, justifyContent: 'space-between' }}>
-                                    <View style={styles.selectSpacer} />
-                                    <Text style={styles.selectText}>{(Object.values(languagedata.langlist).find((v) => v.langLocale === langSelection))?.langName || t('lang1')}</Text>
-                                    <SelectIcon as={ChevronDownIcon} />
-                                </SelectTrigger>
-                                <SelectPortal>
-                                    <SelectBackdrop />
-                                    <SelectContent>
-                                        {Object.values(languagedata.langlist).map(function (value) { 
-                                            return (
-                                                <SelectItem key={value.langLocale} label={value.langName} value={value.langLocale} />
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </SelectPortal>
-                            </Select>
-                        </View>
-                     : null}
-                </View>
-                <View style={styles.logoContainer}>
-                    <Image
-                        source={require('../../assets/images/logo.png')}
-                        style={styles.logo}
-                        resizeMode="contain"
-                    />
-                </View>
+                                    setLangSelection(text);
+                                    i18n.locale = text;
+                                    moment.locale(defl?.dateLocale || 'en');
+                                    setIsRTL(text == 'he' || text == 'ar')
+                                    AsyncStorage.setItem('lang', JSON.stringify({ langLocale: text, dateLocale: defl?.dateLocale || 'en' }));
+                                }}>
+                                    <SelectTrigger size="sm" variant="outline" bg={colors.WHITE} borderColor="#E2E9EC" borderRadius={8} style={{ alignItems: 'center', paddingHorizontal: 8, minWidth: 120, justifyContent: 'space-between' }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                            <Text style={{ fontSize: 16, marginRight: 6 }}>{getLanguageFlag(langSelection)}</Text>
+                                            <Text style={styles.selectText}>{(Object.values(languagedata.langlist).find((v) => v.langLocale === langSelection))?.langName || t('lang1')}</Text>
+                                        </View>
+                                        <SelectIcon as={ChevronDownIcon} />
+                                    </SelectTrigger>
+                                    <SelectPortal>
+                                        <SelectBackdrop />
+                                        <SelectContent>
+                                            {Object.values(languagedata.langlist).map(function (value) { 
+                                                return (
+                                                    <SelectItem 
+                                                        key={value.langLocale} 
+                                                        label={`${getLanguageFlag(value.langLocale)} ${value.langName}`} 
+                                                        value={value.langLocale} 
+                                                    />
+                                                );
+                                            })}
+                                        </SelectContent>
+                                    </SelectPortal>
+                                </Select>
+                            </View>
+                         : null}
+                    </View>
+                    <Animated.View style={[
+                        styles.logoContainer, 
+                        keyboardStatus === 'Keyboard Shown' ? { 
+                            minHeight: height * 0.15, 
+                            marginTop: Platform.OS === 'ios' ? 10 : 5,
+                            marginBottom: 10
+                        } : null,
+                        {
+                            transform: [{ scale: logoScale }],
+                            opacity: logoOpacity
+                        }
+                    ]}>
+                        <Image
+                            source={require('../../assets/images/waygo2.png')}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
+                    </Animated.View>
 
-                <View style={styles.formContainer}>
-                    <Text style={styles.inputLabel}>{settings.emailLogin && settings.mobileLogin ? t('contact_placeholder') : settings.emailLogin && !settings.mobileLogin ? t('email_id') : t('mobile_number')}</Text>
-                    <View style={styles.contactRow}>
-                        {(state.contact && /^\d+$/.test(state.contact) && settings.mobileLogin) ? (
-                            <View style={styles.countryBoxSmall}>
-                                <View style={styles.countryPickerWrapper}>
-                                    <RNPickerSelect
-                                        pickerRef={pickerRef2}
-                                        placeholder={{ label: '+', value: t('select_country') }}
-                                        value={state.countryCode}
-                                        useNativeAndroidPickerStyle={false}
-                                        onTap={() => {
-                                            if (settings && settings.AllowCountrySelection) {
-                                                Keyboard.dismiss();
-                                                pickerRef2.current && pickerRef2.current.focus && pickerRef2.current.focus();
-                                            }
-                                        }}
+                    <Animated.View style={[
+                        styles.formContainer,
+                        {
+                            transform: [{ translateY: formTranslateY }]
+                        }
+                    ]}>
+                        <Text style={styles.inputLabel}>{settings.emailLogin && settings.mobileLogin ? t('contact_placeholder') : settings.emailLogin && !settings.mobileLogin ? t('email_id') : t('mobile_number')}</Text>
+                        <View style={styles.contactRow}>
+                            {(state.contact && /^\d+$/.test(state.contact) && settings.mobileLogin) ? (
+                                <View style={styles.countryBoxSmall}>
+                                    <View style={styles.countryPickerWrapper}>
+                                        <RNPickerSelect
+                                            pickerRef={pickerRef2}
+                                            placeholder={settings?.restrictCountry ? {} : { label: '+', value: t('select_country') }}
+                                            value={state.countryCode}
+                                            useNativeAndroidPickerStyle={false}
+                                            onTap={() => {
+                                                if ((settings && settings.AllowCountrySelection) || settings?.restrictCountry) {
+                                                    Keyboard.dismiss();
+                                                    pickerRef2.current && pickerRef2.current.focus && pickerRef2.current.focus();
+                                                }
+                                            }}
                                                                 style={{
                             viewContainer: styles.countryPickerContainer,
                             inputIOS: [
@@ -489,138 +719,132 @@ export default function LoginScreen(props) {
                                 }
                             ]
                         }}
-                                        onValueChange={(value) => {
-                                            if (!settings?.AllowCountrySelection) return;
-                                            setState({ ...state, countryCode: value });
-                                        }}
-                                        items={state.countryCodeList.map((it) => {
-                                            const match = it.value && it.value.match(/\(\+(\d+)\)/);
-                                            const codePart = match && match[1] ? `+${match[1]}` : (it.label?.startsWith('+') ? it.label : `+${it.label}`);
-                                            return { ...it, label: codePart };
-                                        })}
-                                        disabled={!settings?.AllowCountrySelection}
-                                        mode={mode}
+                                            onValueChange={(value) => {
+                                                if (!settings?.AllowCountrySelection && !settings?.restrictCountry) return;
+                                                setState({ ...state, countryCode: value });
+                                            }}
+                                            items={state.countryCodeList.map((it) => {
+                                                const match = it.value && it.value.match(/\(\+(\d+)\)/);
+                                                const codePart = match && match[1] ? `+${match[1]}` : (it.label?.startsWith('+') ? it.label : `+${it.label}`);
+                                                return { ...it, label: codePart };
+                                            })}
+                                            disabled={!settings?.AllowCountrySelection && !settings?.restrictCountry}
+                                            mode={mode}
+                                        />
+                                    </View>
+                                </View>
+                            ) : null}
+                            <View style={styles.contactInputWrap}>
+                                <TextInput
+                                    style={[styles.input, (state.contact && /^\d+$/.test(state.contact) && settings.mobileLogin) ? styles.inputPhone : null]}
+                                    placeholder={''}
+                                    placeholderTextColor={colors.SHADOW}
+                                    value={state.contact ?? ''}
+                                    onChangeText={handleContactChange}
+                                    autoCapitalize="none"
+                                    keyboardType={(settings.emailLogin && settings.mobileLogin) ? 'default' : settings.emailLogin ? 'email-address' : 'number-pad'}
+                                />
+                            </View>
+                        </View>
+
+                        { (isNaN(state.contact) || (settings.emailLogin && !settings.mobileLogin)) ? (
+                            <View style={styles.passwordContainer}>
+                                <Text style={styles.inputLabel}>{t('password')}</Text>
+                                <View style={styles.inputWrapper}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder={''}
+                                        placeholderTextColor={colors.SHADOW}
+                                        secureTextEntry={eyePass}
+                                        value={state.verificationCode ?? ''}
+                                        onChangeText={(value) => setState({ ...state, verificationCode: value })}
                                     />
+                                    <TouchableOpacity onPress={() => setEyePass(!eyePass)} style={styles.eyeToggle}>
+                                        <Feather name={eyePass ? 'eye-off' : 'eye'} size={20} color={colors.BLACK} />
+                                    </TouchableOpacity>
                                 </View>
                             </View>
-                        ) : null}
-                        <View style={styles.contactInputWrap}>
-                            <TextInput
-                                style={[styles.input, (state.contact && /^\d+$/.test(state.contact) && settings.mobileLogin) ? styles.inputPhone : null]}
-                                placeholder={''}
-                                placeholderTextColor={colors.SHADOW}
-                                value={state.contact ?? ''}
-                                onChangeText={(value) => {
-                                    if (!settings.emailLogin) {
-                                        const numericValue = value.replace(/[^0-9]/g, '');
-                                        setState({ ...state, contact: numericValue });
-                                    } else {
-                                        setState({ ...state, contact: value });
-                                    }
-                                }}
-                                autoCapitalize="none"
-                                keyboardType={(settings.emailLogin && settings.mobileLogin) ? 'default' : settings.emailLogin ? 'email-address' : 'number-pad'}
-                            />
-                        </View>
-                    </View>
+                        ) : null }
 
-                    { (isNaN(state.contact) || (settings.emailLogin && !settings.mobileLogin)) ? (
-                        <View style={styles.passwordContainer}>
-                            <Text style={styles.inputLabel}>{t('password')}</Text>
-                            <View style={styles.inputWrapper}>
+                        { (isNaN(state.contact) || (settings.emailLogin && !settings.mobileLogin)) ? (
+                            <TouchableOpacity style={styles.forgotContainer} onPress={forgotPassword}>
+                                <Text style={styles.forgotText}>{t('forgot_password')}</Text>
+                            </TouchableOpacity>
+                        ) : null }
+
+                        { !!state.verificationId ? (
+                            <>
+                                <Text style={styles.inputLabel}>{t('otp_here')}</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder={''}
                                     placeholderTextColor={colors.SHADOW}
-                                    secureTextEntry={eyePass}
                                     value={state.verificationCode ?? ''}
                                     onChangeText={(value) => setState({ ...state, verificationCode: value })}
+                                    keyboardType={'number-pad'}
+                                    secureTextEntry={true}
                                 />
-                                <TouchableOpacity onPress={() => setEyePass(!eyePass)} style={styles.eyeToggle}>
-                                    <Feather name={eyePass ? 'eye-off' : 'eye'} size={20} color={colors.BLACK} />
+                                <TouchableOpacity style={styles.loginButton} onPress={onSignIn}>
+                                    {loading ? (
+                                        <ActivityIndicator color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>{t('verify_otp')}</Text>
+                                    )}
                                 </TouchableOpacity>
-                            </View>
-                        </View>
-                    ) : null }
-
-                    { (isNaN(state.contact) || (settings.emailLogin && !settings.mobileLogin)) ? (
-                        <TouchableOpacity style={styles.forgotContainer} onPress={forgotPassword}>
-                            <Text style={styles.forgotText}>{t('forgot_password')}</Text>
-                        </TouchableOpacity>
-                    ) : null }
-
-                    { !!state.verificationId ? (
-                        <>
-                            <Text style={styles.inputLabel}>{t('otp_here')}</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder={''}
-                                placeholderTextColor={colors.SHADOW}
-                                value={state.verificationCode ?? ''}
-                                onChangeText={(value) => setState({ ...state, verificationCode: value })}
-                                keyboardType={'number-pad'}
-                                secureTextEntry={true}
-                            />
-                            <TouchableOpacity style={styles.loginButton} onPress={onSignIn}>
+                            </>
+                        ) : (
+                            <TouchableOpacity style={styles.loginButton} onPress={onPressLogin}>
                                 {loading ? (
                                     <ActivityIndicator color={colors.WHITE} />
                                 ) : (
-                                    <Text style={styles.loginButtonText}>{t('verify_otp')}</Text>
+                                    <Text style={styles.loginButtonText}>
+                                        {settings.mobileLogin ? (isNaN(state.contact) ? t('signIn') : t('request_otp')) : t('signIn')}
+                                    </Text>
                                 )}
                             </TouchableOpacity>
-                        </>
-                    ) : (
-                        <TouchableOpacity style={styles.loginButton} onPress={onPressLogin}>
-                            {loading ? (
-                                <ActivityIndicator color={colors.WHITE} />
-                            ) : (
-                                <Text style={styles.loginButtonText}>
-                                    {settings.mobileLogin ? (isNaN(state.contact) ? t('signIn') : t('request_otp')) : t('signIn')}
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-                    )}
-                </View>
+                        )}
+                    </Animated.View>
 
-                {settings.socialLogin ?
-                    <View>
-                        <View style={styles.seperator}>
-                            <View style={styles.lineLeft}></View>
-                            <View style={styles.lineLeftFiller}>
-                                <Text style={[styles.sepText, {color: colors.BLACK}]}>{t('spacer_message')}</Text>
+                    {settings.socialLogin ?
+                        <View>
+                            <View style={styles.seperator}>
+                                <View style={styles.lineLeft}></View>
+                                <View style={styles.lineLeftFiller}>
+                                    <Text style={[styles.sepText, {color: colors.BLACK}]}>{t('spacer_message')}</Text>
+                                </View>
+                                <View style={styles.lineRight}></View>
                             </View>
-                            <View style={styles.lineRight}></View>
-                        </View>
-                        <View style={styles.socialBar}>
-                            <TouchableOpacity style={styles.socialIcon} onPress={GoogleLogin}>
-                                <Image
-                                    source={require("../../assets/images/image_google.png")}
-                                    resizeMode="contain"
-                                    style={styles.socialIconImage}
-                                />
-                            </TouchableOpacity>
-                            {Platform.OS == 'ios' ?
-                                <TouchableOpacity style={styles.socialIcon} onPress={AppleLogin}>
+                            <View style={styles.socialBar}>
+                                <TouchableOpacity style={styles.socialIcon} onPress={GoogleLogin}>
                                     <Image
-                                        source={require("../../assets/images/image_apple.png")}
+                                        source={require("../../assets/images/image_google.png")}
                                         resizeMode="contain"
                                         style={styles.socialIconImage}
                                     />
                                 </TouchableOpacity>
-                            : null}
+                                {Platform.OS == 'ios' ?
+                                    <TouchableOpacity style={styles.socialIcon} onPress={AppleLogin}>
+                                        <Image
+                                            source={require("../../assets/images/image_apple.png")}
+                                            resizeMode="contain"
+                                            style={styles.socialIconImage}
+                                        />
+                                    </TouchableOpacity>
+                                : null}
+                            </View>
                         </View>
-                    </View>
-                : null}
+                    : null}
 
-                <View style={styles.bottomLinksContainer}>
-                    <TouchableOpacity onPress={openRegister} style={styles.bottomLinkItem}>
-                        <Text style={styles.bottomLinkText}>{t('register_as_driver')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={openTerms} style={styles.bottomLinkItem}>
-                        <Text style={styles.bottomLinkText}>{t('terms')}</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+                    <View style={styles.bottomLinksContainer}>
+                        <TouchableOpacity onPress={openRegister} style={styles.bottomLinkItem}>
+                            <Text style={styles.bottomLinkText}>{t('register_as_driver')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={openTerms} style={styles.bottomLinkItem}>
+                            <Text style={styles.bottomLinkText}>{t('terms')}</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     );
 }
@@ -648,8 +872,8 @@ const styles = StyleSheet.create({
         marginBottom: 0
     },
     logo: {
-        width: Math.min(width * 0.6, 260),
-        height: Math.min(height * 0.16, 130)
+        width: Math.min(width * 0.8, 650),
+        height: Math.min(height * 0.22, 350)
     },
     formContainer: {
         width: '100%',

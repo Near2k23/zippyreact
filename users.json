@@ -1,0 +1,77 @@
+{"users": [
+{
+  "localId": "-OXOfh-0qARcPyiJH0s1",
+  "email": "proyectos@tecnosolagencia.com",
+  "emailVerified": true,
+  "passwordHash": "PcCYftTqe+Ar+jdqnA5JczbpItJVpcy5bkstOz/ZtYv33clYDMcLkgKKMhT8bpD91rJsVTZuQFelRVWaKGKEhQ==",
+  "salt": "2++r8ZfwWw+u2w==",
+  "lastSignedInAt": "1754954168128",
+  "createdAt": "1754925031887",
+  "phoneNumber": "+11234567890",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "6jGDhMDbGQS16OFMReksG95IQvA2",
+  "email": "driver@waygo.com",
+  "emailVerified": true,
+  "passwordHash": "zOXO6r+J+OZJT9Kl9IPZ3LxG6vvfpeu9fLeIcsWkJ2jX/rZfjNWPAJIl0H/rYXA1toQu08nv1VRT6lCbKIOZNA==",
+  "salt": "XWbWZT+jWtbIEg==",
+  "lastSignedInAt": "1756304311159",
+  "createdAt": "1756121289178",
+  "phoneNumber": "+573222222222",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "admin0001",
+  "email": "yorksvn@gmail.com",
+  "emailVerified": true,
+  "passwordHash": "E1D9YTmjlSzbcYmXvDyx1Cyk9DdHQZ1L7hnuPRr9M0t7G0azH7DrKGQzytFXXqUX4GjdvztowOelZ+qrsSEorw==",
+  "salt": "ts4yo9OH07AuFQ==",
+  "displayName": "York",
+  "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocJ1Ni4Es19abeuCQUaMmiPF0BxA6CIkfCKPQSB3lWDbviegxPTC=s96-c",
+  "lastSignedInAt": "1756434724168",
+  "createdAt": "1754814946609",
+  "phoneNumber": "+573008660666",
+  "disabled": false,
+  "providerUserInfo": [
+    {
+      "providerId": "google.com",
+      "rawId": "106469123986958845164",
+      "email": "yorksvn@gmail.com",
+      "displayName": "York",
+      "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocJ1Ni4Es19abeuCQUaMmiPF0BxA6CIkfCKPQSB3lWDbviegxPTC=s96-c"
+    }
+  ]
+},
+{
+  "localId": "bEenAUm6HkWgBY0UfTFxQfKro852",
+  "lastSignedInAt": "1756324032674",
+  "createdAt": "1756026869205",
+  "phoneNumber": "+573000000000",
+  "providerUserInfo": []
+},
+{
+  "localId": "g0rpSpL61dN3w3iDlnT7MaH1YGg2",
+  "email": "yorkvn@icloud.com",
+  "emailVerified": true,
+  "passwordHash": "Od262B9wp1ALOrS3MGGv53gAzzA4dvXAi6WRtLdBw2D2cQDq4W36fCHuH/vcsn0/SQIMyk1G3yV7HbEdQAFPOQ==",
+  "salt": "sRvF01uk3uJTcw==",
+  "lastSignedInAt": "1755939238048",
+  "createdAt": "1755935076070",
+  "disabled": false,
+  "providerUserInfo": []
+},
+{
+  "localId": "wl2AaR4GCdelWXotEhNtKqFkCmZ2",
+  "email": "rider@waygo.com",
+  "emailVerified": true,
+  "passwordHash": "tKQZqz3uTquE4kFu1BeivHzX4o/F1y4P7TbMxdgddicNFTd+ywLWDu5nBSPi9FzgnyN9oe08/+ATAGOmmARo/A==",
+  "salt": "co4obJnBn/Oilw==",
+  "lastSignedInAt": "1756429294540",
+  "createdAt": "1756026560024",
+  "phoneNumber": "+573008888888",
+  "disabled": false,
+  "providerUserInfo": []
+}]}

@@ -13,7 +13,8 @@ import {
     Platform,
     FlatList,
     Alert,
-    useColorScheme
+    useColorScheme,
+    Keyboard
 } from 'react-native';
 import { Button } from 'react-native-elements';
 import StarRating from 'react-native-star-rating-widget';
@@ -238,6 +239,11 @@ export default function DriverRating(props) {
                                 onChangeText={(text) => setState({ ...state, feedback: text })}
                                 value={state.feedback}
                                 numberOfLines={10}
+                                returnKeyType="done"
+                                blurOnSubmit={true}
+                                onSubmitEditing={() => {
+                                    Keyboard.dismiss();
+                                }}
                             />
                         </View>
                         {!settings.disable_tips && (
@@ -269,6 +275,7 @@ export default function DriverRating(props) {
                                         placeholder={t('tipamount') + " (" + settings.symbol + ")"}
                                         placeholderTextColor={colors.SHADOW}
                                         keyboardType={'number-pad'}
+                                        returnKeyType="done"
                                         onChangeText={(text) => setAmount(parseFloat(text))}
                                         value={amount? amount.toString(): ""}
                                     />

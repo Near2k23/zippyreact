@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  Alert,
   Keyboard,
   Image,
   Modal,
@@ -125,10 +126,12 @@ export default function SearchScreen(props) {
   }, [settingsdata]);
 
   const setAddressOnMap = (item)=>{
-    props.navigation.navigate('Map', {
-      locationType: locationType,
-      selectFromMap: true
-    });
+    props.navigation.dispatch(StackActions.pop(1));
+    if(locationType == 'pickup'){
+      dispatch(updateTripPickup({...tripdata.pickup, source:"mapSelect"}));
+    }else{
+      dispatch(updateTripDrop({...tripdata.drop, source:"mapSelect"}));
+    }
   }
 
   useEffect(() => {
@@ -206,12 +209,7 @@ export default function SearchScreen(props) {
             props.navigation.dispatch(StackActions.pop(1));
           }
         } else {
-          setDialogData({
-            title: t('alert'),
-            message: t('place_to_coords_error'),
-            type: 'warning'
-          });
-          setDialogVisible(true);
+          Alert.alert(t('alert'), t('place_to_coords_error'));
         }
       });
     } else {
@@ -309,25 +307,9 @@ export default function SearchScreen(props) {
   }
 
   const saveLocation = (item)=>{
+    setLoading(true);
     if(item && saveNameValue && ((saveNameValue== t('other') && addressName) || saveNameValue!= t('other'))){
       let name = saveNameValue== t('other') ? addressName : saveNameValue
-      if (saveNameValue === t('home') || saveNameValue === t('work')) {
-        const existingAddress = savedAddresses.find(addr => addr.name === saveNameValue.toLowerCase());
-        if (existingAddress) {
-          setDialogData({
-            title: t('alert'),
-            message: t('address_already_exists_error'),
-            type: 'warning',
-            onConfirm: () => {
-              setDialogVisible(false);
-            }
-          });
-          setDialogVisible(true);
-          return;
-        }
-      }
-      
-      setLoading(true);
       fetchCoordsfromPlace(item.place_id).then((res) => {
         if (res && res.lat) {
           let dropObj = {
@@ -347,16 +329,7 @@ export default function SearchScreen(props) {
         setSaveNameValue('')
       },3000)
     }else{
-      setDialogData({
-        title: t('alert'),
-        message: t('no_details_error'),
-        type: 'warning',
-        onConfirm: () => {
-          setLoading(false);
-          setDialogVisible(false);
-        }
-      });
-      setDialogVisible(true);
+      setLoading(false);
     }
   }
 
@@ -367,18 +340,7 @@ export default function SearchScreen(props) {
   }
 
   const onPressDelete = (item) =>{
-    setDialogData({
-      title: t('confirm'),
-      message: t('confirm_delete_saved_address'),
-      type: 'warning',
-      icon: 'alert-octagon-outline',
-      iconColor: colors.RED,
-      onConfirm: () => {
-        dispatch(editAddress(profile.uid, item, 'Delete'));
-        setDialogVisible(false);
-      }
-    });
-    setDialogVisible(true);
+    dispatch(editAddress(profile.uid, item, 'Delete'));
   }
 
   const closeModel = () => {
@@ -389,21 +351,28 @@ export default function SearchScreen(props) {
     setSaveNameValue('')
   }
 
+  const cancelAddress = () => {
+    setSearchKeyword2('')
+    setAddressName('')
+    setAddress('')
+    setSaveNameValue('')
+  }
+
 
 
   return (
     <View style={{flex:1, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}}>
       <View style={{flex: 1,backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, height:'100%', width: '100%', alignContent: 'center', alignItems:'center' }}>
 
-      <View style={[mode === 'dark' ? styles.addressBarDark : styles.addressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={[styles.contentStyle]}>
+      <View style={[mode === 'dark' ? styles.modernAddressBarDark : styles.modernAddressBar]}>
+        <View style={styles.modernContentStyle}>
           {locationType == 'drop' ?
-            <View style={[styles.addressBox, {flexDirection:isRTL? 'row-reverse':'row', gap: 5}]}>
-              <View style={{height: 16, width: 16, borderRadius: 8, borderColor: colors.GREEN, borderWidth: 1, justifyContent: 'center', alignItems: 'center'}}>
-                <View style={{height: 10, width: 10, borderRadius: 5, backgroundColor: colors.GREEN }}></View>
+            <View style={[styles.modernAddressBox, {flexDirection:isRTL? 'row-reverse':'row'}]}>
+              <View style={styles.modernPickupIcon}>
+                <View style={styles.modernPickupDot}></View>
               </View>
-              <View style={[styles.addressStyle1, {flexDirection:isRTL? 'row-reverse':'row', borderBottomColor: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
-                <Text numberOfLines={1} style={[mode === 'dark' ? styles.textStyleDark : styles.textStyle, { textAlign: isRTL ? "right" : "left", fontSize: 14 }]}>{tripdata.pickup && tripdata.pickup.add ? tripdata.pickup.add : t('map_screen_where_input_text')}</Text>
+              <View style={[styles.modernAddressContent, {flexDirection:isRTL? 'row-reverse':'row'}]}>
+                <Text numberOfLines={1} style={[mode === 'dark' ? styles.modernTextDark : styles.modernText, { textAlign: isRTL ? "right" : "left" }]}>{tripdata.pickup && tripdata.pickup.add ? tripdata.pickup.add : t('map_screen_where_input_text')}</Text>
               </View>
             </View>
           : null }
@@ -413,40 +382,40 @@ export default function SearchScreen(props) {
               data={selLocations}
               renderItem={({ item, index }) => {
                 return (
-                <View key={"key" + index} style={[styles.addressBox, {flexDirection:isRTL? 'row-reverse':'row', marginBottom: 1, width: width-12, gap: 5}]}>
-                  <View style={[styles.multiAddressChar,{borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
-                    <Text style={{fontFamily:fonts.Bold, fontSize: 14, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{String.fromCharCode(65+index)}</Text> 
+                <View key={"key" + index} style={[styles.modernMultiAddressBox, {flexDirection:isRTL? 'row-reverse':'row'}]}>
+                  <View style={[styles.modernMultiAddressChar, {backgroundColor: mode === 'dark' ? colors.WHITE : colors.BLUE}]}>
+                    <Text style={[styles.modernMultiAddressCharText, {color: mode === 'dark' ? colors.BLACK : colors.WHITE}]}>{String.fromCharCode(65+index)}</Text> 
                   </View>
-                  <View style={[styles.multiAddressStyle, {flexDirection:isRTL? 'row-reverse':'row', borderBottomColor: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>
-                    <Text numberOfLines={1} style={[mode === 'dark' ? styles.textStyleDark : styles.textStyle, {textAlign: isRTL ? "right" : "left", width: width-80 }]}>{item.add}</Text>
+                  <View style={styles.modernMultiAddressContent}>
+                    <Text numberOfLines={1} style={[mode === 'dark' ? styles.modernTextDark : styles.modernText, {textAlign: isRTL ? "right" : "left"}]}>{item.add}</Text>
                   </View>
-                  <TouchableOpacity style={[styles.dropremove,{ borderBottomColor: mode === 'dark' ? colors.WHITE : colors.BLACK}]} onPress={() => removeItem(index)}>
-                    <Entypo name="cross" size={24} color= {mode === 'dark' ? colors.WHITE : colors.SECONDARY} style={{borderLeftWidth: 1, borderLeftColor: mode === 'dark' ? colors.WHITE : colors.SECONDARY}}/>
+                  <TouchableOpacity style={styles.modernRemoveButton} onPress={() => removeItem(index)}>
+                    <Entypo name="cross" size={20} color={mode === 'dark' ? colors.WHITE : colors.RED}/>
                   </TouchableOpacity>
                 </View>
                 );
               }}
               keyExtractor={(item) => item.add}
-              style={styles.multiLocation}
+              style={styles.modernMultiLocation}
             />
           : null}
     
-          <View style={styles.addressStyle2}>
-            <View style={[styles.autocompleteMain, { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 5}]}>
-              {locationType == 'pickup' ?
-                <View style={{height: 16, width: 16, borderRadius: 8, borderColor: colors.GREEN, borderWidth: 1, justifyContent: 'center', alignItems: 'center'}}>
-                  <View style={{height: 10, width: 10, borderRadius: 5, backgroundColor: colors.GREEN }}></View>
-                </View>
-              :
-              <View style={{height: 16, width: 16, borderRadius: 8, borderColor: colors.RED, borderWidth: 1, justifyContent: 'center', alignItems: 'center'}}>
-                <View style={{height: 10, width: 10, borderRadius: 5, backgroundColor: colors.RED }}></View>
+          <View style={[styles.modernAddressBox, {flexDirection:isRTL? 'row-reverse':'row'}]}>
+            {locationType == 'pickup' ?
+              <View style={styles.modernPickupIcon}>
+                <View style={styles.modernPickupDot}></View>
               </View>
-              }
+            :
+              <View style={styles.modernDestinationIcon}>
+                <View style={styles.modernDestinationDot}></View>
+              </View>
+            }
+            <View style={styles.modernAddressContent}>
               <TextInput
                 placeholder={t('search_for_an_address')}
                 returnKeyType="search"
-                style={[mode === 'dark' ? styles.searchBoxDark : styles.searchBox, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]}
-                placeholderTextColor= {mode === 'dark' ? colors.WHITE : colors.BLACK}
+                style={[mode === 'dark' ? styles.modernSearchBoxDark : styles.modernSearchBox, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]}
+                placeholderTextColor= {mode === 'dark' ? colors.WHITE : colors.SECONDARY}
                 onChangeText={(text) => searchLocation(text)}
                 value={searchKeyword}
               />
@@ -626,15 +595,15 @@ export default function SearchScreen(props) {
             <View style={styles.categoryContainer}>
               <View style={[styles.categoryGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 {saveName.map((item, index) => (
-                                      <TouchableOpacity
-                      key={index}
-                      style={[styles.categoryCard, {
-                        backgroundColor: item.value === saveNameValue 
-                          ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
-                          : 'transparent'
-                      }]}
-                      onPress={() => setSaveNameValue(item.value)}
-                    >
+                                    <TouchableOpacity
+                    key={index}
+                    style={[styles.categoryCard, {
+                      backgroundColor: item.value === saveNameValue 
+                        ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                        : 'transparent'
+                    }]}
+                    onPress={() => setSaveNameValue(item.value)}
+                  >
                     <Icon
                       name={item.icon}
                       type={item.type}
@@ -843,25 +812,35 @@ const styles = StyleSheet.create({
     fontFamily:fonts.Regular
   },
   description: {
-    color: colors.BLACK,
-    textAlign: 'left',
-    fontSize: 14
-  },
+     color: colors.BLACK,
+     textAlign: 'left',
+     fontSize: 15,
+     fontFamily: fonts.Regular,
+     lineHeight: 20
+   },
   resultItem: {
-    width: '100%',
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    backgroundColor: colors.TRANSPARENT,
-    alignItems: 'flex-start',
-    height: 40,
-    justifyContent:'center',
-    borderBottomWidth: .5,
-    paddingHorizontal: 5
-  },
+     width: '100%',
+     justifyContent: 'center',
+     borderBottomWidth: 0,
+     backgroundColor: colors.WHITE,
+     alignItems: 'flex-start',
+     minHeight: 56,
+     justifyContent:'center',
+     paddingHorizontal: 16,
+     paddingVertical: 12,
+     marginVertical: 2,
+     borderRadius: 12,
+     shadowColor: colors.BLACK,
+     shadowOffset: { width: 0, height: 1 },
+     shadowOpacity: 0.04,
+     shadowRadius: 2,
+     elevation: 1
+   },
   searchResultsContainer: {
-    width: width,
-    paddingHorizontal: 5
-  },
+      width: width,
+      paddingHorizontal: 16,
+      paddingTop: 12
+    },
   headerTitleStyle: {
     color: colors.WHITE,
     fontFamily: fonts.Bold,
@@ -1112,45 +1091,50 @@ const styles = StyleSheet.create({
     flex: 1
   },
   savedAddressCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    shadowColor: colors.BLACK,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
-  },
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginBottom: 16,
+     borderRadius: 16,
+     borderWidth: 0,
+     padding: 20,
+     backgroundColor: colors.WHITE,
+     shadowColor: colors.BLACK,
+     shadowOffset: {
+       width: 0,
+       height: 4,
+     },
+     shadowOpacity: 0.08,
+     shadowRadius: 8,
+     elevation: 4,
+   },
   savedAddressContent: {
     flex: 1,
     alignItems: 'center'
   },
   addressIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
+     width: 48,
+     height: 48,
+     borderRadius: 24,
+     justifyContent: 'center',
+     alignItems: 'center',
+     marginRight: 16
+   },
   addressInfo: {
     flex: 1
   },
   addressName: {
-    fontSize: 16,
-    fontFamily: fonts.Bold,
-    marginBottom: 4
-  },
-  addressDescription: {
-    fontSize: 13,
-    fontFamily: fonts.Regular,
-    lineHeight: 18
-  },
+     fontSize: 18,
+     fontFamily: fonts.Bold,
+     marginBottom: 6,
+     color: colors.BLACK
+   },
+   addressDescription: {
+     fontSize: 14,
+     fontFamily: fonts.Regular,
+     lineHeight: 20,
+     color: colors.SECONDARY,
+     opacity: 0.8
+   },
   deleteButton: {
     padding: 8,
     marginLeft: 8
@@ -1166,6 +1150,8 @@ const styles = StyleSheet.create({
     fontFamily: fonts.Medium,
     textAlign: 'center'
   },
+
+
 
   dropremove:{
     justifyContent: 'center',
@@ -1199,33 +1185,169 @@ const styles = StyleSheet.create({
     marginRight: 10
   },
   optionCard:{
-    height: 56,
-    width: width-10,
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    backgroundColor: colors.WHITE,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E9EC',
-    shadowColor: colors.BLACK,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1
-  },
+      height: 64,
+      width: width-32,
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      backgroundColor: colors.WHITE,
+      borderRadius: 16,
+      borderWidth: 0,
+      shadowColor: colors.BLACK,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
+      elevation: 3,
+      marginVertical: 6,
+      marginHorizontal: 16
+    },
   optionCardDark:{
-    height: 56,
-    width: width-10,
+      height: 64,
+      width: width-32,
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      backgroundColor: colors.PAGEBACK,
+      borderRadius: 16,
+      borderWidth: 0,
+      shadowColor: colors.SHADOW,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
+      elevation: 3,
+      marginVertical: 6,
+      marginHorizontal: 16
+    },
+  modernAddressBar: {
+     marginVertical: 8,
+     marginHorizontal: 16,
+     width: width - 32,
+     backgroundColor: colors.WHITE,
+     shadowColor: colors.BLACK,
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.1,
+     shadowRadius: 4,
+     borderRadius: 12,
+     elevation: 3,
+     paddingVertical: 20,
+     paddingHorizontal: 20
+   },
+  modernAddressBarDark: {
+     marginVertical: 8,
+     marginHorizontal: 16,
+     width: width - 32,
+     backgroundColor: colors.PAGEBACK,
+     shadowColor: colors.SHADOW,
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.1,
+     shadowRadius: 4,
+     borderRadius: 12,
+     elevation: 3,
+     paddingVertical: 20,
+     paddingHorizontal: 20
+   },
+  modernContentStyle: {
+     justifyContent: 'center',
+     width: '100%',
+     alignItems: 'center',
+     gap: 8
+   },
+  modernAddressBox: {
+     width: '100%',
+     alignItems: 'center',
+     paddingVertical: 12,
+     marginVertical: 4
+   },
+  modernPickupIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderColor: colors.GREEN,
+    borderWidth: 2,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    backgroundColor: colors.PAGEBACK,
+    marginRight: 12
+  },
+  modernPickupDot: {
+    height: 8,
+    width: 8,
+    borderRadius: 4,
+    backgroundColor: colors.GREEN
+  },
+  modernDestinationIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderColor: colors.RED,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12
+  },
+  modernDestinationDot: {
+    height: 8,
+    width: 8,
+    borderRadius: 4,
+    backgroundColor: colors.RED
+  },
+  modernAddressContent: {
+    flex: 1,
+    justifyContent: 'center'
+  },
+  modernText: {
+    fontFamily: fonts.Regular,
+    fontSize: 14,
+    color: colors.BLACK,
+    lineHeight: 20
+  },
+  modernTextDark: {
+    fontFamily: fonts.Regular,
+    fontSize: 14,
+    color: colors.WHITE,
+    lineHeight: 20
+  },
+  modernMultiLocation: {
+    width: '100%',
+    maxHeight: 200
+  },
+  modernMultiAddressBox: {
+     width: '100%',
+     alignItems: 'center',
+     paddingVertical: 12,
+     marginVertical: 4,
+     borderTopWidth: 1,
+     borderTopColor: '#E2E9EC'
+   },
+  modernMultiAddressChar: {
+    height: 24,
+    width: 24,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.WHITE,
-    shadowColor: colors.SHADOW,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1
-  }
-})
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12
+  },
+  modernMultiAddressCharText: {
+    fontSize: 12,
+    fontFamily: fonts.Bold
+  },
+  modernMultiAddressContent: {
+    flex: 1,
+    justifyContent: 'center'
+  },
+  modernRemoveButton: {
+     padding: 4,
+     marginLeft: 8
+   },
+   modernSearchBox: {
+     fontSize: 14,
+     fontFamily: fonts.Regular,
+     color: colors.BLACK,
+     paddingVertical: 8,
+     paddingHorizontal: 0
+   },
+   modernSearchBoxDark: {
+     fontSize: 14,
+     fontFamily: fonts.Regular,
+     color: colors.WHITE,
+     paddingVertical: 8,
+     paddingHorizontal: 0
+   }
+ })

@@ -216,19 +216,21 @@ const SmsSettings = (props) => {
   const classes = useStyles();
   const [data, setData] = useState();
   const [customMobileOTP, setCustomMobileOTP] = useState(false);
+  const [twilioEnabled, setTwilioEnabled] = useState(false);
   const dispatch = useDispatch();
 
   useEffect(() => {
     if (smsDetails) {
         setData(smsDetails);
+        setTwilioEnabled(smsDetails.enabled || false);
     } else {
         setData({
-          apiUrl: "",
-          method: "",
-          authorization: "",
-          contentType: "",
-          body: ""
+          accountSid: "",
+          authToken: "",
+          fromNumber: "",
+          enabled: false
         })
+        setTwilioEnabled(false);
     }                                                                             
   }, [smsDetails]);
 
@@ -242,7 +244,11 @@ const SmsSettings = (props) => {
 
   const handleSubmit = (e) => {
     if (settings.AllowCriticalEditsAdmin) {
-      dispatch(editSmsConfig(data));
+      const twilioConfig = {
+        ...data,
+        enabled: twilioEnabled
+      };
+      dispatch(editSmsConfig(twilioConfig));
       dispatch(editSettings({...settings, customMobileOTP: customMobileOTP}));
     } else {
       alert(t('demo_mode'));
@@ -254,25 +260,23 @@ const SmsSettings = (props) => {
         <Grid item xs={12} sm={12} md={12} lg={12}>
           <Grid item xs={12}>
             <Typography component="h1" variant="h5" className={classes.title} style={{ textAlign: isRTL === 'rtl' ? 'right' : 'left' }}>
-              {t('smssettings_title')}
+              Configuración de Twilio SMS
             </Typography>
           </Grid>
          <div className={classes.container1}>
             <Grid container spacing={2} style={{direction:isRTL ==='rtl'?'rtl':'ltr'}} >
                 <Grid item xs={12} sm={12} md={12} lg={12}>
-                    <TextField
-                        InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
-                        className={isRTL ==="rtl"? classes.rootRtl:classes.textField}
-                        variant="outlined"
-                        margin="normal"
-                        required
-                        fullWidth
-                        id="apiUrl"
-                        label={t('apiUrl')}
-                        name="apiUrl"
-                        autoComplete="apiUrl"
-                        onChange={(e)=> setData({...data, apiUrl: e.target.value})}
-                        value={settings.AllowCriticalEditsAdmin ? (data && data.apiUrl? data.apiUrl: "") :"Hidden for Demo"}
+                    <FormControlLabel
+                        style={{ flexDirection: isRTL === 'rtl' ? 'row' : 'row-reverse', paddingTop:10, paddingBottom:15, marginLeft:5 }}
+                        label={ <Typography className={classes.typography}>Habilitar Twilio SMS</Typography>}
+                        control={
+                            <Switch
+                                checked={twilioEnabled}
+                                onChange={(e)=> setTwilioEnabled(e.target.checked)}
+                                name="twilioEnabled"
+                                color="primary"
+                            />
+                        }
                     />
                     <TextField
                         InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
@@ -281,51 +285,44 @@ const SmsSettings = (props) => {
                         margin="normal"
                         required
                         fullWidth
-                        id="method"
-                        label={t('method')}
-                        name="method"
-                        autoComplete="method"
-                        onChange={(e)=> setData({...data, method: e.target.value})}
-                        value={settings.AllowCriticalEditsAdmin ?  (data && data.method? data.method: "") :"Hidden for Demo"}
+                        id="accountSid"
+                        label="Account SID"
+                        name="accountSid"
+                        autoComplete="accountSid"
+                        disabled={!twilioEnabled}
+                        onChange={(e)=> setData({...data, accountSid: e.target.value})}
+                        value={settings.AllowCriticalEditsAdmin ? (data && data.accountSid? data.accountSid: "") :"Hidden for Demo"}
                     />
                     <TextField
                         InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
                         className={isRTL ==="rtl"? classes.rootRtl:classes.textField}
                         variant="outlined"
                         margin="normal"
+                        required
                         fullWidth
-                        id="authorization"
-                        label={t('authorization')}
-                        name="authorization"
-                        autoComplete="authorization"
-                        onChange={(e)=> setData({...data, authorization: e.target.value})}
-                        value={settings.AllowCriticalEditsAdmin ?  (data && data.authorization? data.authorization: "") :"Hidden for Demo"}
+                        type="password"
+                        id="authToken"
+                        label="Auth Token"
+                        name="authToken"
+                        autoComplete="authToken"
+                        disabled={!twilioEnabled}
+                        onChange={(e)=> setData({...data, authToken: e.target.value})}
+                        value={settings.AllowCriticalEditsAdmin ?  (data && data.authToken? data.authToken: "") :"Hidden for Demo"}
                     />
                     <TextField
                         InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
                         className={isRTL ==="rtl"? classes.rootRtl:classes.textField}
                         variant="outlined"
                         margin="normal"
+                        required
                         fullWidth
-                        id="contentType"
-                        label={t('contentType')}
-                        name="contentType"
-                        autoComplete="contentType"
-                        onChange={(e)=> setData({...data, contentType: e.target.value})}
-                        value={settings.AllowCriticalEditsAdmin ? (data && data.contentType? data.contentType: "") :"Hidden for Demo"}
-                    />
-                    <TextField
-                        InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
-                        className={isRTL ==="rtl"? classes.rootRtl:classes.textField}
-                        variant="outlined"
-                        margin="normal"
-                        fullWidth
-                        id="body"
-                        label={t('body')}
-                        name="body"
-                        autoComplete="body"
-                        onChange={(e)=> setData({...data, body: e.target.value})}
-                        value={settings.AllowCriticalEditsAdmin ?  (data && data.body? data.body: "") :"Hidden for Demo"}
+                        id="fromNumber"
+                        label="Número de Twilio (ej: +1234567890)"
+                        name="fromNumber"
+                        autoComplete="fromNumber"
+                        disabled={!twilioEnabled}
+                        onChange={(e)=> setData({...data, fromNumber: e.target.value})}
+                        value={settings.AllowCriticalEditsAdmin ?  (data && data.fromNumber? data.fromNumber: "") :"Hidden for Demo"}
                     />
                     <FormControlLabel
                         style={{ flexDirection: isRTL === 'rtl' ? 'row' : 'row-reverse', paddingTop:10, paddingBottom:15, marginLeft:5 }}
@@ -345,8 +342,9 @@ const SmsSettings = (props) => {
                         variant="contained" 
                         color="secondaryButton"
                         className={classes.buttonStyle}
+                        disabled={!twilioEnabled}
                     >
-                      <Typography style={{fontFamily:FONT_FAMILY, wordBreak:"break-word",whiteSpace: 'normal',fontSize: '14px', textOverflow:"ellipsis"}}>{t('submit')}</Typography>
+                      <Typography style={{fontFamily:FONT_FAMILY, wordBreak:"break-word",whiteSpace: 'normal',fontSize: '14px', textOverflow:"ellipsis"}}>Guardar Configuración</Typography>
                     </Button>
                 </Grid>
             </Grid>
