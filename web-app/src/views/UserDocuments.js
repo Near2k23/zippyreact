@@ -1,57 +1,221 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Typography, Grid, Card, Avatar, Button } from "@mui/material";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { 
+  Typography, 
+  Grid, 
+  Card, 
+  Avatar, 
+  Button, 
+  Dialog, 
+  DialogContent, 
+  IconButton, 
+  Box,
+  Fade,
+  Backdrop,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip
+} from "@mui/material";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 import { colors } from "../components/Theme/WebTheme";
 import CircularLoading from "../components/CircularLoading";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
 import AlertDialog from "../components/AlertDialog";
 import { api } from "common";
+import { updateUserDocumentStatus } from "common/src/actions/usersactions";
 import { MAIN_COLOR, SECONDORY_COLOR, FONT_FAMILY } from "../common/sharedFunctions";
 import { makeStyles } from "@mui/styles";
 import GoBackButton from "components/GoBackButton";
 
 const useStyles = makeStyles((theme) => ({
-  card: {
-    borderRadius: "10px",
-    backgroundColor: SECONDORY_COLOR,
-    minHeight: 60,
-    minWidth: 300,
+  mainContainer: {
+    background: `linear-gradient(135deg, ${colors.WHITE} 0%, ${SECONDORY_COLOR} 100%)`,
+    minHeight: "100vh",
+    padding: theme.spacing(2),
+  },
+  documentCard: {
+    borderRadius: "24px",
+    backgroundColor: colors.WHITE,
+    boxShadow: "0 20px 40px rgba(0, 141, 153, 0.1)",
+    border: `1px solid ${colors.TABLE_BORDER}`,
+    overflow: "hidden",
+    transition: "all 0.3s ease",
+    "&:hover": {
+      boxShadow: "0 25px 50px rgba(0, 141, 153, 0.15)",
+      transform: "translateY(-2px)",
+    },
+  },
+  imageCard: {
+    borderRadius: "20px",
+    backgroundColor: colors.WHITE,
+    boxShadow: "0 8px 25px rgba(0, 0, 0, 0.08)",
+    border: `2px solid ${colors.TABLE_BORDER}`,
+    padding: theme.spacing(2),
+    margin: theme.spacing(1),
+    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+    cursor: "pointer",
+    position: "relative",
+    overflow: "hidden",
+    height: 400,
+    display: "flex",
+    flexDirection: "column",
+    "&:hover": {
+      transform: "translateY(-8px) scale(1.02)",
+      boxShadow: "0 15px 35px rgba(0, 141, 153, 0.2)",
+      borderColor: MAIN_COLOR,
+    },
+    "&:hover .zoom-overlay": {
+      opacity: 1,
+    },
+  },
+  imageContainer: {
+    position: "relative",
+    borderRadius: "16px",
+    overflow: "hidden",
+    "&:hover .zoom-icon": {
+      opacity: 1,
+      transform: "scale(1.1)",
+    },
+  },
+  zoomOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 141, 153, 0.8)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    textAlign: "center",
-    padding: 2,
-    marginBottom: 10,
-    boxShadow: `0px 2px 5px ${MAIN_COLOR}`,
+    opacity: 0,
+    transition: "all 0.3s ease",
+    borderRadius: "16px",
   },
-  avatar: {
-    width: 300,
-    height: 250,
+  zoomIcon: {
+    color: colors.WHITE,
+    fontSize: 48,
+    transition: "all 0.3s ease",
+    opacity: 0,
+  },
+  uploadArea: {
+    width: "100%",
+    height: 280,
     display: "flex",
     flexDirection: "column",
-    boxShadow: 3,
-    border: `2px dashed ${colors.TABLE_BORDER}`,
-    fontSize: 16,
-    background: "none",
-    color: "inherit",
-    fontWeight: "bold",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "20px",
+    border: `3px dashed ${colors.TABLE_BORDER}`,
+    backgroundColor: `${SECONDORY_COLOR}20`,
+    cursor: "pointer",
+    transition: "all 0.3s ease",
+    position: "relative",
+    overflow: "hidden",
+    flex: 1,
+    "&:hover": {
+      borderColor: MAIN_COLOR,
+      backgroundColor: `${MAIN_COLOR}10`,
+      transform: "scale(1.02)",
+    },
+    "&:hover .upload-icon": {
+      transform: "scale(1.1) rotate(5deg)",
+      color: MAIN_COLOR,
+    },
+  },
+  uploadIcon: {
+    fontSize: 80,
+    color: colors.TABLE_BORDER,
+    marginBottom: theme.spacing(2),
+    transition: "all 0.3s ease",
   },
   buttonStyle: {
-    borderRadius: "19px",
-    minHeight: 50,
-    minWidth: 150,
-    marginBottom: 20,
-    marginTop: 20,
+    borderRadius: "25px",
+    minHeight: 56,
+    minWidth: 160,
+    margin: theme.spacing(1),
     textAlign: "center",
     cursor: "pointer",
-    boxShadow: `0px 2px 5px ${SECONDORY_COLOR}`,
     fontFamily: FONT_FAMILY,
+    fontWeight: 600,
+    textTransform: "none",
+    fontSize: "16px",
+    boxShadow: "0 4px 15px rgba(0, 141, 153, 0.2)",
+    transition: "all 0.3s ease",
     "&:hover": {
-      backgroundColor: MAIN_COLOR,
+      transform: "translateY(-2px)",
+      boxShadow: "0 8px 25px rgba(0, 141, 153, 0.3)",
     },
-  }
+  },
+  previewDialog: {
+    "& .MuiDialog-paper": {
+      borderRadius: "20px",
+      maxWidth: "90vw",
+      maxHeight: "90vh",
+      backgroundColor: "transparent",
+      boxShadow: "none",
+    },
+  },
+  previewImage: {
+    maxWidth: "100%",
+    maxHeight: "80vh",
+    borderRadius: "16px",
+    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+    cursor: "grab",
+    transition: "transform 0.1s ease",
+    userSelect: "none",
+    zIndex: 1,
+    "&:active": {
+      cursor: "grabbing",
+    },
+    "&:hover": {
+      transform: "scale(1.02)",
+    },
+  },
+  previewContainer: {
+    position: "relative",
+    overflow: "hidden",
+    width: "100%",
+    height: "80vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  closeButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    color: colors.WHITE,
+    zIndex: 1000,
+    "&:hover": {
+      backgroundColor: "rgba(0, 0, 0, 0.9)",
+      transform: "scale(1.1)",
+    },
+    transition: "all 0.2s ease-in-out",
+  },
+  documentStatusCard: {
+    borderRadius: "16px",
+    backgroundColor: colors.WHITE,
+    boxShadow: "0 4px 20px rgba(0, 0, 0, 0.1)",
+    border: `1px solid ${colors.TABLE_BORDER}`,
+    padding: theme.spacing(3),
+    margin: theme.spacing(1),
+    transition: "all 0.3s ease",
+    "&:hover": {
+      boxShadow: "0 8px 30px rgba(0, 141, 153, 0.15)",
+      transform: "translateY(-2px)",
+    },
+  },
 }));
 
 function UserDocuments() {
@@ -70,10 +234,30 @@ function UserDocuments() {
   const [images, setImages] = useState({
     idImage: null,
     licenseImageFront: null,
-    licenseImageBack: null
+    licenseImageBack: null,
+    vehicleRegistrationCard: null
   });
   const [commonAlert, setCommonAlert] = useState({ open: false, msg: "" });
+  const [previewImage, setPreviewImage] = useState({ open: false, src: "", title: "" });
+  const [isZoomed, setIsZoomed] = useState(false);
+  const [dragState, setDragState] = useState({ isDragging: false, startX: 0, startY: 0, translateX: 0, translateY: 0 });
+  const [zoomLevel, setZoomLevel] = useState(1);
   const classes = useStyles();
+
+  // Estado para gestión de documentos - usando useRef para evitar re-renders
+  const documentStatusesRef = useRef({
+    verifyIdImage: { status: 'pending', note: '' },
+    licenseImageFront: { status: 'pending', note: '' },
+    licenseImageBack: { status: 'pending', note: '' },
+    vehicleRegistrationCard: { status: 'pending', note: '' }
+  });
+  const driverNotesRef = useRef('');
+  const adminNotesRef = useRef('');
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // Estado local para los campos de notas generales
+  const [localDriverNotes, setLocalDriverNotes] = useState('');
+  const [localAdminNotes, setLocalAdminNotes] = useState('');
 
   useEffect(() => {
     dispatch(fetchUsersOnce());
@@ -86,6 +270,17 @@ function UserDocuments() {
         navigate("/404");
       } else {
         setData(user);
+        // Cargar estados de documentos existentes
+        if (user.documentStatus) {
+          documentStatusesRef.current = user.documentStatus;
+        }
+        driverNotesRef.current = user.driver_notes || '';
+        adminNotesRef.current = user.admin_notes || '';
+        
+        // Sincronizar estado local con las refs
+        setLocalDriverNotes(user.driver_notes || '');
+        setLocalAdminNotes(user.admin_notes || '');
+        setForceUpdate(prev => prev + 1); // Forzar re-render para mostrar datos cargados
       }
     }
   }, [staticusers, id, navigate]);
@@ -93,6 +288,48 @@ function UserDocuments() {
   const handleImageChange = useCallback((field) => (e) => {
     setImages(prev => ({ ...prev, [field]: e.target.files[0] }));
   }, []);
+
+  // Funciones para manejar cambios de estado sin causar re-renders
+  const handleStatusChange = useCallback((docType, field, value) => {
+    documentStatusesRef.current = {
+      ...documentStatusesRef.current,
+      [docType]: {
+        ...documentStatusesRef.current[docType],
+        [field]: value,
+        updatedAt: new Date().getTime(),
+        updatedBy: 'admin'
+      }
+    };
+  }, []);
+
+  const handleDriverNotesChange = useCallback((value) => {
+    setLocalDriverNotes(value);
+    driverNotesRef.current = value;
+  }, []);
+
+  const handleAdminNotesChange = useCallback((value) => {
+    setLocalAdminNotes(value);
+    adminNotesRef.current = value;
+  }, []);
+
+  // Funciones helper para colores y textos
+  const getStatusColor = useCallback((status) => {
+    switch(status) {
+      case 'approved': return 'success';
+      case 'rejected': return 'error';
+      case 'pending': 
+      default: return 'warning';
+    }
+  }, []);
+
+  const getStatusText = useCallback((status) => {
+    switch(status) {
+      case 'approved': return t('approved');
+      case 'rejected': return t('rejected');
+      case 'pending':
+      default: return t('pending');
+    }
+  }, [t]);
 
   const handleSaveUser = useCallback(() => {
     setLoading(true);
@@ -108,7 +345,7 @@ function UserDocuments() {
         setCommonAlert({ open: true, msg: t("no_doc_uploaded") });
       }
       setTimeout(() => {
-        setImages({ idImage: null, licenseImageFront: null, licenseImageBack: null });
+        setImages({ idImage: null, licenseImageFront: null, licenseImageBack: null, vehicleRegistrationCard: null });
         setEditable(false);
         setLoading(false);
         dispatch(fetchUsersOnce());
@@ -120,9 +357,87 @@ function UserDocuments() {
   }, [settings.AllowCriticalEditsAdmin, images, data.id, dispatch, t, fetchUsersOnce, updateLicenseImage]);
 
   const handleCancel = useCallback(() => {
-    setImages({ idImage: null, licenseImageFront: null, licenseImageBack: null });
+    setImages({ idImage: null, licenseImageFront: null, licenseImageBack: null, vehicleRegistrationCard: null });
     setEditable(false);
   }, []);
+
+  const handleSaveDocumentStatuses = useCallback(async () => {
+    setLoading(true);
+    
+    const updateData = {
+      documentStatus: documentStatusesRef.current,
+      driver_notes: driverNotesRef.current,
+      admin_notes: adminNotesRef.current
+    };
+    
+    // Verificar si algún documento fue rechazado para enviar notificación
+    const rejectedDocs = Object.entries(documentStatusesRef.current).filter(
+      ([key, val]) => val.status === 'rejected'
+    );
+    
+    await dispatch(updateUserDocumentStatus(data.id, updateData, rejectedDocs.length > 0));
+    
+    setLoading(false);
+    setCommonAlert({ open: true, msg: t('document_status_updated') });
+  }, [data.id, dispatch, t]);
+
+  const handleImagePreview = useCallback((imageUrl, title) => {
+    if (imageUrl) {
+      setPreviewImage({ open: true, src: imageUrl, title });
+      setIsZoomed(false);
+      setZoomLevel(1);
+      setDragState({ isDragging: false, startX: 0, startY: 0, translateX: 0, translateY: 0 });
+    }
+  }, []);
+
+  const handleClosePreview = useCallback(() => {
+    setPreviewImage({ open: false, src: "", title: "" });
+    setIsZoomed(false);
+    setZoomLevel(1);
+    setDragState({ isDragging: false, startX: 0, startY: 0, translateX: 0, translateY: 0 });
+  }, []);
+
+  const handleImageClick = useCallback((e) => {
+    e.preventDefault();
+    if (e.detail === 2) {
+      const newZoomLevel = zoomLevel === 1 ? 2 : 1;
+      setZoomLevel(newZoomLevel);
+      setIsZoomed(newZoomLevel > 1);
+    }
+  }, [zoomLevel]);
+
+  const handleMouseDown = useCallback((e) => {
+    if (zoomLevel > 1) {
+      setDragState(prev => ({
+        ...prev,
+        isDragging: true,
+        startX: e.clientX - prev.translateX,
+        startY: e.clientY - prev.translateY
+      }));
+    }
+  }, [zoomLevel]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (dragState.isDragging && zoomLevel > 1) {
+      setDragState(prev => ({
+        ...prev,
+        translateX: e.clientX - prev.startX,
+        translateY: e.clientY - prev.startY
+      }));
+    }
+  }, [dragState.isDragging, zoomLevel]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragState(prev => ({ ...prev, isDragging: false }));
+  }, []);
+
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newZoomLevel = Math.max(0.5, Math.min(3, zoomLevel + delta));
+    setZoomLevel(newZoomLevel);
+    setIsZoomed(newZoomLevel > 1);
+  }, [zoomLevel]);
 
   const commonFields = [
     { title: t("verifyid_image"), imageUrl: data?.verifyIdImage, placeholder: t("verifyid_image"), field: "verifyIdImage" },
@@ -131,111 +446,471 @@ function UserDocuments() {
   const driverFields = [
     { title: t("license_image_front"), imageUrl: data?.licenseImage, placeholder: t("license_image_front"), field: "licenseImage" },
     { title: t("license_image_back"), imageUrl: data?.licenseImageBack, placeholder: t("license_image_back"), field: "licenseImageBack" },
+    { title: t("vehicle_registration_card_image"), imageUrl: data?.vehicleRegistrationCard, placeholder: t("upload_vehicle_registration_card"), field: "vehicleRegistrationCard" },
   ];
 
   const imageFields = data.usertype === "driver" ? [...commonFields, ...driverFields] : commonFields;
 
+  // Componente simple para gestión de estado de documento
+  const DocumentStatusCard = ({ docType, title, imageUrl }) => {
+    const [localStatus, setLocalStatus] = useState(documentStatusesRef.current[docType]?.status || 'pending');
+    const [localNote, setLocalNote] = useState(documentStatusesRef.current[docType]?.note || '');
+    
+    // Sincronizar con la ref cuando cambie
+    useEffect(() => {
+      const currentStatus = documentStatusesRef.current[docType] || { status: 'pending', note: '' };
+      setLocalStatus(currentStatus.status);
+      setLocalNote(currentStatus.note);
+    }, [docType, forceUpdate]);
+    
+    const handleStatusChangeLocal = (value) => {
+      setLocalStatus(value);
+      handleStatusChange(docType, 'status', value);
+    };
+    
+    const handleNoteChangeLocal = (value) => {
+      setLocalNote(value);
+      handleStatusChange(docType, 'note', value);
+    };
+    
+    return (
+      <Card className={classes.documentStatusCard} sx={{ mb: 3 }}>
+        <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: MAIN_COLOR }}>
+          {title}
+        </Typography>
+        
+        {/* Imagen del documento */}
+        <ImageCard imageUrl={imageUrl} title={title} />
+        
+        {/* Selector de estado */}
+        <FormControl fullWidth sx={{ mt: 2 }}>
+          <InputLabel id={`${docType}-status-label`}>{t('status')}</InputLabel>
+          <Select
+            labelId={`${docType}-status-label`}
+            id={`${docType}-status-select`}
+            value={localStatus}
+            label={t('status')}
+            onChange={(e) => handleStatusChangeLocal(e.target.value)}
+          >
+            <MenuItem value="pending">{t('pending')}</MenuItem>
+            <MenuItem value="approved">{t('approved')}</MenuItem>
+            <MenuItem value="rejected">{t('rejected')}</MenuItem>
+          </Select>
+        </FormControl>
+        
+        {/* Campo de nota */}
+        <TextField
+          fullWidth
+          multiline
+          rows={3}
+          label={t('admin_note')}
+          value={localNote}
+          onChange={(e) => handleNoteChangeLocal(e.target.value)}
+          sx={{ mt: 2 }}
+        />
+      </Card>
+    );
+  };
+
   const ImageUpload = ({ image, onClick, altText, uploadText }) => (
-    image ? (
-      <div onClick={onClick} style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
-        <img src={URL.createObjectURL(image)} alt={altText} style={{ width: 300, height: 250, borderRadius: "19px" }} />
-      </div>
-    ) : (
-      <div onClick={onClick} style={{ display: "flex", justifyContent: "center", marginTop: 30, cursor: "pointer" }}>
-        <Avatar className={classes.avatar} sx={{ boxShadow: 3 }} variant="square">
-          <FileUploadIcon sx={{ fontSize: 100, marginBottom: 3, color: colors.Header_Text_back, fontFamily: FONT_FAMILY }} />
-          <Typography sx={{ textAlign: "center" }} fontFamily={FONT_FAMILY}>{uploadText}</Typography>
-        </Avatar>
-      </div>
-    )
+    <Card className={classes.imageCard} onClick={onClick}>
+      <Typography 
+        variant="h6" 
+        sx={{ 
+          textAlign: "center", 
+          fontSize: 18, 
+          fontWeight: 600, 
+          fontFamily: FONT_FAMILY,
+          marginBottom: 2,
+          color: MAIN_COLOR,
+          minHeight: 40,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        {altText}
+      </Typography>
+      {image ? (
+        <div className={classes.imageContainer} style={{ flex: 1 }}>
+          <img 
+            src={URL.createObjectURL(image)} 
+            alt={altText} 
+            style={{ 
+              width: "100%", 
+              height: "100%", 
+              borderRadius: "16px",
+              objectFit: "cover"
+            }} 
+          />
+          <div className={`${classes.zoomOverlay} zoom-overlay`}>
+            <ZoomInIcon className={`${classes.zoomIcon} zoom-icon`} />
+          </div>
+        </div>
+      ) : (
+        <div className={classes.uploadArea}>
+          <FileUploadIcon className={`${classes.uploadIcon} upload-icon`} />
+          <Typography 
+            sx={{ 
+              textAlign: "center", 
+              fontSize: 16,
+              fontWeight: 500,
+              fontFamily: FONT_FAMILY,
+              color: colors.TABLE_BORDER
+            }}
+          >
+            {uploadText}
+          </Typography>
+        </div>
+      )}
+    </Card>
   );
 
   const ImageCard = ({ title, imageUrl, placeholder, onClick }) => (
-    <Grid item>
-      <Card className={classes.card}>
-        <Typography style={{ textAlign: "center", fontSize: 16, fontWeight: "bold", fontFamily: FONT_FAMILY }}>
-          {title}
-        </Typography>
-      </Card>
-      <Grid item>
-        {imageUrl ? (
-          <Avatar alt={title} src={imageUrl} sx={{ width: 300, height: 250, borderRadius: "19px", cursor: "pointer" }} variant="square" onClick={onClick} />
-        ) : (
-          <Avatar className={classes.avatar} variant="square" sx={{ boxShadow: 3, cursor: "pointer", fontFamily: FONT_FAMILY, textAlign: "center" }} onClick={onClick}>
+    <Card className={classes.imageCard} onClick={imageUrl ? () => handleImagePreview(imageUrl, title) : onClick}>
+      <Typography 
+        variant="h6" 
+        sx={{ 
+          textAlign: "center", 
+          fontSize: 18, 
+          fontWeight: 600, 
+          fontFamily: FONT_FAMILY,
+          marginBottom: 2,
+          color: MAIN_COLOR,
+          minHeight: 40,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        {title}
+      </Typography>
+      {imageUrl ? (
+        <div className={classes.imageContainer} style={{ flex: 1 }}>
+          <img 
+            src={imageUrl} 
+            alt={title} 
+            style={{ 
+              width: "100%", 
+              height: "100%", 
+              borderRadius: "16px",
+              objectFit: "cover"
+            }} 
+          />
+          <div className={`${classes.zoomOverlay} zoom-overlay`}>
+            <ZoomInIcon className={`${classes.zoomIcon} zoom-icon`} />
+          </div>
+        </div>
+      ) : (
+        <div className={classes.uploadArea}>
+          <FileUploadIcon className={`${classes.uploadIcon} upload-icon`} />
+          <Typography 
+            sx={{ 
+              textAlign: "center", 
+              fontSize: 16,
+              fontWeight: 500,
+              fontFamily: FONT_FAMILY,
+              color: colors.TABLE_BORDER
+            }}
+          >
             {placeholder}
-          </Avatar>
-        )}
-      </Grid>
-    </Grid>
+          </Typography>
+        </div>
+      )}
+    </Card>
   );
 
-  const EditButtonGroup = ({ editable, onEdit, onSave, onCancel }) => (
-    <div style={{ display: "flex", justifyContent: "center", gap: 10 }}>
+  const EditButtonGroup = ({ editable, onEdit, onSave, onCancel, isDriver = false }) => (
+    <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2, marginTop: 2 }}>
       {!editable ? (
-        <Button
-          className={classes.buttonStyle}
-          sx={{
-            backgroundColor: MAIN_COLOR,
-            width: "50%",
-            cursor: "pointer",
-            borderColor: colors.CARD_DETAIL,
-          }}
-          variant="contained"
-          onClick={onEdit}
-        >
-          <Typography sx={{ textAlign: "center", fontSize: 16, fontWeight: "bold", fontFamily: FONT_FAMILY, color: colors.WHITE }}>
-            {t("edit")}
-          </Typography>
-        </Button>
+        <>
+          {isDriver && (
+            <Button
+              className={classes.buttonStyle}
+              sx={{
+                backgroundColor: MAIN_COLOR,
+                width: 200,
+                "&:hover": {
+                  backgroundColor: SECONDORY_COLOR,
+                  transform: "translateY(-3px)",
+                },
+              }}
+              variant="contained"
+              onClick={handleSaveDocumentStatuses}
+              startIcon={<SaveIcon />}
+            >
+              <Typography sx={{ fontSize: 16, fontWeight: 600, fontFamily: FONT_FAMILY, color: colors.WHITE }}>
+                {t("save_document_status")}
+              </Typography>
+            </Button>
+          )}
+          <Button
+            className={classes.buttonStyle}
+            sx={{
+              backgroundColor: MAIN_COLOR,
+              width: 120,
+              "&:hover": {
+                backgroundColor: SECONDORY_COLOR,
+                transform: "translateY(-3px)",
+              },
+            }}
+            variant="contained"
+            onClick={onEdit}
+            startIcon={<EditIcon />}
+          >
+            <Typography sx={{ fontSize: 14, fontWeight: 600, fontFamily: FONT_FAMILY, color: colors.WHITE }}>
+              {t("edit")}
+            </Typography>
+          </Button>
+        </>
       ) : (
         <>
           <Button
             className={classes.buttonStyle}
-            sx={{ backgroundColor: colors.GREEN, width: "40%", "&:hover": { backgroundColor: MAIN_COLOR } }}
+            sx={{ 
+              backgroundColor: colors.GREEN, 
+              width: 100,
+              "&:hover": { 
+                backgroundColor: "#2e7d32",
+                transform: "translateY(-3px)",
+              } 
+            }}
             variant="contained"
             onClick={onSave}
+            startIcon={<SaveIcon />}
           >
-            <Typography sx={{ color: colors.WHITE, textAlign: "center", fontSize: 16 }}>{t("save")}</Typography>
+            <Typography sx={{ color: colors.WHITE, fontSize: 14, fontWeight: 600, fontFamily: FONT_FAMILY }}>
+              {t("save")}
+            </Typography>
           </Button>
-          <Button className={classes.buttonStyle} sx={{ backgroundColor: colors.RED, width: "40%" }} variant="contained" onClick={onCancel}>
-            <Typography sx={{ color: colors.WHITE, textAlign: "center", fontSize: 16 }}>{t("cancel")}</Typography>
+          <Button 
+            className={classes.buttonStyle} 
+            sx={{ 
+              backgroundColor: colors.RED, 
+              width: 100,
+              "&:hover": {
+                backgroundColor: "#d32f2f",
+                transform: "translateY(-3px)",
+              }
+            }} 
+            variant="contained" 
+            onClick={onCancel}
+            startIcon={<CancelIcon />}
+          >
+            <Typography sx={{ color: colors.WHITE, fontSize: 14, fontWeight: 600, fontFamily: FONT_FAMILY }}>
+              {t("cancel")}
+            </Typography>
           </Button>
         </>
       )}
-    </div>
+    </Box>
   );
 
   return loading ? (
     <CircularLoading />
   ) : (
-    <Card sx={{ borderRadius: "19px", backgroundColor: colors.WHITE, minHeight: 200, marginTop: 1, marginBottom: 1, padding: 1 }}>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: isRTL === "rtl" ? "flex-end" : "flex-start" }}>
-        <Typography variant="h5" sx={{ margin: "10px 10px 0 5px", fontFamily: FONT_FAMILY }}>{t("documents_title")}</Typography>
-        <GoBackButton isRTL={isRTL} onClick={() => navigate(`/users/${rId}`, { state: { pageNo: state?.pageNo } })} />
-      </div>
-      <Grid container spacing={1} direction="column" sx={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", height: "100%" }}>
-        <Grid item>
-          <Grid container spacing={1} justifyContent="center" alignItems="center" marginY={10} gap={2}>
+    <Box className={classes.mainContainer}>
+      <Card className={classes.documentCard} sx={{ margin: 2, padding: 3 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: isRTL === "rtl" ? "flex-end" : "flex-start", marginBottom: 3 }}>
+          <GoBackButton isRTL={isRTL} onClick={() => navigate(`/users/${rId}`, { state: { pageNo: state?.pageNo } })} />
+        </Box>
+        
+        {/* Gestión de Estados de Documentos - Solo para conductores */}
+        {data.usertype === "driver" ? (
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: MAIN_COLOR, textAlign: 'center' }}>
+              {t('status')}
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* ID/Passport */}
+              <Grid item xs={12} md={4}>
+                <DocumentStatusCard
+                  docType="verifyIdImage"
+                  title={t("verifyid_image")}
+                  imageUrl={data?.verifyIdImage}
+                />
+              </Grid>
+              
+              {/* Licencia Frente */}
+              <Grid item xs={12} md={4}>
+                <DocumentStatusCard
+                  docType="licenseImageFront"
+                  title={t("license_image_front")}
+                  imageUrl={data?.licenseImage}
+                />
+              </Grid>
+              
+              {/* Licencia Reverso */}
+              <Grid item xs={12} md={4}>
+                <DocumentStatusCard
+                  docType="licenseImageBack"
+                  title={t("license_image_back")}
+                  imageUrl={data?.licenseImageBack}
+                />
+              </Grid>
+              
+              {/* Tarjeta de Propiedad */}
+              <Grid item xs={12} md={4}>
+                <DocumentStatusCard
+                  docType="vehicleRegistrationCard"
+                  title={t("vehicle_registration_card_image")}
+                  imageUrl={data?.vehicleRegistrationCard}
+                />
+              </Grid>
+            </Grid>
+
+            {/* Campos de notas generales */}
+            <Box sx={{ mt: 4 }}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label={t('driver_notes')}
+                value={localDriverNotes}
+                onChange={(e) => handleDriverNotesChange(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+              
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label={t('admin_notes')}
+                value={localAdminNotes}
+                onChange={(e) => handleAdminNotesChange(e.target.value)}
+              />
+            </Box>
+
+          </Box>
+        ) : (
+          /* Para usuarios no conductores, mostrar solo documentos básicos */
+          <Grid container spacing={3} justifyContent="center" alignItems="stretch" sx={{ marginY: 2 }}>
             {editable ? (
               imageFields?.map((field, index) => (
-                <ImageUpload key={index} image={images[field.field]} onClick={() => document.getElementById(field.field).click()} altText={field.title} uploadText={t(field.placeholder)} />
+                <Grid item xs={12} sm={6} md={4} key={index}>
+                  <ImageUpload 
+                    image={images[field.field]} 
+                    onClick={() => document.getElementById(field.field).click()} 
+                    altText={field.title} 
+                    uploadText={t(field.placeholder)} 
+                  />
+                </Grid>
               ))
             ) : (
               imageFields?.map((field, index) => (
-                <ImageCard key={index} title={field.title} imageUrl={field.imageUrl} placeholder={field.placeholder} onClick={() => setEditable(true)} />
+                <Grid item xs={12} sm={6} md={4} key={index}>
+                  <ImageCard 
+                    title={field.title} 
+                    imageUrl={field.imageUrl} 
+                    placeholder={field.placeholder} 
+                    onClick={() => setEditable(true)} 
+                  />
+                </Grid>
               ))
             )}
           </Grid>
-        </Grid>
-        <EditButtonGroup editable={editable} onEdit={() => setEditable(true)} onSave={handleSaveUser} onCancel={handleCancel} />
-      </Grid>
-      {imageFields?.map((field) => (
-        <input key={field.field} id={field.field} type="file" hidden onChange={handleImageChange(field.field)} />
-      ))}
-      <AlertDialog open={commonAlert.open} onClose={() => setCommonAlert({ open: false, msg: "" })}>
-        {commonAlert.msg}
-      </AlertDialog>
-    </Card>
+        )}
+        
+        <EditButtonGroup 
+          editable={editable} 
+          onEdit={() => setEditable(true)} 
+          onSave={handleSaveUser} 
+          onCancel={handleCancel}
+          isDriver={data.usertype === "driver"}
+        />
+        
+        {imageFields?.map((field) => (
+          <input key={field.field} id={field.field} type="file" hidden onChange={handleImageChange(field.field)} />
+        ))}
+        
+        <AlertDialog open={commonAlert.open} onClose={() => setCommonAlert({ open: false, msg: "" })}>
+          {commonAlert.msg}
+        </AlertDialog>
+      </Card>
+
+      <Dialog
+        open={previewImage.open}
+        onClose={handleClosePreview}
+        className={classes.previewDialog}
+        maxWidth="lg"
+        fullWidth
+        BackdropComponent={Backdrop}
+        BackdropProps={{
+          timeout: 500,
+        }}
+        TransitionComponent={Fade}
+        TransitionProps={{ timeout: 500 }}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <DialogContent sx={{ padding: 0, position: "relative" }}>
+          <IconButton
+            className={classes.closeButton}
+            onClick={handleClosePreview}
+            size="large"
+          >
+            <CloseIcon />
+          </IconButton>
+          
+          <Box 
+            className={classes.previewContainer}
+            onWheel={handleWheel}
+          >
+            <img
+              src={previewImage.src}
+              alt={previewImage.title}
+              className={classes.previewImage}
+              onClick={handleImageClick}
+              onMouseDown={handleMouseDown}
+              style={{
+                transform: `scale(${zoomLevel}) translate(${dragState.translateX}px, ${dragState.translateY}px)`,
+                cursor: dragState.isDragging ? "grabbing" : (zoomLevel > 1 ? "grab" : "zoom-in"),
+                transition: dragState.isDragging ? "none" : "transform 0.1s ease",
+              }}
+              draggable={false}
+            />
+          </Box>
+          
+          <Typography
+            variant="h6"
+            sx={{
+              position: "absolute",
+              bottom: 20,
+              left: "50%",
+              transform: "translateX(-50%)",
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              color: colors.WHITE,
+              padding: "8px 16px",
+              borderRadius: "20px",
+              fontFamily: FONT_FAMILY,
+              fontWeight: 500
+            }}
+          >
+            {previewImage.title} {zoomLevel > 1 && `(${Math.round(zoomLevel * 100)}%)`}
+          </Typography>
+          
+          <Typography
+            variant="body2"
+            sx={{
+              position: "absolute",
+              bottom: 60,
+              left: "50%",
+              transform: "translateX(-50%)",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: colors.WHITE,
+              padding: "4px 12px",
+              borderRadius: "12px",
+              fontFamily: FONT_FAMILY,
+              fontSize: "12px"
+            }}
+          >
+            Doble clic para zoom • Rueda del mouse para zoom • Arrastra cuando esté ampliado
+          </Typography>
+        </DialogContent>
+      </Dialog>
+    </Box>
   );
 }
 

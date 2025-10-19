@@ -38,7 +38,7 @@ export const fetchUsers = () => (dispatch) => {
       const locations = locationdata.val();
       const data = snapshot.val();
       const arr = Object.keys(data)
-      .filter(i => data[i].usertype!='admin')
+      .filter(i => data[i] && typeof data[i] === 'object' && data[i].usertype!='admin')
       .map(i => {
         data[i].id = i;
         data[i].location = locations && locations[i] ? locations[i] : null;
@@ -75,6 +75,7 @@ export const fetchUsersOnce = () => (dispatch) => {
       const locations = locationdata.val();
       const data = snapshot.val();
       const arr = Object.keys(data)
+      .filter(i => data[i] && typeof data[i] === 'object')
       .map(i => {
         data[i].id = i;
         data[i].location = locations && locations[i] ? locations[i] : null;
@@ -211,7 +212,8 @@ export const updateLicenseImage = (uid, imageBlob, imageType) => async (dispatch
     singleUserRef,
     driverDocsRef,
     driverDocsRefBack,
-    verifyIdImageRef
+    verifyIdImageRef,
+    vehicleRegistrationCardRef
   } = firebase;
 
   let profile = {};
@@ -230,11 +232,33 @@ export const updateLicenseImage = (uid, imageBlob, imageType) => async (dispatch
     let image1 = await getDownloadURL(verifyIdImageRef(uid));
     profile.verifyIdImage = image1;
   }
+  if(imageType === 'vehicleRegistrationCard'){
+    await uploadBytesResumable(vehicleRegistrationCardRef(uid),imageBlob);
+    let image1 = await getDownloadURL(vehicleRegistrationCardRef(uid));
+    profile.vehicleRegistrationCard = image1;
+  }
   update(singleUserRef(uid),profile);
   dispatch({
     type: EDIT_USER,
     payload: uid
   });
+};
+
+export const updateUserDocumentStatus = (uid, statusData, shouldNotify) => async (dispatch) => {
+  const {
+    singleUserRef
+  } = firebase;
+  
+  // Actualizar datos del usuario
+  await update(singleUserRef(uid), statusData);
+  
+  dispatch({
+    type: EDIT_USER,
+    payload: uid
+  });
+  
+  // Si hay documentos rechazados, la función de Firebase enviará notificación
+  // (se implementará en el siguiente paso)
 };
 
 export const deleteUser = (uid) => (dispatch) => {

@@ -18,7 +18,7 @@ var { height } = Dimensions.get('window');
 import { useSelector, useDispatch } from 'react-redux';
 import { api, FirebaseContext } from 'common';
 import * as ImagePicker from 'expo-image-picker';
-import { MaterialCommunityIcons, Entypo } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Entypo, Ionicons } from '@expo/vector-icons';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { fonts } from '../common/font';
 
@@ -37,6 +37,7 @@ export default function EditProfilePage(props) {
     const [capturedImage, setCapturedImage] = useState(null);
     const [capturedImageBack, setCapturedImageback] = useState(null);
     const [capturedIdImage, setCapturedIdImage] = useState(null);
+    const [capturedVehicleRegistrationCard, setCapturedVehicleRegistrationCard] = useState(null);
     const [check, setCheck] = useState(null);
     const [loading, setLoading] = useState(false);
     const [updateCalled,setUpdateCalled] = useState(false);
@@ -93,10 +94,60 @@ export default function EditProfilePage(props) {
         actionSheetRef.current?.setModalVisible(true);
     }
 
+    const getDocumentStatus = (docType) => {
+        if (!auth.profile.documentStatus) return null;
+        return auth.profile.documentStatus[docType];
+    };
+
+    const getStatusColor = (status) => {
+        switch(status) {
+            case 'approved': return colors.GREEN;
+            case 'rejected': return colors.RED;
+            case 'pending': 
+            default: return colors.ORANGE;
+        }
+    };
+
+    const getStatusText = (status) => {
+        switch(status) {
+            case 'approved': return t('approved');
+            case 'rejected': return t('rejected');
+            case 'pending':
+            default: return t('pending_approval');
+        }
+    };
+
+    const DocumentStatusBadge = ({ status }) => {
+        if (!status) return null;
+        
+        return (
+            <View style={[styles.statusBadge, {
+                backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE,
+                borderColor: getStatusColor(status.status),
+                shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                shadowOffset: {
+                    width: 0,
+                    height: 2,
+                },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                elevation: 5,
+            }]}>
+                <Ionicons 
+                    name={status.status === 'approved' ? 'checkmark' : 
+                          status.status === 'rejected' ? 'close' : 'time'}
+                    size={18}
+                    color={getStatusColor(status.status)}
+                />
+            </View>
+        );
+    };
+
     const [state, setState] = useState({
         licenseImage: null,
         licenseImageBack: null,
-        verifyIdImage: null
+        verifyIdImage: null,
+        vehicleRegistrationCard: null
     });
 
     const uploadImage = () => {
@@ -152,6 +203,9 @@ export default function EditProfilePage(props) {
                 else if (check == 2) {
                     setCapturedIdImage(result.assets[0].uri);
                 }
+                else if (check == 3) {
+                    setCapturedVehicleRegistrationCard(result.assets[0].uri);
+                }
 
                 let blob;
                 try {
@@ -171,6 +225,9 @@ export default function EditProfilePage(props) {
                     else if (check == 2) {
                         setState({ ...state, verifyIdImage: blob });
                     }
+                    else if (check == 3) {
+                        setState({ ...state, vehicleRegistrationCard: blob });
+                    }
                 }
             }
         } else {
@@ -188,6 +245,10 @@ export default function EditProfilePage(props) {
 
     const cancelIdPhoto = () => {
         setCapturedIdImage(null);
+    }
+
+    const cancelVehicleRegistrationCardPhoto = () => {
+        setCapturedVehicleRegistrationCard(null);
     }
 
     const completeSubmit = async () => {
@@ -212,6 +273,9 @@ export default function EditProfilePage(props) {
         }
         if (capturedIdImage) {
             userData.verifyIdImage = state ? state.verifyIdImage : profileData.verifyIdImage ? profileData.verifyIdImage : null;
+        }
+        if (capturedVehicleRegistrationCard) {
+            userData.vehicleRegistrationCard = state ? state.vehicleRegistrationCard : profileData.vehicleRegistrationCard ? profileData.vehicleRegistrationCard : null;
         }
     
         await dispatch(updateProfile(userData));
@@ -364,17 +428,21 @@ export default function EditProfilePage(props) {
                             </View>
                             : null }
                                    
-                            {settings && settings.imageIdApproval ?
-                                !auth.profile.verifyIdImage ?
+                            {settings && settings.imageIdApproval ? (
+                                <View style={styles.documentContainer}>
+                                    {!auth.profile.verifyIdImage ?
                                     capturedIdImage ?
                                         <View style={styles.imagePosition}>
+                                            <DocumentStatusBadge 
+                                                status={getDocumentStatus('verifyIdImage')}
+                                            />
                                             <TouchableOpacity style={styles.photoClick} onPress={cancelIdPhoto}>
                                                 <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
                                             </TouchableOpacity>
                                             <Image source={{ uri: capturedIdImage }} style={styles.photoResult} resizeMode={'cover'} />
                                         </View>
                                         :
-                                        <View style={[styles.capturePhoto, , mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
+                                        <View style={[styles.capturePhoto, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
                                             <View>
                                                 {
                                                     state.imageValid ?
@@ -404,9 +472,12 @@ export default function EditProfilePage(props) {
                                         </View>
                                     :
                                     <View style={styles.imagePosition}>
-                                             <View style={{padding:5,marginTop:5}}>
-                                                <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('verifyid_image')}</Text>
-                                             </View>
+                                        <DocumentStatusBadge 
+                                            status={getDocumentStatus('verifyIdImage')}
+                                        />
+                                        <View style={{padding:5, alignItems: 'center'}}>
+                                            <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('verifyid_image')}</Text>
+                                        </View>
                                         {capturedIdImage ?
                                             <TouchableOpacity style={styles.photoClick} onPress={cancelIdPhoto}>
                                                 <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
@@ -423,20 +494,50 @@ export default function EditProfilePage(props) {
                                             </TouchableOpacity>
                                         }
                                     </View>
-                                : null
-                            }
+                                    }
+                                    
+                                    {/* Nota del administrador si existe */}
+                                    {getDocumentStatus('verifyIdImage')?.note && (
+                                        <View style={[styles.noteContainer, {
+                                            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+                                        }]}>
+                                            <View style={styles.noteHeader}>
+                                                <Ionicons 
+                                                    name={getDocumentStatus('verifyIdImage').status === 'rejected' 
+                                                        ? 'warning' 
+                                                        : 'information-circle'}
+                                                    size={20}
+                                                    color={getStatusColor(getDocumentStatus('verifyIdImage').status)}
+                                                />
+                                                <Text style={[styles.noteTitle, {
+                                                    color: getStatusColor(getDocumentStatus('verifyIdImage').status)
+                                                }]}>
+                                                    {t('admin_note')}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.noteText}>
+                                                {getDocumentStatus('verifyIdImage').note}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            ) : null}
 
-                            {auth.profile.usertype == 'driver' && settings.license_image_required ?
-                                !auth.profile.licenseImage ?
+                            {auth.profile.usertype == 'driver' && settings.license_image_required ? (
+                                <View style={styles.documentContainer}>
+                                    {!auth.profile.licenseImage ?
                                     capturedImage ?
                                         <View style={styles.imagePosition}>
+                                            <DocumentStatusBadge 
+                                                status={getDocumentStatus('licenseImageFront')}
+                                            />
                                             <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
                                                 <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
                                             </TouchableOpacity>
                                             <Image source={{ uri: capturedImage }} style={styles.photoResult} resizeMode={'cover'} />
                                         </View>
                                         :
-                                        <View style={[styles.capturePhoto, , mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
+                                        <View style={[styles.capturePhoto, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
                                             <View>
                                                 {
                                                     state.imageValid ?
@@ -466,9 +567,12 @@ export default function EditProfilePage(props) {
                                         </View>
                                     :
                                     <View style={styles.imagePosition}>
-                                        <View style={{padding:5}}>
-                                       <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('driving_license_font')}</Text>
-                                       </View>
+                                        <DocumentStatusBadge 
+                                            status={getDocumentStatus('licenseImageFront')}
+                                        />
+                                        <View style={{padding:5, alignItems: 'center'}}>
+                                            <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('driving_license_font')}</Text>
+                                        </View>
                                         {capturedImage ?
                                             <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
                                                 <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
@@ -485,20 +589,50 @@ export default function EditProfilePage(props) {
                                             </TouchableOpacity>
                                         }
                                     </View>
-                                : null
-                            }
+                                    }
+                                    
+                                    {/* Nota del administrador si existe */}
+                                    {getDocumentStatus('licenseImageFront')?.note && (
+                                        <View style={[styles.noteContainer, {
+                                            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+                                        }]}>
+                                            <View style={styles.noteHeader}>
+                                                <Ionicons 
+                                                    name={getDocumentStatus('licenseImageFront').status === 'rejected' 
+                                                        ? 'warning' 
+                                                        : 'information-circle'}
+                                                    size={20}
+                                                    color={getStatusColor(getDocumentStatus('licenseImageFront').status)}
+                                                />
+                                                <Text style={[styles.noteTitle, {
+                                                    color: getStatusColor(getDocumentStatus('licenseImageFront').status)
+                                                }]}>
+                                                    {t('admin_note')}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.noteText}>
+                                                {getDocumentStatus('licenseImageFront').note}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            ) : null}
 
-                            {auth.profile.usertype == 'driver' && settings.license_image_required ?
-                                !auth.profile.licenseImageBack ?
+                            {auth.profile.usertype == 'driver' && settings.license_image_required ? (
+                                <View style={styles.documentContainer}>
+                                    {!auth.profile.licenseImageBack ?
                                     capturedImageBack ?
                                         <View style={styles.imagePosition}>
+                                            <DocumentStatusBadge 
+                                                status={getDocumentStatus('licenseImageBack')}
+                                            />
                                             <TouchableOpacity style={styles.photoClick} onPress={cancelPhotoback}>
                                                 <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
                                             </TouchableOpacity>
                                             <Image source={{ uri: capturedImageBack }} style={styles.photoResult} resizeMode={'cover'} />
                                         </View>
                                         :
-                                        <View style={[styles.capturePhoto, , mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
+                                        <View style={[styles.capturePhoto, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
                                             <View>
                                                 {
                                                     state.imageValid ?
@@ -528,9 +662,12 @@ export default function EditProfilePage(props) {
                                         </View>
                                     :
                                     <View style={styles.imagePosition}>
-                                            <View style={{padding:5,marginTop:5}}>
-                                                <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('driving_license_back')}</Text>
-                                             </View>
+                                        <DocumentStatusBadge 
+                                            status={getDocumentStatus('licenseImageBack')}
+                                        />
+                                        <View style={{padding:5, alignItems: 'center'}}>
+                                            <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('driving_license_back')}</Text>
+                                        </View>
                                         {capturedImageBack ?
                                             <TouchableOpacity style={styles.photoClick} onPress={cancelPhotoback}>
                                                 <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
@@ -547,8 +684,150 @@ export default function EditProfilePage(props) {
                                             </TouchableOpacity>
                                         }
                                     </View>
-                                : null
-                            }
+                                    }
+                                    
+                                    {/* Nota del administrador si existe */}
+                                    {getDocumentStatus('licenseImageBack')?.note && (
+                                        <View style={[styles.noteContainer, {
+                                            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+                                        }]}>
+                                            <View style={styles.noteHeader}>
+                                                <Ionicons 
+                                                    name={getDocumentStatus('licenseImageBack').status === 'rejected' 
+                                                        ? 'warning' 
+                                                        : 'information-circle'}
+                                                    size={20}
+                                                    color={getStatusColor(getDocumentStatus('licenseImageBack').status)}
+                                                />
+                                                <Text style={[styles.noteTitle, {
+                                                    color: getStatusColor(getDocumentStatus('licenseImageBack').status)
+                                                }]}>
+                                                    {t('admin_note')}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.noteText}>
+                                                {getDocumentStatus('licenseImageBack').note}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            ) : null}
+
+                            {auth.profile.usertype == 'driver' && settings.vehicle_registration_card_required ? (
+                                <View style={styles.documentContainer}>
+                                    {!auth.profile.vehicleRegistrationCard ?
+                                    capturedVehicleRegistrationCard ?
+                                        <View style={styles.imagePosition}>
+                                            <DocumentStatusBadge 
+                                                status={getDocumentStatus('vehicleRegistrationCard')}
+                                            />
+                                            <TouchableOpacity style={styles.photoClick} onPress={cancelVehicleRegistrationCardPhoto}>
+                                                <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
+                                            </TouchableOpacity>
+                                            <Image source={{ uri: capturedVehicleRegistrationCard }} style={styles.photoResult} resizeMode={'cover'} />
+                                        </View>
+                                        :
+                                        <View style={[styles.capturePhoto, mode === 'dark' ? styles.shadowBackDark : styles.shadowBack]}>
+                                            <View>
+                                                {
+                                                    state.imageValid ?
+                                                        <Text style={styles.capturePhotoTitle}>{t('upload_vehicle_registration_card')}</Text>
+                                                        :
+                                                        <Text style={styles.errorPhotoTitle}>{t('upload_vehicle_registration_card')}</Text>
+                                                }
+
+                                            </View>
+                                            <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                                <TouchableOpacity style={styles.flexView1} onPress={() => showActionSheet('3')}>
+                                                    <View>
+                                                        <View style={styles.imageFixStyle}>
+                                                            <Image source={require('../../assets/images/camera.png')} resizeMode={'contain'} style={styles.imageStyle2} />
+                                                        </View>
+                                                    </View>
+                                                </TouchableOpacity>
+                                                <View style={styles.myView}>
+                                                    <View style={styles.myView1} />
+                                                </View>
+                                                <View style={styles.myView2}>
+                                                    <View style={styles.myView3}>
+                                                        <Text style={mode === 'dark' ? styles.textStyleDark : styles.textStyle}>{t('image_size_warning')}</Text>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </View>
+                                    :
+                                    <View style={styles.imagePosition}>
+                                        <DocumentStatusBadge 
+                                            status={getDocumentStatus('vehicleRegistrationCard')}
+                                        />
+                                        <View style={{padding:5, alignItems: 'center'}}>
+                                            <Text style={mode === 'dark' ? styles.textDark : styles.text}>{t('vehicle_registration_card_image')}</Text>
+                                        </View>
+                                        {capturedVehicleRegistrationCard ?
+                                            <TouchableOpacity style={styles.photoClick} onPress={cancelVehicleRegistrationCardPhoto}>
+                                                <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
+                                            </TouchableOpacity>
+                                            : null}
+
+                                        {capturedVehicleRegistrationCard ?
+                                            <TouchableOpacity onPress={() => showActionSheet('3')}>
+                                                <Image source={{ uri: capturedVehicleRegistrationCard }} style={styles.photoResult} resizeMode={'cover'} />
+                                            </TouchableOpacity>
+                                            :
+                                            <TouchableOpacity onPress={() => showActionSheet('3')}>
+                                                <Image source={{ uri: auth.profile.vehicleRegistrationCard }} style={styles.photoResult} resizeMode={'cover'} />
+                                            </TouchableOpacity>
+                                        }
+                                    </View>
+                                    }
+                                    
+                                    {/* Nota del administrador si existe */}
+                                    {getDocumentStatus('vehicleRegistrationCard')?.note && (
+                                        <View style={[styles.noteContainer, {
+                                            backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+                                        }]}>
+                                            <View style={styles.noteHeader}>
+                                                <Ionicons 
+                                                    name={getDocumentStatus('vehicleRegistrationCard').status === 'rejected' 
+                                                        ? 'warning' 
+                                                        : 'information-circle'}
+                                                    size={20}
+                                                    color={getStatusColor(getDocumentStatus('vehicleRegistrationCard').status)}
+                                                />
+                                                <Text style={[styles.noteTitle, {
+                                                    color: getStatusColor(getDocumentStatus('vehicleRegistrationCard').status)
+                                                }]}>
+                                                    {t('admin_note')}
+                                                </Text>
+                                            </View>
+                                            <Text style={styles.noteText}>
+                                                {getDocumentStatus('vehicleRegistrationCard').note}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            ) : null}
+
+                            {/* Mostrar notas del conductor */}
+                            {auth.profile.usertype === 'driver' && auth.profile.driver_notes && (
+                                <View style={[styles.driverNotesContainer, {
+                                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE
+                                }]}>
+                                    <View style={styles.notesHeader}>
+                                        <Ionicons name="document-text" size={24} color={colors.MAIN_COLOR} />
+                                        <Text style={[styles.notesTitle, {
+                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                                        }]}>
+                                            {t('admin_note')}
+                                        </Text>
+                                    </View>
+                                    <Text style={[styles.notesContent, {
+                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                                    }]}>
+                                        {auth.profile.driver_notes}
+                                    </Text>
+                                </View>
+                            )}
 
                             <View style={styles.buttonContainer}>
                                 <Button
@@ -848,5 +1127,87 @@ const styles = StyleSheet.create({
     textStyleDark:{
         fontFamily:fonts.Regular,
         color: colors.WHITE
+    },
+    documentContainer: {
+        marginBottom: 15
+    },
+    statusBadge: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        position: 'absolute',
+        top: 40,
+        right: 30,
+        zIndex: 2,
+        width: 32,
+        height: 32
+    },
+    statusText: {
+        fontSize: 12,
+        fontWeight: '600',
+        fontFamily: fonts.Bold
+    },
+    noteContainer: {
+        marginTop: 15,
+        marginHorizontal: 20,
+        padding: 16,
+        borderRadius: 8,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    noteHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+        gap: 6
+    },
+    noteTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        fontFamily: fonts.Bold
+    },
+    noteText: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontFamily: fonts.Regular,
+        color: colors.DARK_GRAY
+    },
+    driverNotesContainer: {
+        marginTop: 20,
+        marginBottom: 10,
+        marginHorizontal: 20,
+        padding: 16,
+        borderRadius: 8,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    notesHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 10,
+        gap: 8
+    },
+    notesTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        fontFamily: fonts.Bold
+    },
+    notesContent: {
+        fontSize: 14,
+        lineHeight: 20,
+        fontFamily: fonts.Regular
     }
 });
