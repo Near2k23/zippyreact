@@ -16,7 +16,7 @@ import ListItemText from '@mui/material/ListItemText';
 import MenuIcon from '@mui/icons-material/Menu';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from "react-redux";
 import HomeIcon from '@mui/icons-material/Home';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -38,6 +38,7 @@ import {calcEst, showEst, optionsRequired} from '../common/sharedFunctions';
 import SosIcon from '@mui/icons-material/Sos';
 import { FONT_FAMILY } from "../common/sharedFunctions"
 import AnnouncementOutlinedIcon from '@mui/icons-material/AnnouncementOutlined';
+import GeneralNotifications from './GeneralNotifications';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -67,6 +68,7 @@ export default function ResponsiveDrawer(props) {
   const isRTL = i18n.dir();
   const { window } = props;
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const navigate = useNavigate();
   const {
     signOff
   } = api;
@@ -89,6 +91,20 @@ export default function ResponsiveDrawer(props) {
 
   const handleCloseProfileMenu = () => {
     setProfileMenuAnchor(null);
+  };
+
+  const handleNotificationClick = (notification) => {
+    // Navegar directamente a la pantalla correspondiente
+    switch (notification.type || 'withdraws') {
+      case 'withdraws':
+        navigate('/withdraws');
+        break;
+      case 'complaints':
+        navigate('/complain');
+        break;
+      default:
+        navigate('/dashboard');
+    }
   };
 
   useEffect(() => {
@@ -290,6 +306,11 @@ export default function ResponsiveDrawer(props) {
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
             {auth && auth.profile ? (
               <>
+                {role === 'admin' && (
+                  <GeneralNotifications 
+                    onNotificationClick={handleNotificationClick}
+                  />
+                )}
                 <IconButton onClick={handleOpenProfileMenu} size="small" sx={{ p: 0.5 }} aria-label="user menu">
                   <Avatar
                     src={auth.profile.profile_image ? auth.profile.profile_image : require('../assets/img/profilePic.png')}
