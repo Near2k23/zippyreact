@@ -77,8 +77,12 @@ export default function GeneralNotifications({
 
   const handleNotificationClick = (notification) => {
     handleClose();
-    if (onNotificationClick) {
-      // Agregar el tipo de notificación al objeto
+    
+    if (notification.type === 'complaints' || notification.type === 'complaint') {
+      navigate('/complain');
+    } else if (notification.type === 'withdraws' || notification.type === 'withdraw') {
+      navigate('/withdraws');
+    } else if (onNotificationClick) {
       const notificationWithType = {
         ...notification,
         type: notificationType
