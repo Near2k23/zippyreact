@@ -1006,12 +1006,7 @@ const styles = StyleSheet.create({
         top: 10,
     },
     container: {
-        flex: 1,
-        //backgroundColor: colors.BACKGROUND,
-        // alignItems: 'center',
-        //width: '100%',
-        //height: '100%',
-        //gap: 5,
+        flex: 1
     },
     imagebg: {
         position: 'absolute',

@@ -73,6 +73,7 @@ export default function CarsList() {
   const settings = useSelector((state) => state.settingsdata.settings);
   const userdata = useSelector((state) => state.usersdata);
   const auth = useSelector((state) => state.auth);
+  const cartypes = useSelector((state) => state.cartypes);
   const { updateUserCar, editCar} = api;
   const [driversObj, setDriversObj] = useState();
   const [data, setData] = useState([]);
@@ -353,7 +354,20 @@ export default function CarsList() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('car_type')}</label>
-                <input type="text" value={editForm.carType} onChange={(e)=>setEditForm(prev=>({...prev, carType: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <select 
+                  value={editForm.carType} 
+                  onChange={(e)=>setEditForm(prev=>({...prev, carType: e.target.value}))} 
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">{t('select_vehicle_type')}</option>
+                  {cartypes?.cars && cartypes.cars
+                    .sort((a, b) => (a.pos || 0) - (b.pos || 0))
+                    .map((carType) => (
+                      <option key={carType.name} value={carType.name}>
+                        {t(getLangKey(carType.name))}
+                      </option>
+                    ))}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('vehicle_reg_no')}</label>

@@ -94,14 +94,12 @@ const IntroScreen = ({ navigation }) => {
 
     useEffect(() => {
         const backAction = () => {
-            // Prevenir que el botón atrás cierre la pantalla
-            // En su lugar, ir al slide anterior o no hacer nada si está en el primero
             if (currentIndex > 0) {
                 const prevIndex = currentIndex - 1;
                 setCurrentIndex(prevIndex);
                 flatListRef.current?.scrollToIndex({ index: prevIndex, animated: true });
             }
-            return true; // Prevenir el comportamiento por defecto
+            return true;
         };
 
         const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);

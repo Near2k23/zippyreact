@@ -23,7 +23,6 @@ const useStyles = makeStyles({
     "& .MuiTab-root.Mui-selected": {
       color: MAIN_COLOR
     },
-    // Responsive tabs
     "@media (max-width: 768px)": {
       "& .MuiTabs-flexContainer": {
         flexDirection: "column",
@@ -39,14 +38,12 @@ const useStyles = makeStyles({
   typography:{
     fontFamily:FONT_FAMILY
   },
-  // Responsive container
   container: {
     width: '100%',
     "@media (max-width: 768px)": {
       padding: '8px'
     }
   },
-  // Responsive tab panel
   tabPanel: {
     "@media (max-width: 768px)": {
       padding: '16px 8px !important'
@@ -129,7 +126,6 @@ export default function Users() {
           scrollButtons="auto"
           allowScrollButtonsMobile
           sx={{
-            // Responsive tab styling
             '@media (max-width: 768px)': {
               '& .MuiTabs-scrollButtons': {
                 display: 'flex'

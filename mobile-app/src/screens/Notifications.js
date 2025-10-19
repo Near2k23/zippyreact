@@ -5,7 +5,7 @@ import { colors } from '../common/theme';
 import { useSelector } from 'react-redux';
 import i18n from 'i18n-js';
 import moment from 'moment/min/moment-with-locales';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { SECONDORY_COLOR, MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import { fonts } from '../common/font';
 import WaygoDialog from '../components/WaygoDialog';
@@ -38,17 +38,15 @@ export default function Notifications(props) {
     useEffect(() => {
         if (notificationdata.notifications) {
             const notifications = notificationdata.notifications;
-            // Initialize animation values for each notification
             notifications.forEach((_, index) => {
                 fadeAnim[index] = new Animated.Value(0);
             });
             
-            // Stagger animations
             const animations = notifications.map((_, index) => {
                 return Animated.timing(fadeAnim[index], {
                     toValue: 1,
                     duration: 500,
-                    delay: index * 150, // Stagger delay between each item
+                    delay: index * 150,
                     useNativeDriver: true
                 });
             });
@@ -76,6 +74,8 @@ export default function Notifications(props) {
             return 'car-outline';
         } else if (lowerMsg.includes('payment') || lowerMsg.includes('wallet') || lowerMsg.includes('paid')) {
             return 'cash-outline';
+        } else if (lowerMsg.includes('withdrawal') || lowerMsg.includes('withdraw')) {
+            return 'cash-outline';
         } else if (lowerMsg.includes('cancel')) {
             return 'close-circle-outline';
         } else if (lowerMsg.includes('driver') || lowerMsg.includes('captain')) {
@@ -89,18 +89,27 @@ export default function Notifications(props) {
         } else if (lowerMsg.includes('offer') || lowerMsg.includes('discount')) {
             return 'tag-outline';
         } else {
-            return 'bell-outline';
+            return 'notifications-outline';
         }
     };
 
     const getIconColor = (msg) => {
         const lowerMsg = msg.toLowerCase();
-        if (lowerMsg.includes('cancel')) {
+        if (lowerMsg.includes('cancel') || lowerMsg.includes('rejected')) {
             return colors.RED;
-        } else if (lowerMsg.includes('success') || lowerMsg.includes('completed')) {
+        } else if (lowerMsg.includes('success') || lowerMsg.includes('completed') || lowerMsg.includes('approved')) {
             return colors.GREEN;
         } else if (lowerMsg.includes('payment') || lowerMsg.includes('wallet')) {
             return colors.YELLOW;
+        } else if (lowerMsg.includes('withdrawal') || lowerMsg.includes('withdraw')) {
+            // Para retiros, determinar color basado en el estado
+            if (lowerMsg.includes('rejected')) {
+                return colors.RED;
+            } else if (lowerMsg.includes('approved')) {
+                return colors.GREEN;
+            } else {
+                return colors.YELLOW;
+            }
         } else {
             return mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR;
         }
@@ -155,7 +164,7 @@ export default function Notifications(props) {
                         marginRight: isRTL ? 0 : 15, 
                         marginLeft: isRTL ? 15 : 0 
                     }]}>
-                        <MaterialCommunityIcons 
+                        <Ionicons 
                             name={getNotificationIcon(item.msg)} 
                             size={24} 
                             color={mode === 'dark' ? colors.WHITE : colors.BLACK} 

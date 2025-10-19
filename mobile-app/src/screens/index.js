@@ -1,4 +1,3 @@
-import AuthLoadingScreen from './AuthLoadingScreen';
 import IntroScreen from './IntroScreen';
 import RideListPage from './RideListScreen';
 import MapScreen from './MapScreen';
@@ -27,7 +26,6 @@ import TransactionHistory from './TransactionHistory';
 
 export {
     RegistrationPage,
-    AuthLoadingScreen,
     IntroScreen,
     MapScreen,
     BookedCabScreen,

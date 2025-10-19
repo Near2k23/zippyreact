@@ -38,11 +38,8 @@ export const tripreducer = (state = INITIAL_STATE, action) => {
         case CLEAR_TRIP_POINTS:
             return {
                 ...state,
-                drop: {
-                    lat:state.pickup.lat,
-                    lng:state.pickup.lng,
-                    add: ''
-                },
+                pickup: null,
+                drop: null,
                 carType: null,
                 selected:'pickup'
             };

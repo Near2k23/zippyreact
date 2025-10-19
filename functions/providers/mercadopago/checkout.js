@@ -37,7 +37,6 @@ module.exports.render_checkout = async function (request, response) {
             email: request.body.email
         },
         back_urls: {
-            // FIXED: The success URL should call your process endpoint
             "success": `${server_url}mercadopago-process?platform=${platform}`,
             "failure": platform === 'web'? `${server_url}cancel` : `${firebaseProjectId}://payment?mercadopago_status=cancel`,
             "pending": platform === 'web'? `${server_url}cancel` : `${firebaseProjectId}://payment?mercadopago_status=cancel`
@@ -55,11 +54,9 @@ module.exports.render_checkout = async function (request, response) {
         const res = await mercadopago.preferences.create(preference);
         const checkoutURL = config.testing ? res.body.sandbox_init_point : res.body.init_point;
 
-        // For web platform, redirect directly to checkout URL
         if (platform === 'web') {
             response.redirect(checkoutURL);
         } else {
-            // For mobile platform, send JSON response
             response.json({
                 url: checkoutURL,
                 id: res.body.id,
@@ -73,7 +70,6 @@ module.exports.render_checkout = async function (request, response) {
     }
 };
 
-// Process checkout handler
 module.exports.process_checkout = async function (req, res) {
   const config = (await admin.database().ref('payment_settings/mercadopago').once('value')).val();
     const access_token = config.access_token;

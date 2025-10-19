@@ -9,7 +9,8 @@ import {
     TextInput,
     Alert,
     FlatList,
-    useColorScheme
+    useColorScheme,
+    TouchableOpacity
 } from 'react-native';
 import i18n from 'i18n-js';
 import { Button } from 'react-native-elements'
@@ -18,6 +19,7 @@ import moment from 'moment/min/moment-with-locales';
 import { api } from 'common';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from "../common/sharedFunctions";
 import { fonts } from '../common/font';
+import WaygoDialog from '../components/WaygoDialog';
 
 var { width } = Dimensions.get('window');
 
@@ -91,6 +93,9 @@ export default function Complain() {
         body: '',
         check: false
     });
+    
+    const [dialogVisible, setDialogVisible] = useState(false);
+    const [selectedComplaint, setSelectedComplaint] = useState(null);
 
     const submitComplain = () => {
         if (auth.profile.mobile || auth.profile.email) {
@@ -141,44 +146,107 @@ export default function Complain() {
         </Animated.View>
     );
 
-    const renderComplaintCard = ({ item }) => (
-        <Animated.View 
-            style={[
-                styles.complaintCard,
-                mode === 'dark' ? styles.shadowBackDark : styles.shadowBack,
-                { opacity: fadeAnim }
-            ]}
-        >
-            <View style={[styles.complaintHeader,{flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10}]}>
-                <View style={styles.subjectContainer}>
-                    <Text style={[styles.label, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, textAlign: isRTL ? 'right' : 'left' }]}>
-                        {t('subject')}
-                    </Text>
-                    <Text style={[styles.subject, { color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left' }]}>
-                        {item.subject}
-                    </Text>
-                </View>
-                <View style={[styles.statusContainer,{alignItems:'center'}]}>
-                    <Text style={[styles.date, { color: item.check ? colors.GREEN : colors.RED, textAlign: isRTL ? 'right' : 'left' }]}>
-                        {moment(item.complainDate).format('ll')}
-                    </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: item.check ? colors.GREEN : colors.RED }]}>
-                        <Text style={styles.statusText}>
-                            {item.check ? t('solved') : t('pending')}
+    const getStatusInfo = (item) => {
+        const status = item.status || (item.check ? 'resolved' : 'pending');
+        let color, text, icon, iconColor;
+        
+        switch (status) {
+            case 'resolved':
+                color = colors.GREEN;
+                text = t('resolved') || 'Resolved';
+                icon = 'checkmark-circle-outline';
+                iconColor = colors.GREEN;
+                break;
+            case 'in_review':
+                color = colors.ORANGE;
+                text = t('in_review') || 'In Review';
+                icon = 'time-outline';
+                iconColor = colors.ORANGE;
+                break;
+            case 'rejected':
+                color = colors.RED;
+                text = t('rejected') || 'Rejected';
+                icon = 'close-circle-outline';
+                iconColor = colors.RED;
+                break;
+            default:
+                color = '#9E9E9E';
+                text = t('pending') || 'Pending';
+                icon = 'help-circle-outline';
+                iconColor = '#9E9E9E';
+        }
+        
+        return { color, text, icon, iconColor };
+    };
+
+    const handleComplaintPress = (item) => {
+        setSelectedComplaint(item);
+        setDialogVisible(true);
+    };
+
+    const getDialogContent = (item) => {
+        const statusInfo = getStatusInfo(item);
+        const adminMessage = item.adminMessage;
+        
+        let title = `${t('complain_status') || 'Complaint Status'}: ${statusInfo.text}`;
+        let message = adminMessage || `${t('no_admin_message') || 'No message from administrator'}`;
+        
+        return {
+            title,
+            message,
+            icon: statusInfo.icon,
+            iconColor: statusInfo.iconColor,
+            type: statusInfo.text.toLowerCase().replace(' ', '_')
+        };
+    };
+
+    const renderComplaintCard = ({ item }) => {
+        const statusInfo = getStatusInfo(item);
+        
+        return (
+            <TouchableOpacity 
+                onPress={() => handleComplaintPress(item)}
+                activeOpacity={0.7}
+            >
+                <Animated.View 
+                    style={[
+                        styles.complaintCard,
+                        mode === 'dark' ? styles.shadowBackDark : styles.shadowBack,
+                        { opacity: fadeAnim }
+                    ]}
+                >
+                    <View style={[styles.complaintHeader,{flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10}]}>
+                        <View style={styles.subjectContainer}>
+                            <Text style={[styles.label, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, textAlign: isRTL ? 'right' : 'left' }]}>
+                                {t('subject')}
+                            </Text>
+                            <Text style={[styles.subject, { color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left' }]}>
+                                {item.subject}
+                            </Text>
+                        </View>
+                        <View style={[styles.statusContainer,{alignItems:'center'}]}>
+                            <Text style={[styles.date, { color: statusInfo.color, textAlign: isRTL ? 'right' : 'left' }]}>
+                                {moment(item.complainDate).format('ll')}
+                            </Text>
+                            <View style={[styles.statusBadge, { backgroundColor: statusInfo.color }]}>
+                                <Text style={styles.statusText}>
+                                    {statusInfo.text}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                    <View>
+                        <Text style={[styles.label, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, textAlign: isRTL ? 'right' : 'left' }]}>
+                            {t('message_text')}
+                        </Text>
+                        <Text style={[styles.message, { color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left' }]}>
+                            {item.body}
                         </Text>
                     </View>
-                </View>
-            </View>
-            <View>
-                <Text style={[styles.label, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {t('message_text')}
-                </Text>
-                <Text style={[styles.message, { color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? 'right' : 'left' }]}>
-                    {item.body}
-                </Text>
-            </View>
-        </Animated.View>
-    );
+                </Animated.View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
@@ -202,6 +270,17 @@ export default function Complain() {
                 keyExtractor={(item, index) => index.toString()}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContainer}
+            />
+            
+            <WaygoDialog
+                visible={dialogVisible}
+                onClose={() => setDialogVisible(false)}
+                title={selectedComplaint ? getDialogContent(selectedComplaint).title : ''}
+                message={selectedComplaint ? getDialogContent(selectedComplaint).message : ''}
+                icon={selectedComplaint ? getDialogContent(selectedComplaint).icon : ''}
+                iconColor={selectedComplaint ? getDialogContent(selectedComplaint).iconColor : ''}
+                type={selectedComplaint ? getDialogContent(selectedComplaint).type : 'info'}
+                showButtons={false}
             />
         </View>
     );

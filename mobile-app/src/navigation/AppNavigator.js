@@ -8,7 +8,8 @@ import {
     StatusBar, // Add StatusBar import
     View,
     Text,
-    TouchableOpacity
+    TouchableOpacity,
+    Animated
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -35,10 +36,10 @@ import {
     SettingsScreen,
     CarsScreen,
     CarEditScreen,
-    AuthLoadingScreen,
     IntroScreen,
     TransactionHistory,
 } from '../screens';
+import CustomSplashScreen from '../screens/CustomSplashScreen';
 import Complain from '../screens/Complain';
 var { height, width } = Dimensions.get('window');
 import { useSelector, useDispatch } from "react-redux";
@@ -133,7 +134,7 @@ export default function AppContainer() {
     // Early return after all hooks have been called
     // Check if store is properly initialized - this is safe to do after hooks
     if (!auth || typeof auth !== 'object' || isFirstLaunch === null) {
-        return <AuthLoadingScreen />;
+        return <CustomSplashScreen />;
     }
 
     const linking = {
@@ -180,7 +181,7 @@ export default function AppContainer() {
         },
     };
     
-    const CustomHeader = ({ title, navigation }) => {
+    const CustomHeader = ({ title, navigation, showBackButton = true }) => {
         const handleBackPress = () => {
             if (navigation.canGoBack()) {
                 navigation.goBack();
@@ -198,32 +199,42 @@ export default function AppContainer() {
                 elevation: 0,
                 shadowOpacity: 0,
             }}>
-                <TouchableOpacity 
-                    onPress={handleBackPress}
-                    style={{ 
-                        width: 40, 
-                        height: 40, 
-                        justifyContent: 'center', 
-                        alignItems: isRTL ? 'flex-end' : 'flex-start' 
-                    }}
-                >
-                    <Icon
-                        name={isRTL ? 'arrow-right' : 'arrow-back'}
-                        type='ionicon'
-                        color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                        size={24}
-                    />
-                </TouchableOpacity>
-                <Text style={{
-                    fontFamily: 'Inter-Bold',
-                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                    fontSize: 20,
-                    marginTop: 8,
-                    marginLeft: isRTL ? 0 : 0,
-                    textAlign: isRTL ? 'right' : 'left',
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: showBackButton ? 'space-between' : 'center',
                 }}>
-                    {title}
-                </Text>
+                    {showBackButton && (
+                        <TouchableOpacity 
+                            onPress={handleBackPress}
+                            style={{ 
+                                width: 40, 
+                                height: 40, 
+                                justifyContent: 'center', 
+                                alignItems: 'center' 
+                            }}
+                        >
+                            <Icon
+                                name={isRTL ? 'arrow-right' : 'arrow-back'}
+                                type='ionicon'
+                                color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                                size={24}
+                            />
+                        </TouchableOpacity>
+                    )}
+                    
+                    <Text style={{
+                        fontFamily: 'Inter-Bold',
+                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                        fontSize: 20,
+                        textAlign: 'center',
+                        flex: showBackButton ? 1 : 0,
+                    }}>
+                        {title}
+                    </Text>
+                    
+                    {showBackButton && <View style={{ width: 40 }} />}
+                </View>
             </View>
         );
     };
@@ -238,59 +249,100 @@ export default function AppContainer() {
                 screenOptions={({ route }) => ({
                     animationEnabled: Platform.OS == 'android' ? false : true,
                     tabBarIcon: ({ focused, color, size }) => {
+                        const scaleAnim = useRef(new Animated.Value(1)).current;
+                        const opacityAnim = useRef(new Animated.Value(1)).current;
+
+                        useEffect(() => {
+                            if (focused) {
+                                Animated.sequence([
+                                    Animated.timing(scaleAnim, {
+                                        toValue: 1.2,
+                                        duration: 150,
+                                        useNativeDriver: true,
+                                    }),
+                                    Animated.timing(scaleAnim, {
+                                        toValue: 1,
+                                        duration: 150,
+                                        useNativeDriver: true,
+                                    })
+                                ]).start();
+
+                                Animated.timing(opacityAnim, {
+                                    toValue: 0.7,
+                                    duration: 100,
+                                    useNativeDriver: true,
+                                }).start(() => {
+                                    Animated.timing(opacityAnim, {
+                                        toValue: 1,
+                                        duration: 100,
+                                        useNativeDriver: true,
+                                    }).start();
+                                });
+                            }
+                        }, [focused]);
+
                         let iconName, iconType;
-                        if (route.name === 'Map' || route.name === 'DriverTrips') {
-                            iconName = 'home';
-                            iconType = 'octicon';
+                        if (route.name === 'Home') {
+                            iconName = 'directions-car';
+                            iconType = 'material';
+                        } else if (route.name === 'DriverTrips') {
+                            iconName = 'directions-car';
+                            iconType = 'material';
                         } else if (route.name === 'RideList') {
-                            iconName = 'clock';
-                            iconType = 'octicon';
-                        } else if (route.name === 'Wallet') {
-                            iconName = 'wallet-outline';
-                            iconType = 'ionicon';
+                            iconName = 'history';
+                            iconType = 'material';
                         } else if (route.name === 'Settings') {
-                            iconName = 'person-outline';
-                            iconType = 'ionicon';
+                            iconName = 'person';
+                            iconType = 'material';
                         }
                         return (
-                            <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                            <Animated.View style={{ 
+                                flexDirection: 'column',
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                flex: 1,
+                                transform: [{ scale: scaleAnim }],
+                                opacity: opacityAnim
+                            }}>
                                 <Icon
                                     name={iconName}
                                     type={iconType}
-                                    size={size - 5}
+                                    size={size + 5}
                                     color={color}
                                     style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
                                 />
-                                {focused && (
-                                    <View style={{
-                                        width: 4,
-                                        height: 4,
-                                        borderRadius: 2,
-                                        backgroundColor: color,
-                                        marginTop: 2
-                                    }} />
-                                )}
-                            </View>
+                                <Text style={{
+                                    color: color,
+                                    fontSize: 10,
+                                    fontFamily: fonts.Medium,
+                                    marginTop: 2,
+                                    textAlign: 'center',
+                                }}>
+                                    {route.name === 'Home' ? t('home') : 
+                                     route.name === 'DriverTrips' ? t('task_list') :
+                                     route.name === 'RideList' ? t('ride_list_title') :
+                                     route.name === 'Settings' ? t('profile') : ''}
+                                </Text>
+                            </Animated.View>
                         );
                     },
                     tabBarActiveTintColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
                     tabBarInactiveTintColor: colors.SHADOW,
-                    tabBarBadge: route.name == 'RideList' && activeBookings && activeBookings.length > 0 ? activeBookings.length : null,
-                    tabBarBadgeStyle: isRTL ? {
-                        transform: [{ scaleX: -1 }],
-                        left: 5,
-                        right: 10,
-                    } : {
-                        left: 5,
-                        right: 10,
-                    },
                     tabBarStyle: {
-                        height: hasNotch ? 70 : 50,
+                        height: hasNotch ? 80 : 60,
                         backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
                         direction: isRTL ? 'rtl' : 'ltr',
                         borderTopWidth: 0,
-                        elevation: 0,
-                        shadowOpacity: 0,
+                        elevation: 8,
+                        shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                        shadowOffset: {
+                            width: 0,
+                            height: -2,
+                        },
+                        shadowOpacity: mode === 'dark' ? 0.1 : 0.15,
+                        shadowRadius: 8,
+                        paddingBottom: hasNotch ? 10 : 5,
+                        paddingTop: 5,
                     },
                     tabBarLabelStyle: {
                         display: 'none'
@@ -304,7 +356,7 @@ export default function AppContainer() {
                 })}
             >
                 {auth.profile && auth.profile.usertype && auth.profile.usertype == 'customer' ?
-                    <Tab.Screen name="Map" 
+                    <Tab.Screen name="Home" 
                         component={MapScreen} 
                         options={{ title: t('home'), headerShown: false }}
                         listeners={({ navigation, route }) => ({
@@ -338,7 +390,7 @@ export default function AppContainer() {
                                         fontFamily: 'Inter-Bold',
                                         color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                                         fontSize: 20,
-                                        marginTop: 8,
+                                        marginTop: 16,
                                         textAlign: isRTL ? 'right' : 'left',
                                     }}>
                                         {t('task_list')}
@@ -361,22 +413,9 @@ export default function AppContainer() {
                 : null}
                 <Tab.Screen name="RideList"
                     component={RideListPage} 
-                    options={screenOptions(t('ride_list_title'))}
-                    listeners={({ navigation, route }) => ({
-                        tabPress: e => {
-                            e.preventDefault()
-                            navigation.dispatch(
-                                CommonActions.reset({
-                                    index: 0,
-                                    routes: [{ name: route.name }]
-                                })
-                            )
-                        },
-                    })}
-                />
-                <Tab.Screen name="Wallet" 
-                    component={WalletDetails} 
-                    options={screenOptions(t('my_wallet_tile'))}
+                    options={{
+                        headerShown: false
+                    }}
                     listeners={({ navigation, route }) => ({
                         tabPress: e => {
                             e.preventDefault()
@@ -391,7 +430,9 @@ export default function AppContainer() {
                 />
                 <Tab.Screen name="Settings" 
                     component={SettingsScreen} 
-                    options={screenOptions(t('profile_page_title'))}
+                    options={{
+                        headerShown: false
+                    }}
                     listeners={({ navigation, route }) => ({
                         tabPress: e => {
                             e.preventDefault()
@@ -422,11 +463,13 @@ export default function AppContainer() {
                         <Stack.Screen name="Profile" component={ProfileScreen} options={screenOptions(t('profile_setting_menu'))} />
                         <Stack.Screen name="editUser" component={EditProfilePage} options={screenOptions(t('update_profile_title'))} />
                         <Stack.Screen name="Search" component={SearchScreen} options={screenOptions(t('search'))} />
+                        <Stack.Screen name="Map" component={MapScreen} options={{ headerShown: false }} />
                         <Stack.Screen name="DriverRating" component={DriverRating} options={{ headerShown: false }} />
                         <Stack.Screen name="PaymentDetails" component={PaymentDetails} options={screenOptions(t('payment'))} />
                         <Stack.Screen name="BookedCab" component={BookedCabScreen} options={{ headerShown: false }} />
                         <Stack.Screen name="RideDetails" component={RideDetails} options={screenOptions(t('ride_details_page_title'))} />
                         <Stack.Screen name="onlineChat" component={OnlineChat} options={{ headerShown: false }} />
+                        <Stack.Screen name="WalletDetails" component={WalletDetails} options={screenOptions(t('my_wallet_tile'))} />
                         <Stack.Screen name="addMoney" component={AddMoneyScreen} options={screenOptions(t('add_money'))} />
                         <Stack.Screen name="paymentMethod" component={SelectGatewayPage} options={screenOptions(t('payment'))} />
                         <Stack.Screen name="withdrawMoney" component={WithdrawMoneyScreen} options={screenOptions(t('withdraw_money'))} />
@@ -435,7 +478,7 @@ export default function AppContainer() {
                         <Stack.Screen name="MyEarning" component={DriverIncomeScreen} options={screenOptions(t('incomeText'))} />
                         <Stack.Screen name="Notifications" component={NotificationsPage} options={screenOptions(t('push_notification_title'))} />
                         <Stack.Screen name="Cars" component={CarsScreen} options={screenOptions(t('cars'))} />
-                        <Stack.Screen name="CarEdit" component={CarEditScreen} options={screenOptions(t('editcar'))} />
+                        <Stack.Screen name="CarEdit" component={CarEditScreen} options={screenOptions(t('cars'))} />
                         <Stack.Screen 
                             name="TransactionHistory" 
                             component={TransactionHistory} 

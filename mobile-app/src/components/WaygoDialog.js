@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, useColorScheme } from 'react-native';
 import { Icon } from 'react-native-elements';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../common/theme';
 import { fonts } from '../common/font';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
@@ -47,11 +47,11 @@ export default function WaygoDialog({
         
         switch (type) {
             case 'warning':
-                return { name: 'alert-circle-outline', color: colors.ORANGE };
+                return { name: 'warning-outline', color: colors.ORANGE };
             case 'confirm':
                 return { name: 'help-circle-outline', color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR };
             default:
-                return { name: 'information-outline', color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR };
+                return { name: 'information-circle-outline', color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR };
         }
     };
 
@@ -84,7 +84,7 @@ export default function WaygoDialog({
                         }]}>
                             {showIcon && (
                                 <View style={styles.iconContainer}>
-                                    <MaterialCommunityIcons 
+                                    <Ionicons 
                                         name={iconProps.name} 
                                         size={24} 
                                         color={iconProps.color} 

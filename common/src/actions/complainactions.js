@@ -53,10 +53,20 @@ import {
     });
     
     if (method === 'Add') {
-      push(complainRef, reasons);
+      const complainData = {
+        ...reasons,
+        status: 'pending',
+        adminMessage: '',
+        processDate: new Date().getTime()
+      };
+      push(complainRef, complainData);
     }
     else if(method === 'Update'){
-      set(editComplainRef(reasons.id),{ ...reasons, processDate: new Date().getTime() });
+      const updateData = { 
+        ...reasons, 
+        processDate: new Date().getTime() 
+      };
+      set(editComplainRef(reasons.id), updateData);
     }
   }
   

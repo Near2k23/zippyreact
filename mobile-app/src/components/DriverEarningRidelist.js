@@ -22,7 +22,6 @@ export default function DriverEarningRidelist(props) {
     const [mode, setMode] = useState();
     let colorScheme = useColorScheme();
     
-    // Animation related states
     const [scrollY] = useState(new Animated.Value(0));
     const fadeAnim = useRef({}).current;
     const [tabChangeAnim] = useState(new Animated.Value(1));
@@ -54,15 +53,12 @@ export default function DriverEarningRidelist(props) {
         }
     }, [auth, colorScheme]);
 
-    // Initialize animations when data changes
     useEffect(() => {
         if (props.data && props.data.length > 0) {
-            // Initialize animation values for each item
             props.data.forEach((_, index) => {
                 fadeAnim[index] = new Animated.Value(0);
             });
             
-            // Start staggered animations
             props.data.forEach((_, index) => {
                 Animated.sequence([
                     Animated.delay(index * 100),
@@ -77,14 +73,12 @@ export default function DriverEarningRidelist(props) {
     }, [props.data]);
 
     const animateTabChange = () => {
-        // Reset animation values for new tab content
         if(props.data) {
             props.data.forEach((_, index) => {
                 fadeAnim[index] = new Animated.Value(0);
             });
         }
 
-        // Animate tab change
         Animated.sequence([
             Animated.timing(tabChangeAnim, {
                 toValue: 0,
@@ -98,7 +92,6 @@ export default function DriverEarningRidelist(props) {
             })
         ]).start();
 
-        // Start staggered animations for new items
         if(props.data) {
             props.data.forEach((_, index) => {
                 Animated.sequence([

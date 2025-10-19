@@ -388,7 +388,8 @@ export const updateProfile = (updateData) => async (dispatch) => {
     singleUserRef,
     driverDocsRef,
     driverDocsRefBack,
-    verifyIdImageRef
+    verifyIdImageRef,
+    vehicleRegistrationCardRef
   } = firebase;
 
   const uid = auth.currentUser.uid;
@@ -404,6 +405,10 @@ export const updateProfile = (updateData) => async (dispatch) => {
   if (updateData.verifyIdImage) {
     await uploadBytesResumable(verifyIdImageRef(uid), updateData.verifyIdImage);
     updateData.verifyIdImage = await getDownloadURL(verifyIdImageRef(uid));
+  }
+  if (updateData.vehicleRegistrationCard) {
+    await uploadBytesResumable(vehicleRegistrationCardRef(uid), updateData.vehicleRegistrationCard);
+    updateData.vehicleRegistrationCard = await getDownloadURL(vehicleRegistrationCardRef(uid));
   }
 
   update(singleUserRef(uid), updateData);

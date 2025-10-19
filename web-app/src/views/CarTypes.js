@@ -28,6 +28,7 @@ import TableShadcn from '../components/ui/TableShadcn';
 import IconButton from '../components/ui/icon-button';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
+import InfoIcon from '@mui/icons-material/Info';
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,20 @@ const useStyles = makeStyles((theme) => ({
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+  },
+  infoIcon: {
+    fontSize: 16,
+    color: '#666',
+    marginLeft: 4,
+    cursor: 'help',
+    '&:hover': {
+      color: '#008d99',
+    },
+  },
+  tooltipContent: {
+    maxWidth: 300,
+    fontSize: '14px',
+    lineHeight: '1.4',
   },
 }));
 
@@ -252,6 +267,21 @@ export default function CarTypes() {
     }
   };
 
+  const InfoTooltip = ({ title, content }) => (
+    <Tooltip 
+      title={
+        <div className={classes.tooltipContent}>
+          <strong>{title}</strong><br />
+          {content}
+        </div>
+      } 
+      arrow
+      placement="top"
+    >
+      <InfoIcon className={classes.infoIcon} />
+    </Tooltip>
+  );
+
   return cartypes.loading ? (
     <CircularLoading />
   ) : (
@@ -316,38 +346,86 @@ export default function CarTypes() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('base_fare')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('base_fare')}
+                  <InfoTooltip 
+                    title="Tarifa Base"
+                    content="Costo fijo que se suma al inicio de cada viaje. Ejemplo: $2.50 base + (distancia × tarifa/km) + (tiempo × tarifa/hora)"
+                  />
+                </label>
                 <input type="number" value={editForm.base_fare} onChange={(e)=>setEditForm(prev=>({...prev, base_fare: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('rate_per_unit_distance')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('rate_per_unit_distance')}
+                  <InfoTooltip 
+                    title="Tarifa por Distancia"
+                    content="Costo por cada kilómetro recorrido. Ejemplo: $1.50/km × 10km = $15.00"
+                  />
+                </label>
                 <input type="number" value={editForm.rate_per_unit_distance} onChange={(e)=>setEditForm(prev=>({...prev, rate_per_unit_distance: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('rate_per_hour')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('rate_per_hour')}
+                  <InfoTooltip 
+                    title="Tarifa por Tiempo"
+                    content="Costo por cada hora de viaje (incluyendo esperas). Ejemplo: $20/hora × 0.5 horas = $10.00"
+                  />
+                </label>
                 <input type="number" value={editForm.rate_per_hour} onChange={(e)=>setEditForm(prev=>({...prev, rate_per_hour: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('min_fare')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('min_fare')}
+                  <InfoTooltip 
+                    title="Tarifa Mínima"
+                    content="Costo mínimo garantizado para cualquier viaje. Si el cálculo es menor, se cobra este monto. Ejemplo: Viaje corto calculado en $8, pero tarifa mínima es $12 → se cobra $12"
+                  />
+                </label>
                 <input type="number" value={editForm.min_fare} onChange={(e)=>setEditForm(prev=>({...prev, min_fare: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('convenience_fee')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('convenience_fee')}
+                  <InfoTooltip 
+                    title="Tarifa de Conveniencia"
+                    content="Cargo adicional por servicios de conveniencia. Puede ser fijo ($2) o porcentual (5% del total). Se suma al final del cálculo."
+                  />
+                </label>
                 <input type="number" value={editForm.convenience_fees} onChange={(e)=>setEditForm(prev=>({...prev, convenience_fees: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('convenience_fee_type')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('convenience_fee_type')}
+                  <InfoTooltip 
+                    title="Tipo de Tarifa de Conveniencia"
+                    content="Flat: Cantidad fija (ej: $2). Percentage: Porcentaje del total (ej: 5% de $50 = $2.50)"
+                  />
+                </label>
                 <select value={editForm.convenience_fee_type} onChange={(e)=>setEditForm(prev=>({...prev, convenience_fee_type: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md">
                   <option value="flat">{t('flat')}</option>
                   <option value="percentage">{t('percentage')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('fleet_admin_comission')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('fleet_admin_comission')}
+                  <InfoTooltip 
+                    title="Comisión de Administrador de Flota"
+                    content="Porcentaje que recibe el administrador de flota por cada viaje. Se calcula sobre el total del viaje. Ejemplo: 10% de $50 = $5"
+                  />
+                </label>
                 <input type="number" value={editForm.fleet_admin_fee} onChange={(e)=>setEditForm(prev=>({...prev, fleet_admin_fee: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('position')}</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                  {t('position')}
+                  <InfoTooltip 
+                    title="Posición en Lista"
+                    content="Orden de aparición en la lista de tipos de vehículo. Números menores aparecen primero. Ejemplo: 1 = primer lugar, 2 = segundo lugar"
+                  />
+                </label>
                 <input type="number" value={editForm.pos} onChange={(e)=>setEditForm(prev=>({...prev, pos: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
             </div>

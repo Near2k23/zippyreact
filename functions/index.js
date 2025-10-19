@@ -817,6 +817,115 @@ exports.userDelete = onValueDeleted(
   });
 
 
+exports.complainUpdate = onValueUpdated(
+    {
+        ref: '/complain/{complainId}',
+    }, 
+    async (event) => {
+        const db = getDatabase();
+        const complainId = event.params.complainId;
+        const oldComplain = event.data.before.val();
+        const newComplain = event.data.after.val();
+        
+        if (oldComplain.status !== newComplain.status || 
+            oldComplain.adminMessage !== newComplain.adminMessage) {
+            
+            const userSnap = await db.ref("users/" + newComplain.uid).once('value');
+            const profile = userSnap.val();
+            
+            if (profile && profile.pushToken) {
+                const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
+                const language = Object.values(langSnap.val())[0].keyValuePairs;
+                
+                let message = language.complain_updated || 'Your complaint has been updated';
+                
+                RequestPushMsg(
+                    profile.pushToken,
+                    {
+                        title: language.notification_title || 'Notification',
+                        msg: message,
+                        screen: 'Complain',
+                        ios: profile.userPlatform === "IOS" ? true : false
+                    }
+                );
+            }
+        }
+    }
+);
+
+exports.withdrawUpdate = onValueUpdated(
+    {
+        ref: '/withdraws/{withdrawId}',
+    }, 
+    async (event) => {
+        const db = getDatabase();
+        const oldWithdraw = event.data.before.val();
+        const newWithdraw = event.data.after.val();
+        
+        // Solo procesar si cambió el status
+        if (oldWithdraw.status !== newWithdraw.status && newWithdraw.status !== 'pending') {
+            const userSnap = await db.ref("users/" + newWithdraw.uid).once('value');
+            const profile = userSnap.val();
+            const settingdata = await db.ref('settings').once("value");
+            const settings = settingdata.val();
+            
+            // Si es rechazado, devolver el dinero a la billetera
+            if (newWithdraw.status === 'rejected') {
+                const currentBalance = parseFloat(profile.walletBalance || 0);
+                const refundAmount = parseFloat(newWithdraw.amount);
+                const newBalance = currentBalance + refundAmount;
+                
+                // Actualizar balance de la billetera
+                await db.ref("users/" + newWithdraw.uid).update({ 
+                    walletBalance: parseFloat(newBalance.toFixed(settings.decimal)) 
+                });
+                
+                // Registrar en historial de billetera como Credit (acreditado)
+                const refundDetails = {
+                    type: 'Credit',
+                    amount: refundAmount,
+                    date: new Date().getTime(),
+                    txRef: `Withdraw Rejected: ${newWithdraw.id}`,
+                    transaction_id: newWithdraw.id
+                };
+                await db.ref("walletHistory/" + newWithdraw.uid).push(refundDetails);
+            }
+            
+            // Enviar notificación si el usuario tiene pushToken
+            if (profile && profile.pushToken) {
+                const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
+                const language = Object.values(langSnap.val())[0].keyValuePairs;
+                
+                let message;
+                
+                if (newWithdraw.status === 'approved') {
+                    message = language.withdraw_approved || 'Your withdrawal has been approved';
+                } else if (newWithdraw.status === 'rejected') {
+                    message = language.withdraw_rejected || 'Your withdrawal has been rejected';
+                    
+                    // Agregar motivo de rechazo si existe
+                    if (newWithdraw.rejectionReason) {
+                        message += `\n\n${language.reason || 'Reason'}: ${newWithdraw.rejectionReason}`;
+                    }
+                    
+                    // Agregar mensaje de devolución de dinero
+                    message += `\n\n${language.money_returned_wallet || 'Your money has been returned to your wallet'}`;
+                }
+                
+                RequestPushMsg(
+                    profile.pushToken,
+                    {
+                        title: language.notification_title || 'Notification',
+                        msg: message,
+                        screen: 'wallet',
+                        ios: profile.userPlatform === "IOS" ? true : false
+                    }
+                );
+            }
+        }
+    }
+);
+
   exports.check_user_exists = onRequest( async(request, response) => {
     const db = getDatabase();
     let settingdata = await db.ref('settings').once("value");
@@ -1251,3 +1360,105 @@ exports.update_auth_mobile = onRequest(async (request, response) => {
         response.send({ error: "Request mobile not found" });
     }
 });
+
+exports.documentStatusUpdate = onValueUpdated(
+  {
+    ref: '/users/{userId}',
+  },
+  async (event) => {
+    const db = getDatabase();
+    const oldUser = event.data.before.val();
+    const newUser = event.data.after.val();
+    
+    // Verificar si hay cambios en documentStatus
+    if (!newUser.documentStatus || !oldUser.documentStatus) return null;
+    
+    const changedDocs = [];
+    const rejectedDocs = [];
+    
+    ['verifyIdImage', 'licenseImageFront', 'licenseImageBack', 'vehicleRegistrationCard'].forEach(docType => {
+      const oldStatus = oldUser.documentStatus && oldUser.documentStatus[docType] ? oldUser.documentStatus[docType].status : null;
+      const newStatus = newUser.documentStatus && newUser.documentStatus[docType] ? newUser.documentStatus[docType].status : null;
+      
+      if (oldStatus !== newStatus && newStatus) {
+        changedDocs.push({ type: docType, status: newStatus });
+        if (newStatus === 'rejected') {
+          rejectedDocs.push({
+            type: docType,
+            note: newUser.documentStatus[docType].note
+          });
+        }
+      }
+    });
+    
+    const allDocStatuses = ['verifyIdImage', 'licenseImageFront', 'licenseImageBack', 'vehicleRegistrationCard']
+      .map(docType => {
+        const docStatus = newUser.documentStatus && newUser.documentStatus[docType] 
+          ? newUser.documentStatus[docType].status 
+          : 'pending';
+        return docStatus;
+      });
+    
+    const hasRejected = allDocStatuses.includes('rejected');
+    const allApproved = allDocStatuses.every(status => status === 'approved');
+    const hasPending = allDocStatuses.includes('pending');
+    
+    let newApprovedAccount = newUser.approved_account;
+    let newApproved = newUser.approved;
+    
+    if (hasRejected) {
+      newApprovedAccount = false;
+      newApproved = false;
+    } else if (allApproved) {
+      newApprovedAccount = true;
+      newApproved = true;
+    }
+    
+    const updateData = {};
+    if (newApprovedAccount !== newUser.approved_account) {
+      updateData.approved_account = newApprovedAccount;
+    }
+    if (newApproved !== newUser.approved) {
+      updateData.approved = newApproved;
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await db.ref(`/users/${event.params.userId}`).update(updateData);
+    }
+    if (rejectedDocs.length > 0 && newUser.pushToken) {
+      const langSnap = await db.ref("languages")
+        .orderByChild("default")
+        .equalTo(true)
+        .once('value');
+      const language = Object.values(langSnap.val())[0].keyValuePairs;
+      
+      const docNames = rejectedDocs.map(doc => {
+        switch(doc.type) {
+          case 'verifyIdImage': return language.verify_id || 'ID/Passport';
+          case 'licenseImageFront': return language.driving_license_font || 'License Front';
+          case 'licenseImageBack': return language.driving_license_back || 'License Back';
+          case 'vehicleRegistrationCard': return language.vehicle_registration_card_image || 'Vehicle Card';
+          default: return 'Document';
+        }
+      }).join(', ');
+      
+      let message = `${language.documents_rejected || 'Documents rejected'}: ${docNames}`;
+      
+      if (rejectedDocs[0].note) {
+        message += `\n${language.reason || 'Reason'}: ${rejectedDocs[0].note}`;
+      }
+      
+      RequestPushMsg(
+        newUser.pushToken,
+        {
+          title: language.document_status_update || 'Document Status Update',
+          msg: message,
+          screen: 'Profile',
+          ios: newUser.userPlatform === "IOS" ? true : false
+        }
+      );
+    }
+    
+    return null;
+  }
+);

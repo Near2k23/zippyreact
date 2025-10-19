@@ -1,6 +1,4 @@
 import React,{ useState, useEffect } from 'react';
-// import { downloadCsv } from '../common/sharedFunctions';
-// import MaterialTable from "material-table";
 import CircularLoading from "../components/CircularLoading";
 import { useSelector } from "react-redux";
 import { useTranslation } from "react-i18next";
@@ -9,8 +7,6 @@ import {colors} from '../components/Theme/WebTheme';
 import {SECONDORY_COLOR} from "../common/sharedFunctions"
 import { ThemeProvider } from '@mui/material/styles';
 import theme from "styles/tableStyle";
-// import TableStyle from '../components/Table/Style';
-// import localization from '../components/Table/Localization';
 import TableShadcn from '../components/ui/TableShadcn';
 
 const Sos = () => {
@@ -35,7 +31,6 @@ const Sos = () => {
         }
   },[sosdata.sos]);
 
-  // const [selectedRow, setSelectedRow] = useState(null);
   
   return (
     sosdata.loading? <CircularLoading/>:

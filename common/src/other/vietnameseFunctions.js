@@ -10,21 +10,17 @@ import { useState } from 'react';
 export const formatNumberInput = (value, isVietnamese = false) => {
     if (!value || value === '') return '';
 
-    // Remove any existing formatting and keep only valid characters
     const cleanValue = value.toString().replace(/[^\d,.-]/g, '');
     
-    // If no valid numeric characters remain, return empty string
     if (!cleanValue || cleanValue === '') return '';
 
     if (!isVietnamese) {
         return cleanValue;
     }
 
-    // Parse the number correctly
     let numericValue;
     try {
         if (cleanValue.includes(',')) {
-            // Vietnamese input: 1.234.567,89
             const parts = cleanValue.split(',');
             const integerPart = parts[0].replace(/\./g, '');
             const decimalPart = parts[1] || '';
@@ -35,7 +31,6 @@ export const formatNumberInput = (value, isVietnamese = false) => {
 
         if (isNaN(numericValue)) return '';
 
-        // Format for Vietnamese display
         return numericValue.toLocaleString('vi-VN', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 2

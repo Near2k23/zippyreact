@@ -476,6 +476,18 @@ const GeneralSettings = (props) => {
                   }
                   label={ <Typography className={classes.typography}>{t('settings_label6')}</Typography>}
                 />
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.vehicle_registration_card_required}
+                      onChange={handleSwitchChange}
+                      name="vehicle_registration_card_required"
+                      color="primary"
+                    />
+                  }
+                  label={ <Typography className={classes.typography}>{t('vehicle_registration_card_required')}</Typography>}
+                />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={12} md={12} lg={12}>
                     <Typography component="h1" variant="h5" style={{ marginTop: '13px', textAlign: isRTL === 'rtl' ? 'right' : 'left', fontFamily:FONT_FAMILY }}>

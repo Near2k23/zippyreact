@@ -150,6 +150,10 @@ export default function DriverTrips(props) {
     const onPressAccept = (item, price) => {
         let wallet_balance = parseFloat(auth.profile.walletBalance);
         if ((settings && settings.imageIdApproval && auth.profile.verifyId && auth.profile.verifyIdImage) || (settings && !settings.imageIdApproval)) {
+            if (settings.vehicle_registration_card_required && !auth.profile.vehicleRegistrationCard) {
+                Alert.alert(t('alert'), t('upload_vehicle_registration_card'));
+                return;
+            }
             if (!settings.negativeBalance && !settings.disable_cash && (wallet_balance <= 0 || (wallet_balance > 0 && wallet_balance < item.convenience_fees)) && item.payment_mode === 'cash') {
                 Alert.alert(
                     t('alert'),
@@ -266,6 +270,10 @@ export default function DriverTrips(props) {
                 }
                 if (action === 'on' && settings.imageIdApproval && !auth.profile.verifyIdImage) {
                     Alert.alert(t('alert'), t('upload_id_details'));
+                    return;
+                }
+                if (action === 'on' && settings.vehicle_registration_card_required && !auth.profile.vehicleRegistrationCard) {
+                    Alert.alert(t('alert'), t('upload_vehicle_registration_card'));
                     return;
                 }
                 if (action === 'on') {
@@ -422,81 +430,122 @@ export default function DriverTrips(props) {
                                         <Text style={{ fontFamily: fonts.Regular }}>{t('loading')}</Text>
                                     </View>
                             }
-                            {gps.error || (!auth.profile.carType && settings.carType_required) || (!auth.profile.carApproved && settings.carType_required) || (!auth.profile.licenseImage && settings.license_image_required) || (!auth.profile.approved && settings.driver_approval) || !checks.driverActiveStatus || (settings && settings.imageIdApproval && !auth.profile.verifyIdImage) || (!auth.profile.term && settings.term_required) ?
-                                <View style={{
-                                    top: 0, left: 0, position: 'absolute', width: width - 20, margin: 10, borderRadius: 8, flexDirection: 'column', alignItems: 'center', backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE,
-                                    shadowColor: colors.BLACK, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.75, shadowRadius: 4, elevation: 5,
-                                    minHeight: 10 + (gps.error ? 70 : 0) + (!checks.driverActiveStatus ? 70 : 0) + (!auth.profile.carType && settings.carType_required ? 70 : 0) + (!auth.profile.carApproved && settings.carType_required ? 70 : 0) + (!auth.profile.approved && settings.driver_approval ? 70 : 0) + (!auth.profile.licenseImage && settings.license_image_required ? 70 : 0) + (settings && settings.imageIdApproval && !auth.profile.verifyIdImage ? 70 : 0) + (!auth.profile.term && settings.term_required ? 70 : 0)
-                                }}>
+                            {gps.error || (!auth.profile.carType && settings.carType_required) || (!auth.profile.carApproved && settings.carType_required) || (!auth.profile.licenseImage && settings.license_image_required) || (!auth.profile.approved && settings.driver_approval) || !checks.driverActiveStatus || (settings && settings.imageIdApproval && !auth.profile.verifyIdImage) || (!auth.profile.term && settings.term_required) || (settings && settings.vehicle_registration_card_required && !auth.profile.vehicleRegistrationCard) ?
+                                <View style={[styles.alertContainer, {
+                                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE,
+                                    borderColor: mode === 'dark' ? colors.SHADOW : '#E5E7EB',
+                                }]}>
                                     {gps.error ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row', }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('always_on')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="location" type="ionicon" color={colors.RED} size={20} />
                                             </View>
-                                            <Button onPress={changePermission} title={t('fix').toUpperCase()} titleStyle={styles.checkButtonTitle} buttonStyle={styles.checkButtonStyle} />
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('always_on')}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={changePermission} style={[styles.modernButton, { backgroundColor: colors.RED }]}>
+                                                <Text style={styles.modernButtonText}>{t('fix')}</Text>
+                                            </TouchableOpacity>
                                         </View>
                                         : null}
                                     {!auth.profile.carType && settings.carType_required ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('no_car_assign_text')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="car" type="ionicon" color={MAIN_COLOR} size={20} />
                                             </View>
-                                            <Button onPress={() => props.navigation.navigate('Cars', { fromPage: 'DriverTrips' })}
-                                                title={t('cars')} titleStyle={styles.checkButtonTitle} buttonStyle={styles.checkButtonStyle} />
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('no_car_assign_text')}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={() => props.navigation.navigate('Cars', { fromPage: 'DriverTrips' })} style={[styles.modernButton, { backgroundColor: MAIN_COLOR }]}>
+                                                <Text style={styles.modernButtonText}>{t('cars')}</Text>
+                                            </TouchableOpacity>
                                         </View>
                                         : null}
                                     {!auth.profile.carApproved && settings.carType_required ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={16} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('carApproved_by_admin')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="time" type="ionicon" color={colors.ORANGE} size={20} />
+                                            </View>
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('carApproved_by_admin')}</Text>
                                             </View>
                                         </View>
                                         : null}
                                     {!auth.profile.licenseImage && settings.license_image_required ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={16} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('upload_driving_license')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="card" type="ionicon" color={colors.RED} size={20} />
                                             </View>
-                                            <Button onPress={navEditUser} title={t('profile')} titleStyle={styles.checkButtonTitle} buttonStyle={styles.checkButtonStyle} />
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('upload_driving_license')}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={navEditUser} style={[styles.modernButton, { backgroundColor: colors.BLUE }]}>
+                                                <Text style={styles.modernButtonText}>{t('profile')}</Text>
+                                            </TouchableOpacity>
                                         </View>
                                         : null}
                                     {!auth.profile.approved && settings.driver_approval ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', width: "100%" }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('admin_contact')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="person" type="ionicon" color={colors.ORANGE} size={20} />
+                                            </View>
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('admin_contact')}</Text>
                                             </View>
                                         </View>
                                         : null}
                                     {!checks.driverActiveStatus ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('driver_active')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="power" type="ionicon" color={colors.GREEN} size={20} />
                                             </View>
-                                            <Button onPress={onChangeFunction} title={t('make_active').toUpperCase()} titleStyle={styles.checkButtonTitle} buttonStyle={styles.checkButtonStyle} />
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('driver_active')}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={onChangeFunction} style={[styles.modernButton, { backgroundColor: colors.GREEN }]}>
+                                                <Text style={styles.modernButtonText}>{t('make_active')}</Text>
+                                            </TouchableOpacity>
                                         </View>
                                         : null}
                                     {settings && settings.imageIdApproval && !auth.profile.verifyIdImage ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', padding: 2 }]}>
-                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('upload_id_details')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="id-card" type="ionicon" color={colors.RED} size={20} />
                                             </View>
-                                            <Button onPress={navEditUser} title={t('profile')} titleStyle={styles.checkButtonTitle} buttonStyle={[styles.checkButtonStyle, { width: 90 }]} />
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('upload_id_details')}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={navEditUser} style={[styles.modernButton, { backgroundColor: colors.BLUE }]}>
+                                                <Text style={styles.modernButtonText}>{t('profile')}</Text>
+                                            </TouchableOpacity>
                                         </View>
                                         : null}
                                     {!auth.profile.term && settings.term_required ?
-                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                            <TouchableOpacity onPress={onTermLink} style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', width: width - 180, height: 50 }]}>
-                                                <Icon name="document-text" type="ionicon" color={colors.RED} size={18} />
-                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: colors.BLUE, marginLeft: 3, textDecorationLine: 'underline' }}>{t('term_condition')}</Text>
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="document-text" type="ionicon" color={colors.RED} size={20} />
+                                            </View>
+                                            <View style={styles.alertContent}>
+                                                <TouchableOpacity onPress={onTermLink}>
+                                                    <Text style={[styles.alertTitle, { color: colors.BLUE, textDecorationLine: 'underline' }]}>{t('term_condition')}</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                            <TouchableOpacity onPress={onTermAccept} style={[styles.modernButton, { backgroundColor: colors.GREEN }]}>
+                                                <Text style={styles.modernButtonText}>{t('accept')}</Text>
                                             </TouchableOpacity>
-                                            <Button onPress={onTermAccept} title={t('accept')} titleStyle={styles.checkButtonTitle} buttonStyle={styles.checkButtonStyle} />
+                                        </View>
+                                        : null}
+                                    {settings && settings.vehicle_registration_card_required && !auth.profile.vehicleRegistrationCard ?
+                                        <View style={[styles.modernAlert, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.alertIconContainer}>
+                                                <Icon name="car-sport" type="ionicon" color={MAIN_COLOR} size={20} />
+                                            </View>
+                                            <View style={styles.alertContent}>
+                                                <Text style={[styles.alertTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('upload_vehicle_registration_card')}</Text>
+                                            </View>
+                                            <TouchableOpacity onPress={navEditUser} style={[styles.modernButton, { backgroundColor: MAIN_COLOR }]}>
+                                                <Text style={styles.modernButtonText}>{t('profile')}</Text>
+                                            </TouchableOpacity>
                                         </View>
                                         : null}
                                 </View>
@@ -1163,6 +1212,67 @@ const styles = StyleSheet.create({
         fontSize: 18,
         marginLeft: 3,
         fontFamily: fonts.Bold
+    },
+    // Modern alert styles
+    alertContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        margin: 10,
+        borderRadius: 12,
+        borderWidth: 1,
+        shadowColor: colors.BLACK,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+        paddingVertical: 8,
+    },
+    modernAlert: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        marginVertical: 4,
+        borderRadius: 8,
+        backgroundColor: 'transparent',
+    },
+    alertIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    alertContent: {
+        flex: 1,
+        marginRight: 12,
+    },
+    alertTitle: {
+        fontSize: 16,
+        fontFamily: fonts.Bold,
+        marginBottom: 2,
+    },
+    alertSubtitle: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        lineHeight: 18,
+    },
+    modernButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 6,
+        minWidth: 80,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modernButtonText: {
+        color: colors.WHITE,
+        fontSize: 14,
+        fontFamily: fonts.Bold,
     },
 
 });

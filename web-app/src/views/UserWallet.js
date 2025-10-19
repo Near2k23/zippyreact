@@ -268,9 +268,7 @@ const UserWallet = (props) => {
     const isVietnamese = settings && settings.country === "Vietnam";
 
     if (isVietnamese) {
-      // Parse Vietnamese input and get actual numeric value
       const numericValue = parseNumberInput(value, true);
-      // Format for display
       const displayValue = formatNumberInput(numericValue, true);
 
       setAmount(numericValue);

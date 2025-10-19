@@ -9,7 +9,8 @@ import {
   StyleSheet,
   View,
   ImageBackground,
-  LogBox
+  LogBox,
+  Animated
 } from "react-native";
 import { Provider } from "react-redux";
 import {
@@ -26,6 +27,11 @@ import { config } from '@gluestack-ui/config';
 
 SplashScreen.preventAutoHideAsync();
 
+SplashScreen.setOptions({
+  duration: 2000,
+  fade: true,
+});
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -38,6 +44,10 @@ Notifications.setNotificationHandler({
 export default function App() {
 
   const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [showCustomSplash, setShowCustomSplash] = useState(true);
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [backgroundColor] = useState(new Animated.Value(0));
+  const [bounceAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
     LogBox.ignoreAllLogs(true);
@@ -53,14 +63,63 @@ export default function App() {
         console.log(e);
     }
 
+    startSplashAnimations();
     onLoad();
   }, []);
+
+  const startSplashAnimations = () => {
+    SplashScreen.hideAsync();
+    
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: false,
+    }).start();
+
+    Animated.timing(backgroundColor, {
+      toValue: 1,
+      duration: 1500,
+      delay: 500,
+      useNativeDriver: false,
+    }).start(() => {
+      startBounceAnimation();
+    });
+  };
+
+  const startBounceAnimation = () => {
+    Animated.sequence([
+      Animated.timing(bounceAnim, {
+        toValue: 1.2,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bounceAnim, {
+        toValue: 0.9,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bounceAnim, {
+        toValue: 1.1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(bounceAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setTimeout(() => {
+        setShowCustomSplash(false);
+      }, 300);
+    });
+  };
 
   const _loadResourcesAsync = async () => {
     return Promise.all([
       Asset.loadAsync([
         require('./assets/images/background.jpg'),
-        require('./assets/images/intro.png'),
+        require('./assets/images/logo_splash.png'),
         require('./assets/images/g4.gif'),
         require('./assets/images/lodingDriver.gif')
       ]),
@@ -104,17 +163,48 @@ export default function App() {
     }
   }
 
-  if (!assetsLoaded) {
-    return <View style={styles.container}>
-      <ImageBackground
-        source={require('./assets/images/intro.png')}
-        resizeMode="cover"
-        style={styles.imagebg}
-        imageStyle={{ resizeMode: 'contain', width: '100%', height: '100%' }}
+  if (showCustomSplash || !assetsLoaded) {
+    const backgroundColorInterpolate = backgroundColor.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['#000000', colors.TAXIPRIMARY],
+    });
+
+    return (
+      <Animated.View
+        style={{
+          flex: 1,
+          backgroundColor: backgroundColorInterpolate,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
       >
-        <ActivityIndicator style={{ paddingBottom: 100 }} color={colors.BLUE} size='large' />
-      </ImageBackground>
-    </View>
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [
+              {
+                scale: Animated.multiply(
+                  fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
+                  bounceAnim
+                ),
+              },
+            ],
+          }}
+        >
+          <Animated.Image
+            source={require('./assets/images/logo_splash.png')}
+            style={{
+              width: 200,
+              height: 200,
+              resizeMode: 'contain',
+            }}
+          />
+        </Animated.View>
+      </Animated.View>
+    );
   }
 
   return (

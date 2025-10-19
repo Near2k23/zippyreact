@@ -3,16 +3,15 @@ import { api, store } from 'common';
 import { useSelector, useDispatch } from 'react-redux';
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, View, ActivityIndicator, Animated } from 'react-native';
 import i18n from 'i18n-js';
 import { colors } from './src/common/theme';
 import GetPushToken from './src/components/GetPushToken';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment/min/moment-with-locales';
-import {
-  AuthLoadingScreen,
-} from './src/screens';
+import CustomSplashScreen from './src/screens/CustomSplashScreen';
 import * as SplashScreen from 'expo-splash-screen';
+
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 const LOCATION_TASK_NAME = 'background-location-task';
@@ -50,17 +49,40 @@ export default function AppCommon({ children }) {
   const settings = useSelector(state => state.settingsdata.settings);
   const watcher = useRef();
   const locationOn = useRef(false);
+  const [bounceAnim] = useState(new Animated.Value(1));
   const languagedata = useSelector(state => state.languagedata);
   const initialFunctionsNotCalled = useRef(true);
   const authStillNotResponded = useRef(true);
   const authState = useRef('loading');
   const locationLoading = useRef(true);
+
+  useEffect(() => {
+    const startBounceAnimation = () => {
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        startBounceAnimation();
+      });
+    };
+    
+    startBounceAnimation();
+  }, []);
   const fetchingToken = useRef(true);
   const langCalled = useRef();
   const tasks = useSelector(state => state.taskdata.tasks);
   const [playedSounds, setPlayedSounds] = useState([]);
   const [deviceId,setDeviceId] = useState();
   const [hornPlayerPlaying, setHornPlayerPlaying] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
   const [repeatPlayerPlaying, setRepeatPlayerPlaying] = useState(false);
 
   const player = useAudioPlayer(audioSource);
@@ -548,14 +570,30 @@ export default function AppCommon({ children }) {
     })();
   }, []);
 
-  if (authStillNotResponded.current || !(languagedata && languagedata.langlist) || !settings || authState.current == 'loading') {
-    return <AuthLoadingScreen />;
-  }
+  useEffect(() => {
+    if (animationComplete) {
+      const hideSplash = async () => {
+        await SplashScreen.hideAsync();
+      };
+      hideSplash();
+    }
+  }, [animationComplete]);
 
-  const hideSplash = async () => {
-    await SplashScreen.hideAsync();
-  };
-  hideSplash();
+  if (authStillNotResponded.current || !(languagedata && languagedata.langlist) || !settings || authState.current == 'loading') {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.TAXIPRIMARY }}>
+        <Animated.Image
+          source={require('./assets/images/logo_splash.png')}
+          style={{
+            width: 200,
+            height: 200,
+            resizeMode: 'contain',
+            transform: [{ scale: bounceAnim }],
+          }}
+        />
+      </View>
+    );
+  }
 
   return children;
 }

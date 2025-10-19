@@ -15,6 +15,7 @@ import { fonts } from "../common/font";
 import Button from '../components/Button';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WaygoDialog from '../components/WaygoDialog';
+import HeaderGradient from '../components/HeaderGradient';
 
 export default function SettingsScreen(props) {
     const { t } = i18n;
@@ -53,8 +54,8 @@ export default function SettingsScreen(props) {
     const menuList = [
         // { name: t('profile_setting_menu'), navigationName: 'Profile', icon: 'account-cog-outline', type: 'material-community' },
         { name: t('documents'), navigationName: 'editUser', icon: 'description', type: 'materialIcons' },
+        { name: t('my_wallet_tile'), navigationName: 'WalletDetails', icon: 'wallet-outline', type: 'ionicon' },
         { name: t('incomeText'), navigationName: 'MyEarning', icon: 'attach-money', type: 'materialIcons' },
-        { name: auth.profile && auth.profile && auth.profile.usertype == "driver" ? t('convert_to_rider') : t('convert_to_driver'), navigationName: 'Convert', icon: 'account-convert-outline', type: 'material-community' },
         { name: t('cars'), navigationName: 'Cars', icon: 'car-cog', type: 'material-community' },
         { name: t('refer_earn'), navigationName: 'Refer', icon: 'cash-outline', type: 'ionicon' },
         { name: t('sos'), navigationName: 'Sos', icon: 'alert-circle-outline', type: 'ionicon' },
@@ -207,12 +208,35 @@ export default function SettingsScreen(props) {
 
 
     return (
-        <ScrollView 
-            style={[styles.mainView,{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND}]}
-            contentContainerStyle={{ flexGrow: 1 }}
-            showsVerticalScrollIndicator={false}
-        >
-            {/* Profile Section */}
+        <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+            {/* Header Gradient */}
+            <HeaderGradient mode={mode} />
+            
+            {/* Custom Header */}
+            <View style={[styles.customHeader, { 
+                backgroundColor: 'transparent',
+                paddingTop: Platform.OS === 'ios' ? 50 : 30,
+                paddingHorizontal: 20,
+                paddingBottom: 15,
+                zIndex: 2,
+            }]}>
+                <Text style={{
+                    fontFamily: 'Inter-Bold',
+                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                    fontSize: 20,
+                    textAlign: 'center',
+                    marginTop: 8,
+                }}>
+                    {t('profile')}
+                </Text>
+            </View>
+            
+            <ScrollView 
+                style={styles.scrollView}
+                contentContainerStyle={{ flexGrow: 1 }}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Profile Section */}
             <Animated.View 
                 style={[styles.profileSection, {
                     backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
@@ -509,13 +533,25 @@ export default function SettingsScreen(props) {
                 confirmText={t('ok')}
                 cancelText={t('cancel')}
             />
-        </ScrollView>
+            </ScrollView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     mainView: {
         flex: 1
+    },
+    scrollView: {
+        flex: 1,
+        zIndex: 1,
+    },
+    customHeader: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 2,
     },
     vew: {
         flex: 1,
@@ -726,7 +762,7 @@ const styles = StyleSheet.create({
     // Nuevos estilos para el diseño actualizado
     profileSection: {
         marginHorizontal: 20,
-        marginTop: 20,
+        marginTop: Platform.OS === 'ios' ? 100 : 80, // Ajustado para el header personalizado
         marginBottom: 32,
         borderRadius: 20,
         backgroundColor: '#FFFFFF',

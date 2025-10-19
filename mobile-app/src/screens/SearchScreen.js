@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from 'react-native-elements';
 import { colors } from '../common/theme';
 import {
@@ -50,7 +50,7 @@ export default function SearchScreen(props) {
   const tripdata = useSelector(state => state.tripdata);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [savedAddresses, setSavedAddresses] = useState([]);
-  const { locationType, addParam } = props.route.params;
+  const { locationType, addParam, isSearchDrop = false } = props.route.params;
   const [loading, setLoading] = useState();
   const settingsdata = useSelector(state => state.settingsdata.settings);
   const [settings, setSettings] = useState({});
@@ -69,6 +69,15 @@ export default function SearchScreen(props) {
   const [mode, setMode] = useState();
   const [dialogVisible, setDialogVisible] = useState(false);
   const [dialogData, setDialogData] = useState({});
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isSearchDrop && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isSearchDrop]);
 
   useEffect(() => {
     if (auth?.profile?.mode) {
@@ -412,6 +421,7 @@ export default function SearchScreen(props) {
             }
             <View style={styles.modernAddressContent}>
               <TextInput
+                ref={searchInputRef}
                 placeholder={t('search_for_an_address')}
                 returnKeyType="search"
                 style={[mode === 'dark' ? styles.modernSearchBoxDark : styles.modernSearchBox, isRTL ? { textAlign: 'right' } : { textAlign: 'left' }]}

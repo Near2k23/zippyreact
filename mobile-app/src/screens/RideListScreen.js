@@ -6,7 +6,8 @@ import {
     TouchableOpacity,
     FlatList,
     Dimensions,
-    useColorScheme
+    useColorScheme,
+    Platform
 } from 'react-native';
 import { colors } from '../common/theme';
 import { fonts } from '../common/font';
@@ -15,6 +16,7 @@ import { useSelector } from 'react-redux';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import { Ionicons } from '@expo/vector-icons';
 import { Icon } from 'react-native-elements';
+import HeaderGradient from '../components/HeaderGradient';
 
 const { width } = Dimensions.get('window');
 
@@ -75,19 +77,33 @@ export default function RideListPage(props) {
 
     const getFilteredData = () => {
         const activeTrips = getActiveTrips();
-        if (tabIndex === 0) {
-            return activeTrips;
-        } else if (tabIndex === 1 || (activeTrips.length === 0 && tabIndex === 0)) {
-            return bookingData.filter(item => item.status === 'COMPLETE');
+        const hasActiveTrips = activeTrips.length > 0;
+        
+        if (hasActiveTrips) {
+            // Si hay viajes activos, usar los índices originales
+            if (tabIndex === 0) {
+                return activeTrips;
+            } else if (tabIndex === 1) {
+                return bookingData.filter(item => item.status === 'COMPLETE');
+            } else {
+                return bookingData.filter(item => item.status === 'CANCELLED');
+            }
         } else {
-            return bookingData.filter(item => item.status === 'CANCELLED');
+            // Si no hay viajes activos, ajustar los índices
+            if (tabIndex === 0) {
+                return bookingData.filter(item => item.status === 'COMPLETE');
+            } else {
+                return bookingData.filter(item => item.status === 'CANCELLED');
+            }
         }
     }
 
     useEffect(() => {
         const activeTrips = getActiveTrips();
-        if (activeTrips.length === 0 && tabIndex === 0) {
-            setTabIndex(1);
+        // Si no hay viajes activos y estamos en el tab 0 (que ahora sería "Completados"), no hacer nada
+        // Si hay viajes activos y estamos en un tab inválido, resetear a 0
+        if (activeTrips.length > 0 && tabIndex > 2) {
+            setTabIndex(0);
         }
     }, [bookingData]);
 
@@ -95,138 +111,218 @@ export default function RideListPage(props) {
         const tripCost = item.trip_cost || item.estimate || 0;
         const distance = item.distance || 0;
         const duration = item.total_time || 0;
+        const status = item.status;
+        
+        const getStatusInfo = () => {
+            switch(status) {
+                case 'ACCEPTED':
+                    return { color: '#3B82F6', text: t('accepted'), icon: 'checkmark-circle', bgColor: '#EFF6FF' };
+                case 'STARTED':
+                    return { color: '#F59E0B', text: t('started'), icon: 'play-circle', bgColor: '#FFFBEB' };
+                case 'ARRIVED':
+                    return { color: '#10B981', text: t('arrived'), icon: 'location', bgColor: '#ECFDF5' };
+                case 'REACHED':
+                    return { color: '#10B981', text: t('reached'), icon: 'flag', bgColor: '#ECFDF5' };
+                case 'COMPLETE':
+                    return { color: '#10B981', text: t('complete'), icon: 'checkmark-circle', bgColor: '#ECFDF5' };
+                case 'CANCELLED':
+                    return { color: '#EF4444', text: t('cancelled'), icon: 'close-circle', bgColor: '#FEF2F2' };
+                default:
+                    return { color: colors.SHADOW, text: status, icon: 'help-circle', bgColor: '#F3F4F6' };
+            }
+        };
+
+        const statusInfo = getStatusInfo();
         
         return (
             <TouchableOpacity 
                 style={[styles.tripCard, { 
                     backgroundColor: mode === 'dark' ? '#1C1C1E' : colors.WHITE,
-                    borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC'
                 }]}
                 onPress={() => goDetails(item)}
             >
+                {/* Header con estado y fecha */}
                 <View style={styles.tripHeader}>
-                    <Text style={[styles.todayText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                        {t('today_text')}
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bgColor }]}>
+                        <Ionicons name={statusInfo.icon} size={14} color={statusInfo.color} />
+                        <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                            {statusInfo.text}
+                        </Text>
+                    </View>
+                    <Text style={[styles.tripDate, { color: colors.SHADOW }]}>
+                        {(() => {
+                            const dateString = item.tripdate;
+                            
+                            if (!dateString) {
+                                return t('no_date');
+                            }
+                            
+                            const date = new Date(dateString);
+                            if (isNaN(date.getTime())) {
+                                return t('no_date');
+                            }
+                            
+                            return date.toLocaleDateString();
+                        })()}
                     </Text>
                 </View>
                 
-                <View style={styles.tripContent}>
-                    <View style={styles.locationContainer}>
-                        <View style={styles.iconColumn}>
-                            <View style={[styles.pickupIconContainer, { 
-                                borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
-                                backgroundColor: colors.WHITE
-                            }]}>
-                                <View style={[styles.locationDot, { 
-                                    backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
-                                }]} />
-                            </View>
-                            <View style={[styles.dashedLine, { borderColor: mode === 'dark' ? colors.WHITE : colors.SHADOW }]} />
-                            <View style={[styles.locationIcon, { backgroundColor: colors.WHITE }]}>
-                                <Icon 
-                                    name="location"
-                                    type="ionicon"
-                                    size={10}
-                                    color={colors.RED}
-                                />
-                            </View>
-                        </View>
-                        <View style={styles.addressColumn}>
-                            <View style={styles.locationRow}>
-                                <View style={styles.locationTextContainer}>
-                                    <Text style={[styles.locationLabel, { color: colors.SHADOW }]}>
-                                        {t('marker_title_1')}
-                                    </Text>
-                                    <Text style={[styles.locationAddress, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
-                                        {item.pickup?.add}
-                                    </Text>
-                                </View>
-                            </View>
-                            <View style={[styles.locationRow, { marginTop: 15 }]}>
-                                <View style={styles.locationTextContainer}>
-                                    <Text style={[styles.locationLabel, { color: colors.SHADOW }]}>
-                                        {t('marker_title_2')}
-                                    </Text>
-                                    <Text style={[styles.locationAddress, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
-                                        {item.drop?.add}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
+                {/* Ruta simplificada */}
+                <View style={styles.routeContainer}>
+                    <View style={styles.routePoint}>
+                        <View style={[styles.routeDot, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} />
+                        <Text style={[styles.routeAddress, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
+                            {item.pickup?.add}
+                        </Text>
                     </View>
                     
-                    <View style={styles.tripInfo}>
-                        <View style={styles.infoItem}>
-                            <Ionicons name="location-outline" size={16} color={colors.SHADOW} />
-                            <Text style={[styles.infoText, { color: colors.SHADOW }]}>
-                                {distance.toFixed(2)} km
+                    <View style={[styles.routeLine, { backgroundColor: mode === 'dark' ? colors.WHITE + '30' : colors.SHADOW + '30' }]} />
+                    
+                    <View style={styles.routePoint}>
+                        <View style={[styles.routeDot, { backgroundColor: colors.RED }]} />
+                        <Text style={[styles.routeAddress, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
+                            {item.drop?.add}
+                        </Text>
+                    </View>
+                </View>
+                
+                {/* Footer con información */}
+                <View style={styles.tripFooter}>
+                    <View style={styles.tripMetrics}>
+                        <View style={styles.metricItem}>
+                            <Ionicons name="location-outline" size={14} color={colors.SHADOW} />
+                            <Text style={[styles.metricText, { color: colors.SHADOW }]}>
+                                {distance.toFixed(1)} km
                             </Text>
                         </View>
                         
-                        <View style={styles.infoItem}>
-                            <Ionicons name="time-outline" size={16} color={colors.SHADOW} />
-                            <Text style={[styles.infoText, { color: colors.SHADOW }]}>
+                        <View style={styles.metricItem}>
+                            <Ionicons name="time-outline" size={14} color={colors.SHADOW} />
+                            <Text style={[styles.metricText, { color: colors.SHADOW }]}>
                                 {Math.round(duration)} {t('mins')}
                             </Text>
                         </View>
-                        
-                        <View style={styles.infoItem}>
-                            <Ionicons name="cash-outline" size={16} color={colors.SHADOW} />
-                            <Text style={[styles.infoText, { color: colors.SHADOW }]}>
-                                $ {formatAmount(tripCost)}
-                            </Text>
-                        </View>
+                    </View>
+                    
+                    <View style={[styles.priceBadge, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20' }]}>
+                        <Text style={[styles.priceText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                            ${formatAmount(tripCost)}
+                        </Text>
                     </View>
                 </View>
             </TouchableOpacity>
         );
     }
 
-    const renderTabHeader = () => (
-        <View style={[styles.tabContainer, { 
-            backgroundColor: mode === 'dark' ? '#1C1C1E' : colors.WHITE, 
-            borderColor: mode === 'dark' ? '#2C2C2E' : '#E2E9EC' 
-        }]}>
-            {getActiveTrips().length > 0 && (
-                <TouchableOpacity 
-                    style={[styles.tab, tabIndex === 0 && styles.activeTab]}
-                    onPress={() => setTabIndex(0)}
-                >
-                    <Text style={[styles.tabText, tabIndex === 0 && styles.activeTabText]}>
-                        {t('actives')}
-                    </Text>
-                </TouchableOpacity>
-            )}
-            
-            <TouchableOpacity 
-                style={[styles.tab, tabIndex === 1 && styles.activeTab]}
-                onPress={() => setTabIndex(1)}
-            >
-                <Text style={[styles.tabText, tabIndex === 1 && styles.activeTabText]}>
-                    {t('complete')}
+    const renderFilterHeader = () => {
+        const activeTrips = getActiveTrips();
+        const completeTrips = bookingData.filter(item => item.status === 'COMPLETE');
+        const cancelledTrips = bookingData.filter(item => item.status === 'CANCELLED');
+        
+        const filterOptions = [];
+        
+        // Solo agregar "Activos" si hay viajes activos
+        if (activeTrips.length > 0) {
+            filterOptions.push({ key: 0, label: t('actives'), count: activeTrips.length, icon: 'time-outline' });
+        }
+        
+        // Siempre agregar "Completados" y "Cancelados"
+        filterOptions.push(
+            { key: 1, label: t('complete'), count: completeTrips.length, icon: 'checkmark-circle-outline' },
+            { key: 2, label: t('cancelled'), count: cancelledTrips.length, icon: 'close-circle-outline' }
+        );
+
+        return (
+            <View style={styles.filterContainer}>
+                <Text style={[styles.filterTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                    {t('filter_trips')}
                 </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-                style={[styles.tab, tabIndex === 2 && styles.activeTab]}
-                onPress={() => setTabIndex(2)}
-            >
-                <Text style={[styles.tabText, tabIndex === 2 && styles.activeTabText]}>
-                    {t('cancelled')}
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
+                <View style={styles.filterChips}>
+                    {filterOptions.map((option) => (
+                        <TouchableOpacity
+                            key={option.key}
+                            style={[
+                                styles.filterChip,
+                                tabIndex === option.key && styles.activeFilterChip,
+                                {
+                                    backgroundColor: tabIndex === option.key 
+                                        ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                                        : (mode === 'dark' ? '#2C2C2E' : '#F5F5F5'),
+                                    borderColor: tabIndex === option.key 
+                                        ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                                        : (mode === 'dark' ? '#2C2C2E' : '#E2E9EC')
+                                }
+                            ]}
+                            onPress={() => setTabIndex(option.key)}
+                        >
+                            <Ionicons 
+                                name={option.icon} 
+                                size={16} 
+                                color={tabIndex === option.key ? colors.WHITE : (mode === 'dark' ? colors.WHITE : colors.BLACK)} 
+                            />
+                            <Text style={[
+                                styles.filterChipText,
+                                {
+                                    color: tabIndex === option.key ? colors.WHITE : (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                                }
+                            ]}>
+                                {option.label}
+                            </Text>
+                            {option.count > 0 && (
+                                <View style={[
+                                    styles.countBadge,
+                                    {
+                                        backgroundColor: tabIndex === option.key ? colors.WHITE : (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                                    }
+                                ]}>
+                                    <Text style={[
+                                        styles.countText,
+                                        {
+                                            color: tabIndex === option.key ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : colors.WHITE
+                                        }
+                                    ]}>
+                                        {option.count}
+                                    </Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+        );
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : '#FFF' }]}>
+            {/* Header Gradient */}
+            <HeaderGradient mode={mode} />
+            
+            {/* Custom Header */}
+            <View style={[styles.customHeader, { 
+                backgroundColor: 'transparent',
+                paddingTop: Platform.OS === 'ios' ? 50 : 30,
+                paddingHorizontal: 20,
+                paddingBottom: 15,
+                zIndex: 2,
+            }]}>
+                <Text style={{
+                    fontFamily: 'Inter-Bold',
+                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                    fontSize: 20,
+                    textAlign: 'center',
+                    marginTop: 8,
+                }}>
+                    {t('ride_list_title')}
+                </Text>
+            </View>
+            
             <FlatList
                 data={getFilteredData()}
                 renderItem={renderTripCard}
                 keyExtractor={(item, index) => index.toString()}
-                contentContainerStyle={styles.listContainer}
+                contentContainerStyle={[styles.listContainer, { paddingTop: Platform.OS === 'ios' ? 100 : 80 }]}
                 showsVerticalScrollIndicator={false}
-                ListHeaderComponent={renderTabHeader}
+                ListHeaderComponent={renderFilterHeader}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={[styles.emptyText, { color: colors.SHADOW }]}>
@@ -243,16 +339,36 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+    customHeader: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 2,
+    },
 
-    tabContainer: {
+    filterContainer: {
+        marginBottom: 24,
+        paddingHorizontal: 4,
+    },
+    filterTitle: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+        marginBottom: 16,
+    },
+    filterChips: {
         flexDirection: 'row',
-        backgroundColor: colors.WHITE,
-        marginHorizontal: 5,
-        marginBottom: 20,
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
         borderRadius: 25,
-        padding: 4,
-        gap: 8,
         borderWidth: 1,
+        gap: 8,
         shadowColor: colors.BLACK,
         shadowOffset: {
             width: 0,
@@ -260,134 +376,118 @@ const styles = StyleSheet.create({
         },
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        elevation: 4,
+        elevation: 3,
     },
-    tab: {
-        flex: 1,
-        paddingVertical: 8,
+    activeFilterChip: {
+        shadowOpacity: 0.2,
+        elevation: 6,
+    },
+    filterChipText: {
+        fontSize: 14,
+        fontFamily: fonts.Medium,
+    },
+    countBadge: {
+        minWidth: 20,
+        height: 20,
+        borderRadius: 10,
         alignItems: 'center',
-        borderRadius: 20,
+        justifyContent: 'center',
+        paddingHorizontal: 6,
     },
-    activeTab: {
-        backgroundColor: colors.BLUE,
-    },
-    tabText: {
-        fontSize: 16,
+    countText: {
+        fontSize: 12,
         fontFamily: fonts.Bold,
-        color: colors.SHADOW,
-    },
-    activeTabText: {
-        color: colors.WHITE,
     },
     listContainer: {
         padding: 20,
     },
     tripCard: {
         borderRadius: 12,
-        marginBottom: 16,
+        marginBottom: 12,
         padding: 16,
-        borderWidth: 1,
         shadowColor: colors.BLACK,
         shadowOffset: {
             width: 0,
-            height: 4,
+            height: 2,
         },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 8,
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 3,
     },
     tripHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 12,
     },
-    todayText: {
-        fontSize: 14,
-        fontFamily: fonts.Regular,
-        color: colors.SHADOW,
-    },
-    tripContent: {
-        gap: 16,
-    },
-    locationContainer: {
+    statusBadge: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
-    iconColumn: {
-        width: 20,
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        marginRight: 15,
-        paddingTop: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        gap: 4,
     },
-    pickupIconContainer: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        borderWidth: 2,
+    statusText: {
+        fontSize: 12,
+        fontFamily: fonts.Medium,
+    },
+    tripDate: {
+        fontSize: 11,
+        fontFamily: fonts.Regular,
+    },
+    routeContainer: {
+        marginBottom: 12,
+        gap: 8,
+    },
+    routePoint: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 12,
     },
-    locationDot: {
+    routeDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
     },
-    locationIcon: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: colors.RED,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    dashedLine: {
-        height: 35,
-        width: 2,
-        borderStyle: 'dashed',
-        borderWidth: 1,
-        marginVertical: 12,
-    },
-    addressColumn: {
+    routeAddress: {
         flex: 1,
-        justifyContent: 'space-between',
-        height: 80,
+        fontSize: 14,
+        fontFamily: fonts.Medium,
     },
-    locationRow: {
-        justifyContent: 'center',
-        height: 28,
-        marginBottom: 8,
+    routeLine: {
+        height: 1,
+        marginLeft: 4,
+        marginVertical: 4,
     },
-    locationTextContainer: {
-        flex: 1,
-        gap: 2,
-    },
-    locationLabel: {
-        fontSize: 12,
-        fontFamily: fonts.Regular,
-    },
-    locationAddress: {
-        fontSize: 16,
-        fontFamily: fonts.Bold,
-    },
-    tripInfo: {
+    tripFooter: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 8,
+        alignItems: 'center',
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(0, 0, 0, 0.05)',
     },
-    infoItem: {
+    tripMetrics: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    metricItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        flexShrink: 1,
-        justifyContent: 'flex-start',
     },
-    infoText: {
-        fontSize: 14,
-        fontFamily: fonts.Regular,
+    metricText: {
+        fontSize: 11,
+        fontFamily: fonts.Medium,
+    },
+    priceBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 8,
     },
     priceText: {
-        fontSize: 18,
+        fontSize: 14,
         fontFamily: fonts.Bold,
     },
     emptyContainer: {

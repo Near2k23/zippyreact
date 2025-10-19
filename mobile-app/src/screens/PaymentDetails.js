@@ -744,7 +744,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40
   },
   
-  // Header Card Styles
   headerCard: {
     borderRadius: 16,
     padding: 20,
@@ -791,7 +790,6 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   
-  // Trip Card Styles
   tripCard: {
     borderRadius: 16,
     padding: 20,
@@ -882,7 +880,6 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   
-  // Payment Card Styles
   paymentCard: {
     borderRadius: 16,
     padding: 20,
@@ -946,7 +943,6 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   
-  // Payment Methods Card Styles
   actionButtonsContainer: {
       flexDirection: 'row',
       paddingHorizontal: 16,
@@ -983,16 +979,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.RED
   },
   walletButton: {
-    backgroundColor: '#8B5CF6'
+    backgroundColor: MAIN_COLOR
   },
   cashButton: {
-    backgroundColor: colors.GREEN
+    backgroundColor: MAIN_COLOR
   },
   cardButton: {
     backgroundColor: MAIN_COLOR
   },
   
-  // Modal Styles
   modalContainer: {
     flex: 1
   },
@@ -1044,7 +1039,6 @@ const styles = StyleSheet.create({
      fontWeight: '600'
    },
    
-   // Promo Text Styles
    promoTextContainer: {
      paddingHorizontal: 16,
      paddingVertical: 12,

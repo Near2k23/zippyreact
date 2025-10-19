@@ -14,7 +14,9 @@ import {
     Linking,
     ActivityIndicator,
     useColorScheme,
-    TouchableOpacity
+    TouchableOpacity,
+    SafeAreaView,
+    Modal
 } from 'react-native';
 import { Icon } from 'react-native-elements';
 import { colors } from '../common/theme';
@@ -27,6 +29,8 @@ import { api, FirebaseContext } from 'common';
 import * as DecodePolyLine from '@mapbox/polyline';
 import { OptionModal } from '../components/OptionModal';
 import BookingModal, { appConsts, prepareEstimateObject } from '../common/sharedFunctions';
+import HeaderGradient from '../components/HeaderGradient';
+import WaygoDialog from '../components/WaygoDialog';
 import MapView, { PROVIDER_GOOGLE, Marker, Polyline } from 'react-native-maps';
 import { CommonActions } from '@react-navigation/native';
 import { MAIN_COLOR, MAIN_COLOR_DARK, CarHorizontal, CarVertical, validateBookingObj, SECONDORY_COLOR } from '../common/sharedFunctions';
@@ -73,6 +77,7 @@ export default function MapScreen(props) {
     const providers = useSelector(state => state.paymentmethods.providers);
     const gps = useSelector(state => state.gpsdata);
     const activeBookings = useSelector(state => state.bookinglistdata.active);
+    const bookings = useSelector(state => state.bookinglistdata.bookings);
     const addressdata = useSelector(state => state.addressdata);
     const [datePickerOpen, setDatePickerOpen] = useState(false)
     const latitudeDelta = 0.0122;
@@ -152,6 +157,10 @@ export default function MapScreen(props) {
     const [routeCoords, setRouteCoords] = useState([]);
     const [hasAutoFitted, setHasAutoFitted] = useState(false);
     const [shouldRequestEstimate, setShouldRequestEstimate] = useState(false);
+    const [currentLocation, setCurrentLocation] = useState(null);
+    const [loadingLocation, setLoadingLocation] = useState(false);
+    const [showRecentTripsModal, setShowRecentTripsModal] = useState(false);
+    const [recentTrips, setRecentTrips] = useState([]);
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -308,6 +317,59 @@ export default function MapScreen(props) {
     }, [addressdata]);
 
     useEffect(() => {
+        const initializeLocation = async () => {
+            try {
+                const { status } = await Location.requestForegroundPermissionsAsync();
+                if (status === 'granted') {
+                    const location = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                        timeout: 15000,
+                        maximumAge: 10000
+                    });
+                    
+                    if (location && location.coords) {
+                        dispatch({
+                            type: 'UPDATE_GPS_LOCATION',
+                            payload: {
+                                lat: location.coords.latitude,
+                                lng: location.coords.longitude
+                            }
+                        });
+                    }
+                } else {
+                    console.warn('Location permission denied');
+                }
+            } catch (error) {
+                console.warn('Error initializing location:', error);
+            }
+        };
+
+        initializeLocation();
+    }, []);
+
+    useEffect(() => {
+        if (gps && gps.location && 
+            typeof gps.location.lat === 'number' && 
+            typeof gps.location.lng === 'number' && 
+            !currentLocation) {
+            updateCurrentLocation({
+                latitude: gps.location.lat,
+                longitude: gps.location.lng
+            });
+        }
+    }, [gps.location]);
+
+    useEffect(() => {
+        if (bookings && bookings.length > 0) {
+            const completedTrips = bookings
+                .filter(trip => trip.status === 'COMPLETE' && trip.pickup && trip.drop)
+                .sort((a, b) => new Date(b.created_at || b.timestamp) - new Date(a.created_at || a.timestamp))
+                .slice(0, 5);
+            setRecentTrips(completedTrips);
+        }
+    }, [bookings]);
+
+    useEffect(() => {
         if (auth.profile && auth.profile.uid) {
             setProfile(auth.profile);
         } else {
@@ -320,6 +382,16 @@ export default function MapScreen(props) {
             setIsEditing(true);
         }
     }, [tripdata]);
+
+    // Cambiar showInitialScreen a false cuando se regrese del SearchScreen con datos completos
+    useEffect(() => {
+        if (tripdata.pickup && tripdata.pickup.add && tripdata.drop && tripdata.drop.add && showInitialScreen) {
+            // Solo cambiar si el drop fue configurado desde SearchScreen (source: 'search')
+            if (tripdata.drop.source === 'search') {
+                setShowInitialScreen(false);
+            }
+        }
+    }, [tripdata.pickup, tripdata.drop, showInitialScreen]);
 
     useEffect(() => easing => {
         Animated.timing(animation, {
@@ -552,22 +624,6 @@ export default function MapScreen(props) {
         setAllCarTypes(carWiseArr);
     }
 
-    const locateUser = async () => {
-        if (tripdata.selected == 'pickup') {
-            let tempWatcher = await Location.watchPositionAsync({
-                accuracy: Location.Accuracy.Balanced
-            }, location => {
-                dispatch({
-                    type: 'UPDATE_GPS_LOCATION',
-                    payload: {
-                        lat: location.coords.latitude,
-                        lng: location.coords.longitude
-                    }
-                });
-                tempWatcher.remove();
-            })
-        }
-    }
 
 
   const setAddresses = async (pos, res, source) => {
@@ -862,7 +918,7 @@ export default function MapScreen(props) {
     }
     
     const tapAddress = (selection) => {
-        if(selection==='drop' &&  tripdata.drop.add=== null)  props.navigation.navigate('Search', { locationType: "drop"})
+        if(selection==='drop' &&  tripdata.drop && tripdata.drop.add=== null)  props.navigation.navigate('Search', { locationType: "drop"})
         if (selection === tripdata.selected) {
             let savedAddresses = [];
             let allAddresses = profile.savedAddresses;
@@ -898,8 +954,260 @@ export default function MapScreen(props) {
     };
 
     const handleNewTrip = () => {
+        if (tripdata.pickup && tripdata.pickup.add) {
+            dispatch(updatSelPointType('drop'));
+            props.navigation.navigate('Search', { 
+                locationType: "drop",
+                isSearchDrop: true 
+            });
+        } else {
+            dispatch(updatSelPointType('pickup'));
+            props.navigation.navigate('Search', { 
+                locationType: "pickup",
+                isSearchDrop: false 
+            });
+        }
+    };
+
+    const handleRecentTrips = () => {
+        setShowRecentTripsModal(true);
+    };
+
+    const handleSelectRecentTrip = (trip) => {
+        // Limpiar datos anteriores
+        dispatch(clearTripPoints());
+        
+        // Configurar pickup
+        if (trip.pickup && trip.pickup.lat && trip.pickup.lng) {
+            dispatch(updateTripPickup({
+                lat: trip.pickup.lat,
+                lng: trip.pickup.lng,
+                add: trip.pickup.add || 'Pickup Location',
+                source: 'recent_trip'
+            }));
+        }
+        
+        // Configurar drop
+        if (trip.drop && trip.drop.lat && trip.drop.lng) {
+            dispatch(updateTripDrop({
+                lat: trip.drop.lat,
+                lng: trip.drop.lng,
+                add: trip.drop.add || 'Drop Location',
+                source: 'recent_trip'
+            }));
+        }
+        
+        // Cerrar modal y salir del modo inicial
+        setShowRecentTripsModal(false);
         setShowInitialScreen(false);
-        dispatch(updatSelPointType('pickup'));
+    };
+
+    const renderRecentTripItem = (trip, index) => {
+        return (
+            <TouchableOpacity
+                key={index}
+                style={[styles.recentTripCard, {
+                    backgroundColor: mode === 'dark' ? '#1C1C1E' : colors.WHITE,
+                    borderLeftColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
+                }]}
+                onPress={() => handleSelectRecentTrip(trip)}
+                activeOpacity={0.7}
+            >
+                {/* Ruta simplificada */}
+                <View style={styles.tripRouteContainer}>
+                    <View style={styles.routePointContainer}>
+                        <View style={[styles.routeIconContainer, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                            <Icon name="location-on" type="material" size={10} color={colors.WHITE} />
+                        </View>
+                        <Text style={[styles.routeAddress, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
+                            {trip.pickup?.add || 'Pickup Location'}
+                        </Text>
+                    </View>
+                    
+                    <View style={[styles.routeConnector, { backgroundColor: mode === 'dark' ? colors.WHITE + '30' : colors.SHADOW + '30' }]} />
+                    
+                    <View style={styles.routePointContainer}>
+                        <View style={[styles.routeIconContainer, { backgroundColor: colors.RED }]}>
+                            <Icon name="location-on" type="material" size={10} color={colors.WHITE} />
+                        </View>
+                        <Text style={[styles.routeAddress, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
+                            {trip.drop?.add || 'Drop Location'}
+                        </Text>
+                    </View>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    const renderRecentTripsContent = () => (
+        <ScrollView 
+            style={styles.recentTripsScrollView}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+        >
+            <View style={styles.recentTripsContent}>
+                {recentTrips.length > 0 ? (
+                    recentTrips.map((trip, index) => renderRecentTripItem(trip, index))
+                ) : (
+                    <View style={styles.emptyTripsContainer}>
+                        <Text style={[styles.emptyTripsText, { color: colors.SHADOW }]}>
+                            {t('no_recent_trips_available')}
+                        </Text>
+                    </View>
+                )}
+            </View>
+        </ScrollView>
+    );
+
+    const handleWallet = () => {
+        // Navegar a la pantalla de billetera
+        props.navigation.navigate('WalletDetails');
+    };
+
+    const handleQuickBooking = (carType) => {
+        // Limpiar datos anteriores
+        dispatch(clearTripPoints());
+        
+        // Seleccionar tipo de auto
+        if (cars && cars.length > 0) {
+            const selectedCar = cars.find(car => car.name === carType) || cars[0];
+            dispatch(updateTripCar(selectedCar));
+        }
+        
+        // Configurar pickup con ubicación actual
+        if (gps && gps.location && gps.location.lat && gps.location.lng) {
+            dispatch(updateTripPickup({
+                lat: gps.location.lat,
+                lng: gps.location.lng,
+                add: currentLocation || 'Current Location',
+                source: 'gps'
+            }));
+        }
+        
+        // Ir al MapScreen con el cartype seleccionado
+        dispatch(updatSelPointType('drop'));
+        setShowInitialScreen(false);
+    };
+
+    const handleAddressSelect = (address) => {
+        // Validar que la dirección tenga coordenadas válidas
+        if (!address || !address.lat || !address.lng) {
+            console.warn('Address missing coordinates:', address);
+            return;
+        }
+        
+        // Limpiar datos anteriores
+        dispatch(clearTripPoints());
+        
+        // Configurar pickup con ubicación actual
+        if (gps && gps.location && gps.location.lat && gps.location.lng) {
+            dispatch(updateTripPickup({
+                lat: gps.location.lat,
+                lng: gps.location.lng,
+                add: currentLocation || 'Current Location',
+                source: 'gps'
+            }));
+        }
+        
+        // Configurar destino seleccionado
+        dispatch(updateTripDrop({
+            lat: address.lat,
+            lng: address.lng,
+            add: address.description || address.name,
+            source: 'predefined'
+        }));
+        
+        // Ir al MapScreen con el drop seleccionado
+        dispatch(updatSelPointType('drop'));
+        setShowInitialScreen(false);
+    };
+
+    const updateCurrentLocation = async (pos) => {
+        if (!pos || !pos.latitude || !pos.longitude) {
+            console.warn('Invalid position data:', pos);
+            setLoadingLocation(false);
+            return;
+        }
+        
+        setLoadingLocation(true);
+        
+        let latlng = pos.latitude + "," + pos.longitude;
+        let res = '';
+        let found = false;
+        let storedAddresses = [];
+
+        try {
+            const value = addresses;
+            if (value !== null) {
+                storedAddresses = Array.isArray(value) ? value : JSON.parse(value);
+                for(let i = 0; i < storedAddresses.length; i++){
+                    if (storedAddresses[i] && storedAddresses[i].lat && storedAddresses[i].lng) {
+                        let distance = GetDistance(pos.latitude, pos.longitude, storedAddresses[i].lat, storedAddresses[i].lng);
+                        if(distance < 0.25){
+                            res = storedAddresses[i].description;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Error parsing addresses:', error);
+            found = false;
+        }
+
+        if(found){
+            setCurrentLocation(res);
+            setLoadingLocation(false);
+        } else {
+            fetchAddressfromCoords(latlng).then((add) => {  
+                if (add) {
+                    storedAddresses.push({
+                        lat: pos.latitude,
+                        lng: pos.longitude,
+                        description: add
+                    });
+                    storeAddresses(storedAddresses);
+                    setCurrentLocation(add);
+                }
+                setLoadingLocation(false);
+            }).catch((error) => {
+                console.warn('Error fetching address:', error);
+                setLoadingLocation(false);
+            });
+        }
+    };
+
+    const locateUser = async () => {
+        setLoadingLocation(true);
+        try {
+            let tempWatcher = await Location.watchPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+                timeInterval: 1000,
+                distanceInterval: 1
+            }, location => {
+                if (location && location.coords && location.coords.latitude && location.coords.longitude) {
+                    dispatch({
+                        type: 'UPDATE_GPS_LOCATION',
+                        payload: {
+                            lat: location.coords.latitude,
+                            lng: location.coords.longitude
+                        }
+                    });
+                    updateCurrentLocation({
+                        latitude: location.coords.latitude,
+                        longitude: location.coords.longitude
+                    });
+                    tempWatcher.remove();
+                } else {
+                    console.warn('Invalid location data received:', location);
+                    setLoadingLocation(false);
+                }
+            });
+        } catch (error) {
+            console.warn('Error getting location:', error);
+            setLoadingLocation(false);
+        }
     };
 
     const handleHomeTrip = () => {
@@ -1383,7 +1691,8 @@ const onMapSelectComplete = () => {
     return (
         <View style={styles.container}>
             {/* <StatusBar hidden={true} /> */}
-            <View style={styles.mapcontainer}>
+            {!showInitialScreen ? (
+                <View style={styles.mapcontainer}>
                 {region && region.latitude && pageActive.current ?
                     <MapView
                         ref={mapRef}
@@ -1483,36 +1792,31 @@ const onMapSelectComplete = () => {
                         <Text style={{fontFamily:fonts.Regular}} >{t('location_permission_error')}</Text>
                     </View>
                     : null}
-                    </View>
+                </View>
+            ) : null}
 
             
             <View style={styles.menuIcon}>
                 <ImageBackground source={mode === 'dark' ? require('../../assets/images/black-grad6.png') : require('../../assets/images/white-grad6.png')} style={{ height: '100%', width: '100%' }}>
-                    <View style={[styles.headerContainer, { marginTop: Platform.OS == 'android' ? (__DEV__ ? 20 : 40) : (hasNotch ? 48 : 20) }]}>
-                        {!showInitialScreen ? (
-                            <TouchableOpacity onPress={() => {
-                                setShowInitialScreen(true);
-                                setRouteCoords([]);
-                                setHasAutoFitted(false);
-                            }} style={styles.backButton}>
-                                <Icon 
-                                    name="arrow-back"
-                                    type="ionicon"
-                                    size={24}
-                                    color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                                />
-                            </TouchableOpacity>
-                        ) : (
-                            <View style={styles.backButton} />
-                        )}
-                        <TouchableOpacity onPress={() => props.navigation.navigate('Notifications')} style={[styles.notificationButton, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>
-                            <Icon 
-                                name="notifications-outline"
-                                type="ionicon"
-                                size={20}
-                                color={mode === 'dark' ? colors.WHITE : colors.BLACK}
-                            />
-                        </TouchableOpacity>
+                    <View style={[styles.backHeaderContainer, { marginTop: Platform.OS == 'android' ? (__DEV__ ? 20 : 40) : (hasNotch ? 48 : 20) }]}>
+                        <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            {!showInitialScreen ? (
+                                <TouchableOpacity onPress={() => {
+                                    setShowInitialScreen(true);
+                                    setRouteCoords([]);
+                                    setHasAutoFitted(false);
+                                }} style={styles.backButton}>
+                                    <Icon 
+                                        name="arrow-back"
+                                        type="ionicon"
+                                        size={24}
+                                        color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                                    />
+                                </TouchableOpacity>
+                            ) : (
+                                <View style={styles.backButton} />
+                            )}
+                        </View>
                     </View>
                 </ImageBackground>
             </View>
@@ -1564,61 +1868,186 @@ const onMapSelectComplete = () => {
                 </View>
             :
                 showInitialScreen ? (
-                    <View style={[styles.initialHomeContainer, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
-                        <View style={[styles.homeHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <Text style={[styles.homeHeaderText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                {t('where_are_you_going')}
-                            </Text>
-
-                    </View>
-
-                        <View style={[styles.destinationOptions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                            <TouchableOpacity onPress={handleNewTrip} style={styles.optionContainer}>
-                                <View style={[styles.iconContainer, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                                    <Icon 
-                                        name="location-outline" 
-                                        type="ionicon" 
-                                        size={24} 
-                                        color={colors.WHITE} 
-                                    />
-                        </View>
-                                <Text style={[styles.optionText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                    {t('new_trip')}
-                                </Text>
-                            </TouchableOpacity>
-                            {hasHomeAddress && (
-                                <TouchableOpacity onPress={handleHomeTrip} style={styles.optionContainer}>
-                                    <View style={[styles.iconContainer, { backgroundColor: '#E6E7E8' }]}>
-                                        <Icon 
-                                            name="home-outline" 
-                                            type="material-community" 
-                                            size={24} 
-                                            color={colors.BLACK} 
-                                        />
+                    <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+                        <StatusBar 
+                            translucent
+                            backgroundColor="transparent"
+                            barStyle="light-content"
+                        />
+                        
+                        {/* Header */}
+                        <View style={[styles.headerContainer]}>
+                            <HeaderGradient mode={mode} />
+                            <View style={[styles.header]}>
+                                <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                    <View style={[styles.profileSection, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                        <TouchableOpacity 
+                                            onPress={() => props.navigation.navigate('Profile')}
+                                            style={[styles.profileImageContainer, { 
+                                                marginRight: isRTL ? 0 : 12,
+                                                marginLeft: isRTL ? 12 : 0,
+                                            }]}
+                                        >
+                                            <Image
+                                                source={
+                                                    auth.profile?.profile_image 
+                                                        ? { uri: auth.profile.profile_image }
+                                                        : require('../../assets/images/profilePic.png')
+                                                }
+                                                style={[styles.profileImage, {
+                                                    borderColor: mode === 'dark' ? colors.BLACK : colors.WHITE
+                                                }]}
+                                            />
+                                        </TouchableOpacity>
+                                        <View style={styles.locationSection}>
+                                            <Text style={[styles.greetingText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                                {`${t('hello_user')}, ${auth.profile?.firstName || t('rider')}!`}
+                                            </Text>
+                                            <TouchableOpacity 
+                                                onPress={locateUser}
+                                                style={[styles.currentLocationContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                                            >
+                                                <Icon 
+                                                    name="location-on" 
+                                                    type="material" 
+                                                    size={16} 
+                                                    color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} 
+                                                />
+                                                {loadingLocation ? (
+                                                    <ActivityIndicator size="small" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                                ) : (
+                                                    <Text style={[styles.currentLocationText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1} ellipsizeMode="tail">
+                                                        {currentLocation || 'Detecting location...'}
+                                                    </Text>
+                                                )}
+                                            </TouchableOpacity>
+                                        </View>
                                     </View>
-                                    <Text style={[styles.optionText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                        {t('home')}
-                                    </Text>
-                            </TouchableOpacity>
-                            )}
-                            
-                            {hasWorkAddress && (
-                                <TouchableOpacity onPress={handleWorkTrip} style={styles.optionContainer}>
-                                    <View style={[styles.iconContainer, { backgroundColor: '#E6E7E8' }]}>
+                                    <TouchableOpacity 
+                                        onPress={() => props.navigation.navigate('Notifications')} 
+                                        style={[styles.notificationButton, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}
+                                    >
                                         <Icon 
-                                            name="briefcase-outline" 
-                                            type="material-community" 
-                                            size={24} 
-                                            color={colors.BLACK} 
+                                            name="notifications-outline"
+                                            type="ionicon"
+                                            size={20}
+                                            color={mode === 'dark' ? colors.WHITE : colors.BLACK}
                                         />
-                        </View>
-                                    <Text style={[styles.optionText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                        {t('work')}
+                                    </TouchableOpacity>
+                                </View>
+                                <TouchableOpacity 
+                                    onPress={handleNewTrip}
+                                    style={[styles.searchInput, { 
+                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                        borderColor: mode === 'dark' ? colors.WHITE + '20' : colors.SHADOW + '20',
+                                    }]}
+                                >
+                                    <Icon 
+                                        name="search" 
+                                        type="ionicon" 
+                                        size={20} 
+                                        color={colors.SHADOW} 
+                                    />
+                                    <Text style={[styles.searchPlaceholder, { color: colors.SHADOW }]}>
+                                        {t('map_screen_drop_input_text')}
                                     </Text>
                                 </TouchableOpacity>
+                                
+                                {/* Chips de direcciones guardadas */}
+                                <ScrollView 
+                                    horizontal 
+                                    showsHorizontalScrollIndicator={false}
+                                    style={styles.chipScrollContainer}
+                                    contentContainerStyle={styles.chipContainer}
+                                >
+                                    {savedAddresses
+                                        .filter(address => address && address.lat && address.lng) // Filtrar direcciones válidas
+                                        .map((address, index) => (
+                                        <TouchableOpacity 
+                                            key={index}
+                                            onPress={() => handleAddressSelect(address)}
+                                            style={[styles.chip, { 
+                                                backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                borderWidth: 1,
+                                                borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
+                                                marginRight: isRTL ? 0 : 8,
+                                                marginLeft: isRTL ? 8 : 0,
+                                            }]}
+                                        >
+                                            <Text style={[styles.chipText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} numberOfLines={1} ellipsizeMode="tail">
+                                                {(address.description || address.name || '').length > 20 
+                                                    ? (address.description || address.name || '').substring(0, 20) + '...'
+                                                    : (address.description || address.name || '')
+                                                }
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            </View>
+                        </View>
+
+                        <ScrollView 
+                            style={styles.scrollContainer}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.scrollContent}
+                        >
+
+                            {/* Service Types */}
+                            {cars && cars.length > 0 && (
+                                <View style={styles.serviceTypesContainer}>
+                                    <Text style={[styles.sectionTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                        {t('choose_service')}
+                                    </Text>
+                                    <View style={styles.serviceTypes}>
+                                        {cars.slice(0, 4).map((car, index) => (
+                                            <TouchableOpacity 
+                                                key={index}
+                                                onPress={() => handleQuickBooking(car.name)}
+                                                style={[styles.serviceTypeCard, { 
+                                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                    shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
+                                                }]}
+                                            >
+                                                <View style={[styles.serviceTypeIcon, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20' }]}>
+                                                    <Icon 
+                                                        name="directions-car" 
+                                                        type="material" 
+                                                        size={24} 
+                                                        color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} 
+                                                    />
+                                                </View>
+                                                <Text style={[styles.serviceTypeName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                                    {car.name}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                </View>
                             )}
-                </View>
-                    </View>
+
+                            {/* Main Action Buttons */}
+                            <View style={styles.actionButtonsContainer}>
+                                <TouchableOpacity 
+                                    onPress={handleRecentTrips}
+                                    style={[styles.primaryButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                >
+                                    <Text style={styles.primaryButtonText}>{t('recent_trips')}</Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity 
+                                    onPress={handleWallet}
+                                    style={[styles.secondaryButton, { 
+                                        borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
+                                        backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND
+                                    }]}
+                                >
+                                    <Text style={[styles.secondaryButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                        {t('my_wallet_tile')}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </SafeAreaView>
                 ) : null
             }
 
@@ -1858,6 +2287,16 @@ const onMapSelectComplete = () => {
                 minimumDate={new Date()}
                 theme='light'
             />
+
+            {/* Modal de Viajes Recientes */}
+            <WaygoDialog
+                visible={showRecentTripsModal}
+                onClose={() => setShowRecentTripsModal(false)}
+                title={t('recent_trips')}
+                showButtons={false}
+                showIcon={false}
+                customContent={renderRecentTripsContent()}
+            />
         </View>
     );
 
@@ -1887,8 +2326,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     notificationButton: {
-        width: 40,
-        height: 40,
+        width: 50,
+        height: 50,
         borderRadius: 12,
         justifyContent: 'center',
         alignItems: 'center',
@@ -2395,5 +2834,260 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontFamily: fonts.Regular,
         textAlign: 'center',
+    },
+    headerContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        overflow: 'hidden',
+        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 70 : 60) : 60,
+        height: Platform.OS === 'ios' ? (hasNotch ? 240 : 230) : 230,
+        backgroundColor: 'transparent',
+        zIndex: 1,
+    },
+    backHeaderContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        overflow: 'hidden',
+        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 20 : 10) : 10,
+        height: Platform.OS === 'ios' ? (hasNotch ? 100 : 80) : 80,
+        backgroundColor: 'transparent',
+        zIndex: 1,
+    },
+    header: {
+        paddingHorizontal: 20,
+        paddingBottom: 15,
+        backgroundColor: 'transparent',
+        position: 'relative',
+        zIndex: 2,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+    },
+    chipScrollContainer: {
+        marginTop: 10,
+    },
+    chipContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 0,
+        paddingRight: 20,
+    },
+    chip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        minWidth: 80,
+        maxWidth: 150,
+        alignItems: 'center',
+    },
+    chipText: {
+        color: colors.WHITE,
+        fontSize: 12,
+        fontFamily: fonts.Medium,
+    },
+    profileSection: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    profileImage: {
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        backgroundColor: colors.SHADOW + '20',
+        borderWidth: 2,
+        borderColor: colors.WHITE,
+    },
+    locationSection: {
+        flex: 1,
+        justifyContent: 'center',
+        height: 50,
+    },
+    greetingText: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+        marginBottom: 2,
+        lineHeight: 20,
+    },
+    currentLocationContainer: {
+        alignItems: 'center',
+        marginTop: 2,
+    },
+    currentLocationText: {
+        fontSize: 12,
+        fontFamily: fonts.Regular,
+        marginLeft: 5,
+        flex: 1,
+        maxWidth: width * 0.5,
+        lineHeight: 16,
+    },
+    notificationButton: {
+        width: 50,
+        height: 50,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.WHITE,
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+    },
+    scrollContainer: {
+        flex: 1,
+    },
+    scrollContent: {
+        padding: 20,
+        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 200 : 200) : 200,
+        paddingBottom: 20,
+    },
+    searchInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 15,
+        paddingVertical: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginHorizontal: 0,
+        marginTop: 15,
+    },
+    searchPlaceholder: {
+        marginLeft: 10,
+        fontSize: 16,
+        fontFamily: fonts.Regular,
+    },
+    sectionTitle: {
+        fontSize: 20,
+        fontFamily: fonts.Bold,
+        marginBottom: 15,
+    },
+    serviceTypesContainer: {
+        marginBottom: 25,
+    },
+    serviceTypes: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    serviceTypeCard: {
+        width: (width - 60) / 2,
+        borderRadius: 12,
+        padding: 20,
+        marginBottom: 15,
+        alignItems: 'center',
+        backgroundColor: colors.WHITE,
+        elevation: 2,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        minHeight: 120,
+    },
+    serviceTypeIcon: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    serviceTypeName: {
+        fontSize: 16,
+        fontFamily: fonts.Bold,
+        marginBottom: 5,
+        textAlign: 'center',
+    },
+    serviceTypePrice: {
+        fontSize: 12,
+        fontFamily: fonts.Regular,
+        textAlign: 'center',
+    },
+    actionButtonsContainer: {
+        gap: 15,
+    },
+    primaryButton: {
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    primaryButtonText: {
+        color: colors.WHITE,
+        fontSize: 16,
+        fontFamily: fonts.Bold,
+    },
+    secondaryButton: {
+        paddingVertical: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+    },
+    secondaryButtonText: {
+        fontSize: 16,
+        fontFamily: fonts.Bold,
+    },
+    // Estilos para el modal de viajes recientes - Tarjetas compactas
+    recentTripsScrollView: {
+        maxHeight: 400,
+    },
+    recentTripsContent: {
+        paddingHorizontal: 4,
+        paddingBottom: 20,
+    },
+    recentTripCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+        borderLeftWidth: 4,
+        shadowColor: colors.BLACK,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
+    },
+    tripRouteContainer: {
+        gap: 4,
+    },
+    routePointContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    routeIconContainer: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    routeAddress: {
+        flex: 1,
+        fontSize: 14,
+        fontFamily: fonts.Medium,
+    },
+    routeConnector: {
+        width: 2,
+        height: 12,
+        marginLeft: 9,
+        marginVertical: 2,
+        borderRadius: 1,
+    },
+    emptyTripsContainer: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emptyTripsText: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        textAlign: 'center',
+        color: colors.SHADOW,
     }
 });

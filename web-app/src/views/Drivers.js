@@ -10,7 +10,7 @@ import { colors } from "../components/Theme/WebTheme";
 import AlertDialog from "../components/AlertDialog";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import Switch from "@mui/material/Switch";
-import { Typography } from "@mui/material";
+import { Typography, Chip } from "@mui/material";
 import {MAIN_COLOR,SECONDORY_COLOR} from "../common/sharedFunctions"
 import EditIcon from '@mui/icons-material/Edit';
 import InfoIcon from '@mui/icons-material/InfoOutlined';
@@ -196,6 +196,68 @@ export default function Users() {
     { accessorKey: 'queue', header: t('queue'), cell: ({row}) => (
       <Switch disabled checked={!!row.original.queue} />
     )},
+    // NUEVA columna: Estado de documentos
+    {
+      accessorKey: 'documentsStatus',
+      header: t('documents_status'),
+      cell: ({row}) => {
+        const docStatus = row.original.documentStatus;
+        if (!docStatus) return <Chip label="Sin documentos" color="default" size="small" />;
+        
+        const statuses = Object.values(docStatus).map(d => d.status);
+        const hasRejected = statuses.includes('rejected');
+        const hasPending = statuses.includes('pending');
+        const allApproved = statuses.every(s => s === 'approved');
+        
+        if (hasRejected) {
+          return <Chip label={t('rejected')} color="error" size="small" />;
+        } else if (hasPending || statuses.length === 0) {
+          return <Chip label={t('pending')} color="warning" size="small" />;
+        } else if (allApproved) {
+          return <Chip label={t('all_approved')} color="success" size="small" />;
+        }
+      }
+    },
+    
+    {
+      accessorKey: 'driver_notes',
+      header: t('driver_notes') || 'Notas Conductor',
+      cell: ({row}) => (
+        <Typography variant="body2" sx={{ 
+          maxWidth: 200, 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          lineHeight: 1.2,
+          fontSize: '0.875rem',
+          fontFamily: 'inherit'
+        }}>
+          {row.original.driver_notes || '--'}
+        </Typography>
+      )
+    },
+    
+    {
+      accessorKey: 'admin_notes',
+      header: t('admin_notes') || 'Notas Admin',
+      cell: ({row}) => (
+        <Typography variant="body2" sx={{ 
+          maxWidth: 200, 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          lineHeight: 1.2,
+          fontSize: '0.875rem',
+          fontFamily: 'inherit'
+        }}>
+          {row.original.admin_notes || '--'}
+        </Typography>
+      )
+    }
   ]), [t, settings]);
 
   const [commonAlert, setCommonAlert] = useState({ open: false, msg: "" });

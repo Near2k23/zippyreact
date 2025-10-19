@@ -187,9 +187,6 @@ export default function CarEditScreen(props) {
         const { status } = permisions;
 
         if (status === 'granted') {
-            setLoading(true);
-            actionSheetRef.current?.setModalVisible(false);
-            
             let pickFrom = permissionType === 'CAMERA' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
             
             let result = await pickFrom({
@@ -198,7 +195,11 @@ export default function CarEditScreen(props) {
                 quality: 0.8
             });
             
+            // Cerrar el ActionSheet después de la selección
+            actionSheetRef.current?.setModalVisible(false);
+            
             if (!result.canceled && result.assets && result.assets[0]) {
+                setLoading(true);
                 const imageUri = result.assets[0].uri;
                 setCapturedImage(imageUri);
                 setState({
@@ -218,10 +219,9 @@ export default function CarEditScreen(props) {
                         Alert.alert(t('alert'), t('image_upload_error'));
                         setLoading(false);
                     });
-            } else {
-                setLoading(false);
             }
         } else {
+            actionSheetRef.current?.setModalVisible(false);
             Alert.alert(t('alert'), t('camera_permission_error'));
         }
     }
@@ -327,8 +327,17 @@ export default function CarEditScreen(props) {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>
-            <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-                <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 12.5, paddingBottom: 30 }}>
+            <KeyboardAvoidingView 
+                style={styles.keyboardAvoidingView} 
+                behavior={Platform.OS === "ios" ? "padding" : "padding"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+            >
+                <ScrollView 
+                    style={styles.scrollViewStyle} 
+                    showsVerticalScrollIndicator={false} 
+                    contentContainerStyle={{ paddingHorizontal: 12.5, paddingBottom: 30 }}
+                    keyboardShouldPersistTaps="handled"
+                >
                   
                     <View style={styles.form}>
                         {
@@ -340,41 +349,59 @@ export default function CarEditScreen(props) {
                                     <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
                                 </View>
                             ) : state.car_image ? (
-                                <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
+                                <View style={styles.imageContainer}>
                                     <RemoteImage
                                         uri={state.car_image}
                                         desiredWidth={width * 0.8}
                                     />
-                                    <View style={styles.imageOverlay}>
-                                        <Feather name="edit-2" size={24} color={colors.WHITE} />
-                                    </View>
-                                </TouchableOpacity>
+                                    {!car || !car.id ? (
+                                        <TouchableOpacity onPress={showActionSheet} style={styles.imageOverlay}>
+                                            <Feather name="edit-2" size={24} color={colors.WHITE} />
+                                        </TouchableOpacity>
+                                    ) : null}
+                                </View>
                             ) : capturedImage ? (
                                 <View style={styles.imagePosition}>
-                                    <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
-                                        <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={showActionSheet} style={styles.imageContainer}>
+                                    {!car || !car.id ? (
+                                        <TouchableOpacity style={styles.photoClick} onPress={cancelPhoto}>
+                                            <Image source={require('../../assets/images/cross.png')} resizeMode={'contain'} style={styles.imageStyle} />
+                                        </TouchableOpacity>
+                                    ) : null}
+                                    <View style={styles.imageContainer}>
                                         <Image source={{ uri: capturedImage }} style={styles.photoResult} resizeMode={'cover'} />
-                                        <View style={styles.imageOverlay}>
-                                            <Feather name="edit-2" size={24} color={colors.WHITE} />
-                                        </View>
-                                    </TouchableOpacity>
+                                        {!car || !car.id ? (
+                                            <TouchableOpacity onPress={showActionSheet} style={styles.imageOverlay}>
+                                                <Feather name="edit-2" size={24} color={colors.WHITE} />
+                                            </TouchableOpacity>
+                                        ) : null}
+                                    </View>
                                 </View>
                             ) : (
                                 <View style={styles.capturePhoto}>
                                     <View>
                                         <Text style={[styles.capturePhotoTitle, styles.fontStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('upload_car_image')}</Text>
                                     </View>
-                                    <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                        <TouchableOpacity style={styles.flexView1} onPress={showActionSheet}>
-                                            <View>
-                                                <View style={styles.imageFixStyle}>
-                                                    <AntDesign name="clouduploado" size={100} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} style={styles.imageStyle2} />
+                                    {!car || !car.id ? (
+                                        <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <TouchableOpacity style={styles.flexView1} onPress={showActionSheet}>
+                                                <View>
+                                                    <View style={styles.imageFixStyle}>
+                                                        <AntDesign name="clouduploado" size={100} color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} style={styles.imageStyle2} />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={styles.flexView1}>
+                                                <View>
+                                                    <View style={styles.imageFixStyle}>
+                                                        <AntDesign name="clouduploado" size={100} color={colors.SHADOW} style={styles.imageStyle2} />
+                                                    </View>
                                                 </View>
                                             </View>
-                                        </TouchableOpacity>
-                                    </View>
+                                        </View>
+                                    )}
                                 </View>
                             )}
 
@@ -532,41 +559,43 @@ export default function CarEditScreen(props) {
                                 />
                             </View>
                         </View>
-                        <View style={styles.buttonContainer}>
-                            {!car ? (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.registerButton,
-                                        loading && styles.registerButtonClicked,
-                                        { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
-                                    ]}
-                                    onPress={onSave}
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <ActivityIndicator size="small" color={colors.WHITE} />
-                                    ) : (
-                                        <Text style={styles.buttonStyle}>{t('save')}</Text>
-                                    )}
-                                </TouchableOpacity>
-                            ) : (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.registerButton,
-                                        loading && styles.registerButtonClicked,
-                                        { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
-                                    ]}
-                                    onPress={makeActive}
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <ActivityIndicator size="small" color={colors.WHITE} />
-                                    ) : (
-                                        <Text style={styles.buttonStyle}>{t('save')}</Text>
-                                    )}
-                                </TouchableOpacity>
-                            )}
-                        </View>
+                        {!car || !car.id ? (
+                            <View style={styles.buttonContainer}>
+                                {!car ? (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.registerButton,
+                                            loading && styles.registerButtonClicked,
+                                            { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
+                                        ]}
+                                        onPress={onSave}
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator size="small" color={colors.WHITE} />
+                                        ) : (
+                                            <Text style={styles.buttonStyle}>{t('save')}</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.registerButton,
+                                            loading && styles.registerButtonClicked,
+                                            { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
+                                        ]}
+                                        onPress={makeActive}
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator size="small" color={colors.WHITE} />
+                                        ) : (
+                                            <Text style={styles.buttonStyle}>{t('save')}</Text>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        ) : null}
                         </View>
                     </View>
                 </ScrollView>
@@ -578,6 +607,9 @@ export default function CarEditScreen(props) {
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1
+    },
+    keyboardAvoidingView: {
         flex: 1
     },
     headerContainer: {
@@ -603,7 +635,7 @@ const styles = StyleSheet.create({
         width: '100%',
         gap: 25,
         marginBottom: 25,
-        flex: 1
+        flexGrow: 1
     },
     containerStyle: {
         flexDirection: 'column',

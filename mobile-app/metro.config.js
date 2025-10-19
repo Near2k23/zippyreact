@@ -6,10 +6,8 @@ const projectRoot = __dirname;
 
 const config = getDefaultConfig(projectRoot);
 
-// Mantener vigilancia del workspace para hot-reload de paquetes internos
 config.watchFolders = [workspaceRoot];
 
-// Forzar singletons pero permitir resolver paquetes hoisteados en la raíz del workspace
 config.resolver.disableHierarchicalLookup = true;
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),

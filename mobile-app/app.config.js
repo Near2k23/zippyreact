@@ -25,9 +25,9 @@ export default {
     orientation: "portrait",
     icon: "./assets/images/logo1024x1024.png",
     splash: {
-        "image": "./assets/images/splash.png",
-        "resizeMode": 'cover',
-        "backgroundColor": "#ffffff"
+        "image": "./assets/images/logo_splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#000000"
     },
     updates: {
         "fallbackToCacheTimeout": 0,
@@ -47,9 +47,9 @@ export default {
     ios: {
         newArchEnabled: false,
         splash: {
-            image: "./assets/images/splash_ios.png",
-            resizeMode: "cover",
-            backgroundColor: "#ffffff",
+            image: "./assets/images/logo_splash.png",
+            resizeMode: "contain",
+            backgroundColor: "#000000",
         },
         supportsTablet: true,
         usesAppleSignIn: true,
@@ -102,6 +102,11 @@ export default {
         versionCode: AppConfig.android_app_version,
         newArchEnabled: false,
         edgeToEdgeEnabled: false,
+        splash: {
+            image: "./assets/images/logo_splash.png",
+            resizeMode: "contain",
+            backgroundColor: "#000000",
+        },
         permissions: [
             "CAMERA",
             "READ_EXTERNAL_STORAGE",
@@ -130,6 +135,15 @@ export default {
         "expo-localization",
         "@react-native-firebase/app",
         "@react-native-firebase/auth",
+        [
+            "expo-splash-screen",
+            {
+                "backgroundColor": "#000000",
+                "image": "./assets/images/logo_splash.png",
+                "imageWidth": 200,
+                "resizeMode": "contain"
+            }
+        ],
         [
             "expo-notifications",
             {

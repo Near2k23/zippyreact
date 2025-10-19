@@ -47,5 +47,16 @@ export const completeWithdraw = (entry) => (dispatch) => {
     type: EDIT_WITHDRAWS,
     payload: entry
   });
-  update(child(withdrawRef, entry.id),{ ...entry, processed: true, processDate: new Date().getTime() });
+  
+  const updateData = {
+    ...entry,
+    processDate: new Date().getTime()
+  };
+  
+  if (!entry.status) {
+    updateData.processed = true;
+    updateData.status = 'approved';
+  }
+  
+  update(child(withdrawRef, entry.id), updateData);
 }

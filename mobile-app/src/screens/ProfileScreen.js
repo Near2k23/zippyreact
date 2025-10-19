@@ -310,7 +310,6 @@ export default function ProfileScreen(props) {
     
 
     const saveProfile = async (set) => {
-        // setLoading(true)
         if (profileData.email === auth.profile.email && set === 1) {
             setEditEmail(false);
             setLoading(false)
