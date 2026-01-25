@@ -15,6 +15,7 @@ import {MAIN_COLOR,SECONDORY_COLOR} from "../common/sharedFunctions"
 import EditIcon from '@mui/icons-material/Edit';
 import InfoIcon from '@mui/icons-material/InfoOutlined';
 import DescriptionIcon from '@mui/icons-material/DescriptionOutlined';
+import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from "styles/tableStyle";
 import TableShadcn from '../components/ui/TableShadcn';
@@ -26,6 +27,16 @@ import {
   DialogTitle,
   DialogOverlay,
 } from '../components/ui/dialog';
+import {
+  AlertDialog as ShadAlertDialog,
+  AlertDialogAction as ShadAlertDialogAction,
+  AlertDialogCancel as ShadAlertDialogCancel,
+  AlertDialogContent as ShadAlertDialogContent,
+  AlertDialogDescription as ShadAlertDialogDescription,
+  AlertDialogFooter as ShadAlertDialogFooter,
+  AlertDialogHeader as ShadAlertDialogHeader,
+  AlertDialogTitle as ShadAlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { useToast } from '../components/Toast';
 
 export default function Users() {
@@ -54,6 +65,8 @@ export default function Users() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
   const initialEditForm = React.useMemo(() => ({
     firstName: '',
     lastName: '',
@@ -173,13 +186,21 @@ export default function Users() {
     return updatedUser;
   };
 
-  const columns = React.useMemo(()=> ([
-    { accessorKey: 'createdAt', header: t('createdAt'), cell: ({row}) => row.original.createdAt ? moment(row.original.createdAt).format('lll') : null },
-    { accessorKey: 'firstName', header: t('first_name') },
-    { accessorKey: 'lastName', header: t('last_name') },
-    { accessorKey: 'mobile', header: t('mobile'), cell: ({row}) => settings.AllowCriticalEditsAdmin ? row.original.mobile : t('hidden_demo') },
-    { accessorKey: 'email', header: t('email'), cell: ({row}) => settings.AllowCriticalEditsAdmin ? row.original.email : t('hidden_demo') },
-    { accessorKey: 'profile_image', header: t('profile_image'), cell: ({row}) => row.original.profile_image ? (
+  const columns = React.useMemo(()=> {
+    const baseColumns = [
+      { accessorKey: 'createdAt', header: t('createdAt'), cell: ({row}) => row.original.createdAt ? moment(row.original.createdAt).format('lll') : null },
+      { accessorKey: 'firstName', header: t('first_name') },
+      { accessorKey: 'lastName', header: t('last_name') },
+      { accessorKey: 'mobile', header: t('mobile'), cell: ({row}) => settings.AllowCriticalEditsAdmin ? row.original.mobile : t('hidden_demo') },
+      { accessorKey: 'email', header: t('email'), cell: ({row}) => settings.AllowCriticalEditsAdmin ? row.original.email : t('hidden_demo') },
+    ];
+    
+    if (settings.showSocialSecurityDrivers) {
+      baseColumns.push({ accessorKey: 'socialSecurity', header: 'Social Security', cell: ({row}) => row.original.socialSecurity || '--' });
+    }
+    
+    baseColumns.push(
+      { accessorKey: 'profile_image', header: t('profile_image'), cell: ({row}) => row.original.profile_image ? (
         <img alt="Profile" src={row.original.profile_image} style={{ width: 40, height: 40, borderRadius: '50%' }} />
       ) : (<AccountCircleIcon sx={{ fontSize: 40 }} />)
     },
@@ -196,7 +217,6 @@ export default function Users() {
     { accessorKey: 'queue', header: t('queue'), cell: ({row}) => (
       <Switch disabled checked={!!row.original.queue} />
     )},
-    // NUEVA columna: Estado de documentos
     {
       accessorKey: 'documentsStatus',
       header: t('documents_status'),
@@ -218,7 +238,6 @@ export default function Users() {
         }
       }
     },
-    
     {
       accessorKey: 'driver_notes',
       header: t('driver_notes') || 'Notas Conductor',
@@ -238,7 +257,6 @@ export default function Users() {
         </Typography>
       )
     },
-    
     {
       accessorKey: 'admin_notes',
       header: t('admin_notes') || 'Notas Admin',
@@ -258,7 +276,10 @@ export default function Users() {
         </Typography>
       )
     }
-  ]), [t, settings]);
+    );
+    
+    return baseColumns;
+  }, [t, settings]);
 
   const [commonAlert, setCommonAlert] = useState({ open: false, msg: "" });
   const handleCommonAlertClose = (e) => {
@@ -316,6 +337,21 @@ export default function Users() {
     closeEditDialog();
   };
 
+  const handleDeleteClick = (row) => {
+    setItemToDelete(row);
+    setConfirmDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (itemToDelete) {
+      dispatch(deleteUser(itemToDelete.id));
+      dispatch(fetchUsersOnce());
+      showToast(t('user_deleted'), 'success');
+      setConfirmDeleteOpen(false);
+      setItemToDelete(null);
+    }
+  };
+
   const handleEditCancel = () => closeEditDialog();
   const handleInputChange = (field, value) => setEditForm(prev => ({...prev, [field]: value}));
 
@@ -339,6 +375,7 @@ export default function Users() {
               lastName: t('last_name'),
               mobile: t('mobile'),
               email: t('email'),
+              ...(settings.showSocialSecurityDrivers && { socialSecurity: 'Social Security' }),
               profile_image: t('profile_image'),
               approved: t('account_approve'),
               driverActiveStatus: t('driver_active'),
@@ -354,6 +391,9 @@ export default function Users() {
                 </IconButton>
                 <IconButton aria-label="documents" onClick={() => navigate(`/users/userdocuments/${id}/${row.id}`,{state:{pageNo:currentPage}})}>
                   <DescriptionIcon fontSize='small' />
+                </IconButton>
+                <IconButton aria-label="delete" onClick={() => handleDeleteClick(row)}>
+                  <DeleteIcon fontSize='small' />
                 </IconButton>
               </div>
             )}
@@ -426,6 +466,22 @@ export default function Users() {
           </DialogContent>
         </Dialog>
         </ThemeProvider>
+
+      <ShadAlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <ShadAlertDialogContent>
+          <ShadAlertDialogHeader>
+            <ShadAlertDialogTitle>{t('delete_account_modal_title')}</ShadAlertDialogTitle>
+            <ShadAlertDialogDescription>
+              {t('delete_user_confirmation')}
+            </ShadAlertDialogDescription>
+          </ShadAlertDialogHeader>
+          <ShadAlertDialogFooter>
+            <ShadAlertDialogCancel onClick={()=>setConfirmDeleteOpen(false)}>{t('cancel')}</ShadAlertDialogCancel>
+            <ShadAlertDialogAction onClick={handleDeleteConfirm}>{t('delete')}</ShadAlertDialogAction>
+          </ShadAlertDialogFooter>
+        </ShadAlertDialogContent>
+      </ShadAlertDialog>
+
       <AlertDialog open={commonAlert.open} onClose={handleCommonAlertClose}>
         {commonAlert.msg}
       </AlertDialog>

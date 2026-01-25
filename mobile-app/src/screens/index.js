@@ -19,6 +19,7 @@ import WithdrawMoneyScreen from './WithdrawMoney';
 import DriverIncomeScreen from './DriverIncomeScreen';
 import Notifications from './Notifications';
 import RegistrationPage from './Registration';
+import RegistrationDriverPage from './RegistrationDriver';
 import SettingsScreen from './SettingsScreen';
 import CarsScreen from './CarsScreen';
 import CarEditScreen from './CarEditScreen';
@@ -26,6 +27,7 @@ import TransactionHistory from './TransactionHistory';
 
 export {
     RegistrationPage,
+    RegistrationDriverPage,
     IntroScreen,
     MapScreen,
     BookedCabScreen,

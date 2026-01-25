@@ -1,12 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import MaterialTable from "material-table";
 import { useSelector, useDispatch } from "react-redux";
 import CircularLoading from "../components/CircularLoading";
 import { api } from "common";
-import PhotoSizeSelectSmallIcon from "@mui/icons-material/PhotoSizeSelectSmall";
 import { makeStyles } from "@mui/styles";
-import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
-import CancelScheduleSendIcon from "@mui/icons-material/CancelScheduleSend";
 import { useTranslation } from "react-i18next";
 import { useNavigate,useLocation } from "react-router-dom";
 import { Modal, Grid, Typography } from "@mui/material";
@@ -16,13 +12,9 @@ import AlertDialog from "../components/AlertDialog";
 import CircularProgress from "@mui/material/CircularProgress";
 import Tooltip from "@mui/material/Tooltip";
 import { colors } from "../components/Theme/WebTheme";
-import { carTypeColumns, optionsRequired } from "common/sharedFunctions";
 import { FONT_FAMILY, SECONDORY_COLOR } from "../common/sharedFunctions";
 import { ThemeProvider } from '@mui/material/styles';
 import theme from "styles/tableStyle";
-import BlankTable from '../components/Table/BlankTable';
-import TableStyle from '../components/Table/Style';
-import localization from '../components/Table/Localization';
 import { getLangKey } from "common/src/other/getLangKey";
 import TableShadcn from '../components/ui/TableShadcn';
 import IconButton from '../components/ui/icon-button';
@@ -88,9 +80,10 @@ export default function CarTypes() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.dir();
   const settings = useSelector((state) => state.settingsdata.settings);
-  const { editCarType, convertLanguage } = api;
+  const { editCarType, convertLanguage, fetchZones } = api;
   const [data, setData] = useState([]);
   const cartypes = useSelector((state) => state.cartypes);
+  const zonesdata = useSelector((state) => state.zonesdata);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const rootRef = useRef(null);
@@ -120,6 +113,11 @@ export default function CarTypes() {
   const [editForm, setEditForm] = useState(initialEditForm);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [selectedZone, setSelectedZone] = useState('all');
+  const [selectedZones, setSelectedZones] = useState([]);
+  const [showZoneSelector, setShowZoneSelector] = useState(false);
+  const [activeZoneTab, setActiveZoneTab] = useState(null);
+  const [zonePrices, setZonePrices] = useState({});
 
   useEffect(()=>{
     setCurrentPage(state?.pageNo)
@@ -155,24 +153,87 @@ export default function CarTypes() {
     { accessorKey: 'image', header: t('image'), cell: ({row}) => row.original.image ? (
       <button onClick={() => onClick(row.original)}><img alt='CarImage' src={row.original.image} style={{ width: 50 }}/></button>
     ) : null },
-    { accessorKey: 'base_fare', header: t('base_fare'), cell: ({row}) => row.original.base_fare ? formatAmount(row.original.base_fare, settings.decimal, settings.country) : 0 },
-    { accessorKey: 'rate_per_unit_distance', header: t('rate_per_unit_distance'), cell: ({row}) => row.original.rate_per_unit_distance ? formatAmount(row.original.rate_per_unit_distance, settings.decimal, settings.country) : 0 },
-    { accessorKey: 'rate_per_hour', header: t('rate_per_hour'), cell: ({row}) => row.original.rate_per_hour ? formatAmount(row.original.rate_per_hour, settings.decimal, settings.country) : 0 },
-    { accessorKey: 'min_fare', header: t('min_fare'), cell: ({row}) => row.original.min_fare ? formatAmount(row.original.min_fare, settings.decimal, settings.country) : 0 },
-    { accessorKey: 'convenience_fees', header: t('convenience_fee'), cell: ({row}) => row.original.convenience_fees ? formatAmount(row.original.convenience_fees, settings.decimal, settings.country) : 0 },
-    { accessorKey: 'convenience_fee_type', header: t('convenience_fee_type'), cell: ({row}) => row.original.convenience_fee_type === 'flat' ? t('flat') : t('percentage') },
-    { accessorKey: 'fleet_admin_fee', header: t('fleet_admin_comission'), cell: ({row}) => row.original.fleet_admin_fee ? formatAmount(row.original.fleet_admin_fee, settings.decimal, settings.country) : 0 },
+    { accessorKey: 'zones', header: t('zones'), cell: ({row}) => {
+      const zones = row.original.zones || [];
+      if (zones.length === 0) return 'Sin zonas';
+      return zones.slice(0, 2).map(zoneId => {
+        const zone = zonesdata.zones?.find(z => z.id === zoneId);
+        return zone ? zone.name : zoneId;
+      }).join(', ') + (zones.length > 2 ? ` +${zones.length - 2}` : '');
+    }},
+    { accessorKey: 'base_fare', header: t('base_fare'), cell: ({row}) => {
+      if(selectedZone==='all') return "--";
+      const zone = zonesdata.zones?.find(z => z.id === selectedZone);
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      const value = p.base_fare || 0;
+      return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
+    } },
+    { accessorKey: 'rate_per_unit_distance', header: t('rate_per_unit_distance'), cell: ({row}) => {
+      if(selectedZone==='all') return "--";
+      const zone = zonesdata.zones?.find(z => z.id === selectedZone);
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      const value = p.rate_per_unit_distance || 0;
+      return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
+    } },
+    { accessorKey: 'rate_per_hour', header: t('rate_per_hour'), cell: ({row}) => {
+      if(selectedZone==='all') return "--";
+      const zone = zonesdata.zones?.find(z => z.id === selectedZone);
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      const value = p.rate_per_hour || 0;
+      return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
+    } },
+    { accessorKey: 'min_fare', header: t('min_fare'), cell: ({row}) => {
+      if(selectedZone==='all') return "--";
+      const zone = zonesdata.zones?.find(z => z.id === selectedZone);
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      const value = p.min_fare || 0;
+      return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
+    } },
+    { accessorKey: 'convenience_fees', header: t('convenience_fee'), cell: ({row}) => {
+      if(selectedZone==='all') return "--";
+      const zone = zonesdata.zones?.find(z => z.id === selectedZone);
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      const value = p.convenience_fees || 0;
+      if ((p.convenience_fee_type || 'flat') === 'percentage') return `${value}%`;
+      return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
+    } },
+    { accessorKey: 'convenience_fee_type', header: t('convenience_fee_type'), cell: ({row}) => {
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      return p.convenience_fee_type === 'percentage' ? t('percentage') : t('flat');
+    } },
+    { accessorKey: 'fleet_admin_fee', header: t('fleet_admin_comission'), cell: ({row}) => {
+      if(selectedZone==='all') return "--";
+      const zone = zonesdata.zones?.find(z => z.id === selectedZone);
+      const p = row.original.zonePrices?.[selectedZone] || {};
+      const value = p.fleet_admin_fee || 0;
+      return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
+    } },
     { accessorKey: 'extra_info', header: t('extra_info') },
     { accessorKey: 'pos', header: t('position') },
-  ]), [t, settings]);
+  ]), [t, settings.decimal, settings.country, zonesdata.zones, selectedZone]);
+
+  useEffect(() => {
+    dispatch(fetchZones());
+  }, [dispatch, fetchZones]);
+
+  useEffect(() => {
+    const defaultZone = zonesdata.zones?.find(z => z.isDefault) || zonesdata.zones?.[0];
+    if (defaultZone && !selectedZone) {
+      setSelectedZone(defaultZone);
+    }
+  }, [zonesdata.zones]);
 
   useEffect(() => {
     if (cartypes.cars) {
-      setData(cartypes.cars);
+      if(selectedZone === 'all') {
+        setData(cartypes.cars);
+      } else {
+        setData(cartypes.cars.filter(ct => Array.isArray(ct.zones) && ct.zones.includes(selectedZone)));
+      }
     } else {
       setData([]);
     }
-  }, [cartypes.cars]);
+  }, [cartypes.cars, selectedZone]);
 
   const [selectedImage, setSelectedImage] = useState(null);
   const handleProfileModal = (e) => {
@@ -218,23 +279,57 @@ export default function CarTypes() {
   const handleAdd = () => {
     setItemToEdit(null);
     setEditForm(initialEditForm);
+    setSelectedZones([]);
+    setZonePrices({});
+    setActiveZoneTab(null);
     setEditDialogOpen(true);
+  };
+
+  const getCurrentZonePrices = (zoneId) => {
+    return zonePrices[zoneId] || {
+      base_fare: 0,
+      rate_per_unit_distance: 0,
+      rate_per_hour: 0,
+      min_fare: 0,
+      convenience_fees: 0,
+      convenience_fee_type: 'flat',
+      fleet_admin_fee: 0,
+    };
+  };
+
+  const updateZonePrice = (zoneId, field, value) => {
+    setZonePrices(prev => ({
+      ...prev,
+      [zoneId]: {
+        ...getCurrentZonePrices(zoneId),
+        [field]: value,
+      },
+    }));
+  };
+
+  const toggleZone = (zoneId) => {
+    setSelectedZones(prev => {
+      if (prev.includes(zoneId)) {
+        return prev.filter(z => z !== zoneId);
+      } else {
+        return [...prev, zoneId];
+      }
+    });
   };
 
   const handleEdit = (row) => {
     setItemToEdit(row);
+    setSelectedZones(row.zones || []);
+    setZonePrices(row.zonePrices || {});
+    if (row.zones && row.zones.length > 0) {
+      setActiveZoneTab(row.zones[0]);
+    }
     setEditForm({
       name: row.name || '',
       image: row.image || '',
-      base_fare: row.base_fare || 0,
-      rate_per_unit_distance: row.rate_per_unit_distance || 0,
-      rate_per_hour: row.rate_per_hour || 0,
-      min_fare: row.min_fare || 0,
-      convenience_fees: row.convenience_fees || 0,
-      convenience_fee_type: row.convenience_fee_type || 'flat',
-      fleet_admin_fee: row.fleet_admin_fee || 0,
       extra_info: row.extra_info || '',
       pos: row.pos || 0,
+      zones: row.zones || [],
     });
     setEditDialogOpen(true);
   };
@@ -245,11 +340,20 @@ export default function CarTypes() {
       setCommonAlert({ open: true, msg: t('please_enter_required') || 'Por favor completa los campos obligatorios' });
       return;
     }
-    const payload = { ...itemToEdit, ...editForm };
+    if (selectedZones.length === 0) {
+      setCommonAlert({ open: true, msg: 'Por favor selecciona al menos una zona' });
+      return;
+    }
+    const payload = { 
+      ...itemToEdit, 
+      ...editForm, 
+      zones: selectedZones,
+      zonePrices: zonePrices,
+    };
     if (itemToEdit) {
       dispatch(editCarType(payload, 'Update'));
     } else {
-      dispatch(editCarType({ ...editForm, createdAt: Date.now() }, 'Add'));
+      dispatch(editCarType({ ...editForm, zones: selectedZones, zonePrices, createdAt: Date.now() }, 'Add'));
     }
     setEditDialogOpen(false);
   };
@@ -291,6 +395,7 @@ export default function CarTypes() {
           direction: isRTL === "rtl" ? "rtl" : "ltr",
           borderRadius: "8px",
           boxShadow: `0px 2px 5px ${SECONDORY_COLOR}`,
+          padding: "20px",
         }}>
           <TableShadcn
             columns={columns}
@@ -300,9 +405,32 @@ export default function CarTypes() {
             addButtonLabel={t('add_carType')}
             title={t('car_type_title')}
             columnsButtonLabel={t('columns')}
+            toolbarRight={
+              zonesdata.zones && zonesdata.zones.length > 0 ? (
+                <select
+                  value={selectedZone}
+                  onChange={(e) => setSelectedZone(e.target.value)}
+                  style={{
+                    padding: "6px 10px",
+                    border: "1px solid #ddd",
+                    borderRadius: "4px",
+                    fontSize: "13px",
+                    minWidth: "180px"
+                  }}
+                >
+                  <option value="all">{t('all_zones') || 'Todos'}</option>
+                  {zonesdata.zones.map(zone => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.name} ({zone.symbol}{zone.code})
+                    </option>
+                  ))}
+                </select>
+              ) : null
+            }
             columnLabels={{
               name: t('name'),
               image: t('image'),
+              zones: t('zones'),
               base_fare: t('base_fare'),
               rate_per_unit_distance: t('rate_per_unit_distance'),
               rate_per_hour: t('rate_per_hour'),
@@ -331,11 +459,84 @@ export default function CarTypes() {
 
       <Dialog open={editDialogOpen} onOpenChange={(open)=> { if(!open) setEditDialogOpen(false); else setEditDialogOpen(true); }}>
         <DialogOverlay onClick={()=>setEditDialogOpen(false)} />
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="!max-w-[95vw] !w-[95vw] md:!max-w-[50vw] md:!w-[50vw]" style={{ 
+          maxHeight: '85vh', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          top: '80px', 
+          transform: 'translateX(-50%)' 
+        }}>
+          <DialogHeader style={{ flexShrink: 0 }}>
             <DialogTitle>{ itemToEdit ? t('edit') : t('add_carType') }</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4" style={{ 
+            overflowY: 'auto', 
+            flex: 1, 
+            paddingRight: '8px',
+            maxHeight: 'calc(85vh - 140px)',
+            minHeight: '200px'
+          }}>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">{t('select_zones')}</label>
+              <div 
+                style={{ 
+                  border: '1px solid #ddd', 
+                  borderRadius: '4px', 
+                  padding: '8px', 
+                  maxHeight: '150px', 
+                  overflowY: 'auto',
+                  backgroundColor: '#f9f9f9'
+                }}
+                onClick={() => setShowZoneSelector(!showZoneSelector)}
+              >
+                {selectedZones.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedZones.map(zoneId => {
+                      const zone = zonesdata.zones?.find(z => z.id === zoneId);
+                      return zone ? (
+                        <span key={zoneId} style={{ backgroundColor: '#008d99', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                          {zone.name}
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleZone(zoneId);
+                            }}
+                            style={{ marginLeft: '4px', background: 'rgba(255,255,255,0.3)', border: 'none', borderRadius: '50%', width: '16px', height: '16px', cursor: 'pointer' }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">Clic para seleccionar zonas</div>
+                )}
+              </div>
+              {showZoneSelector && (
+                <div style={{ marginTop: '8px', border: '1px solid #ddd', borderRadius: '4px', padding: '8px', backgroundColor: 'white' }}>
+                  {zonesdata.zones?.map(zone => (
+                    <label key={zone.id} style={{ display: 'block', padding: '4px', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedZones.includes(zone.id)}
+                        onChange={() => toggleZone(zone.id)}
+                        style={{ marginRight: '8px' }}
+                      />
+                      {zone.name} ({zone.symbol}{zone.code})
+                    </label>
+                  ))}
+                  <button 
+                    type="button"
+                    onClick={() => setShowZoneSelector(false)}
+                    className="mt-2 px-3 py-1 text-sm bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              )}
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('name')}</label>
               <input type="text" value={editForm.name} onChange={(e)=>setEditForm(prev=>({...prev, name: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -344,80 +545,180 @@ export default function CarTypes() {
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('image')}</label>
               <input type="text" value={editForm.image} onChange={(e)=>setEditForm(prev=>({...prev, image: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." />
             </div>
+
+            {selectedZones.length > 0 && (
+              <>
+                <div style={{ borderTop: '1px solid #ddd', paddingTop: '16px', marginTop: '16px' }}>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('prices_by_zone')}</label>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    {selectedZones.map(zoneId => {
+                      const zone = zonesdata.zones?.find(z => z.id === zoneId);
+                      return zone ? (
+                        <button
+                          key={zoneId}
+                          type="button"
+                          onClick={() => setActiveZoneTab(zoneId)}
+                          style={{
+                            padding: '8px 16px',
+                            border: `2px solid ${activeZoneTab === zoneId ? '#008d99' : '#ddd'}`,
+                            borderRadius: '4px',
+                            backgroundColor: activeZoneTab === zoneId ? '#f0f9ff' : 'white',
+                            color: activeZoneTab === zoneId ? '#008d99' : '#333',
+                            fontWeight: activeZoneTab === zoneId ? 'bold' : 'normal',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {zone.name}
+                        </button>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+
+                {activeZoneTab && (
+                  <div style={{ borderTop: '1px solid #ddd', paddingTop: '16px' }}>
+                    {(() => {
+                      const currentPrices = getCurrentZonePrices(activeZoneTab);
+                      const zone = zonesdata.zones?.find(z => z.id === activeZoneTab);
+                      return (
+                        <div>
+                          <div style={{ backgroundColor: '#f0f9ff', padding: '12px', borderRadius: '6px', marginBottom: '16px', border: '1px solid #008d99' }}>
+                            <div className="text-sm font-medium text-gray-700 mb-1">Zona: {zone?.name || 'Sin nombre'}</div>
+                            <div className="text-xs text-gray-600">{zone?.symbol}{zone?.code} (Decimales: {zone?.decimal || 2})</div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
                   {t('base_fare')}
                   <InfoTooltip 
                     title="Tarifa Base"
-                    content="Costo fijo que se suma al inicio de cada viaje. Ejemplo: $2.50 base + (distancia × tarifa/km) + (tiempo × tarifa/hora)"
+                                  content="Costo fijo que se suma al inicio de cada viaje."
+                                />
+                              </label>
+                              <input 
+                                type="number" 
+                                value={currentPrices.base_fare} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'base_fare', Number(e.target.value))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('rate_per_unit_distance')}
+                                <InfoTooltip 
+                                  title="Tarifa por Distancia"
+                                  content="Costo por cada kilómetro recorrido."
+                                />
+                              </label>
+                              <input 
+                                type="number" 
+                                value={currentPrices.rate_per_unit_distance} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'rate_per_unit_distance', Number(e.target.value))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('rate_per_hour')}
+                                <InfoTooltip 
+                                  title="Tarifa por Tiempo"
+                                  content="Costo por cada hora de viaje."
+                                />
+                              </label>
+                              <input 
+                                type="number" 
+                                value={currentPrices.rate_per_hour} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'rate_per_hour', Number(e.target.value))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('min_fare')}
+                                <InfoTooltip 
+                                  title="Tarifa Mínima"
+                                  content="Costo mínimo garantizado para cualquier viaje."
+                                />
+                              </label>
+                              <input 
+                                type="number" 
+                                value={currentPrices.min_fare} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'min_fare', Number(e.target.value))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('convenience_fee')}
+                                <InfoTooltip 
+                                  title="Tarifa de Conveniencia"
+                                  content="Cargo adicional por servicios de conveniencia."
+                                />
+                              </label>
+                              <input 
+                                type="number" 
+                                value={currentPrices.convenience_fees} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'convenience_fees', Number(e.target.value))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('convenience_fee_type')}
+                                <InfoTooltip 
+                                  title="Tipo de Tarifa de Conveniencia"
+                                  content="Flat: Cantidad fija. Percentage: Porcentaje del total."
+                                />
+                              </label>
+                              <select 
+                                value={currentPrices.convenience_fee_type} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'convenience_fee_type', e.target.value)} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                              >
+                                <option value="flat">{t('flat')}</option>
+                                <option value="percentage">{t('percentage')}</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('fleet_admin_comission')}
+                                <InfoTooltip 
+                                  title="Comisión de Administrador de Flota"
+                                  content="Porcentaje que recibe el administrador de flota."
+                                />
+                              </label>
+                              <input 
+                                type="number" 
+                                value={currentPrices.fleet_admin_fee} 
+                                onChange={(e)=>updateZonePrice(activeZoneTab, 'fleet_admin_fee', Number(e.target.value))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                                {t('position')}
+                                <InfoTooltip 
+                                  title="Posición en Lista"
+                                  content="Orden de aparición en la lista de tipos de vehículo."
                   />
                 </label>
-                <input type="number" value={editForm.base_fare} onChange={(e)=>setEditForm(prev=>({...prev, base_fare: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  {t('rate_per_unit_distance')}
-                  <InfoTooltip 
-                    title="Tarifa por Distancia"
-                    content="Costo por cada kilómetro recorrido. Ejemplo: $1.50/km × 10km = $15.00"
-                  />
-                </label>
-                <input type="number" value={editForm.rate_per_unit_distance} onChange={(e)=>setEditForm(prev=>({...prev, rate_per_unit_distance: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  {t('rate_per_hour')}
-                  <InfoTooltip 
-                    title="Tarifa por Tiempo"
-                    content="Costo por cada hora de viaje (incluyendo esperas). Ejemplo: $20/hora × 0.5 horas = $10.00"
-                  />
-                </label>
-                <input type="number" value={editForm.rate_per_hour} onChange={(e)=>setEditForm(prev=>({...prev, rate_per_hour: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  {t('min_fare')}
-                  <InfoTooltip 
-                    title="Tarifa Mínima"
-                    content="Costo mínimo garantizado para cualquier viaje. Si el cálculo es menor, se cobra este monto. Ejemplo: Viaje corto calculado en $8, pero tarifa mínima es $12 → se cobra $12"
-                  />
-                </label>
-                <input type="number" value={editForm.min_fare} onChange={(e)=>setEditForm(prev=>({...prev, min_fare: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  {t('convenience_fee')}
-                  <InfoTooltip 
-                    title="Tarifa de Conveniencia"
-                    content="Cargo adicional por servicios de conveniencia. Puede ser fijo ($2) o porcentual (5% del total). Se suma al final del cálculo."
-                  />
-                </label>
-                <input type="number" value={editForm.convenience_fees} onChange={(e)=>setEditForm(prev=>({...prev, convenience_fees: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  {t('convenience_fee_type')}
-                  <InfoTooltip 
-                    title="Tipo de Tarifa de Conveniencia"
-                    content="Flat: Cantidad fija (ej: $2). Percentage: Porcentaje del total (ej: 5% de $50 = $2.50)"
-                  />
-                </label>
-                <select value={editForm.convenience_fee_type} onChange={(e)=>setEditForm(prev=>({...prev, convenience_fee_type: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md">
-                  <option value="flat">{t('flat')}</option>
-                  <option value="percentage">{t('percentage')}</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  {t('fleet_admin_comission')}
-                  <InfoTooltip 
-                    title="Comisión de Administrador de Flota"
-                    content="Porcentaje que recibe el administrador de flota por cada viaje. Se calcula sobre el total del viaje. Ejemplo: 10% de $50 = $5"
-                  />
-                </label>
-                <input type="number" value={editForm.fleet_admin_fee} onChange={(e)=>setEditForm(prev=>({...prev, fleet_admin_fee: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
+                              <input 
+                                type="number" 
+                                value={editForm.pos} 
+                                onChange={(e)=>setEditForm(prev=>({...prev, pos: Number(e.target.value)}))} 
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md" 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
                   {t('position')}
@@ -434,7 +735,7 @@ export default function CarTypes() {
               <textarea value={editForm.extra_info} onChange={(e)=>setEditForm(prev=>({...prev, extra_info: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" rows={3} />
             </div>
           </div>
-          <div className="flex justify-end space-x-2 mt-6">
+          <div className="flex justify-end space-x-2 mt-6" style={{ flexShrink: 0, borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
             <button onClick={()=>setEditDialogOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               {t('cancel')}
             </button>
@@ -458,7 +759,6 @@ export default function CarTypes() {
         </ShadAlertDialogContent>
       </ShadAlertDialog>
 
-      {/* Existing image modal and other Material UI modals remain for image handling */}
       <Modal
         disablePortal
         disableEnforceFocus

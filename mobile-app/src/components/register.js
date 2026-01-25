@@ -12,15 +12,17 @@ import {
     TextInput,
     SafeAreaView,
     useColorScheme,
-    Animated
+    Animated,
+    ActivityIndicator
 } from 'react-native';
+import { Input } from '../../components/ui/input';
 import { colors } from '../common/theme';
 var { height,width } = Dimensions.get('window');
 import i18n from 'i18n-js';
 
-import RNPickerSelect from './RNPickerSelect';
 import { useSelector,useDispatch } from 'react-redux';
 import { api } from 'common';
+import { requestEmailOtp, verifyEmailOtp } from 'common/src/actions/authactions';
 import { Feather, Ionicons, AntDesign } from '@expo/vector-icons';
 import { Keyboard } from 'react-native';
 import { Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal, SelectBackdrop, SelectContent, SelectItem, ChevronDownIcon } from '@gluestack-ui/themed';
@@ -29,6 +31,9 @@ import Button from './Button';
 import { fonts } from '../common/font';
 import DeviceInfo from 'react-native-device-info';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import RegistrationDocumentStep from './RegistrationDocumentStep';
+import RegistrationBiometricStep from './RegistrationBiometricStep';
+import RegistrationTermsStep from './RegistrationTermsStep';
 
 const hasNotch = DeviceInfo.hasNotch();
 
@@ -46,7 +51,8 @@ export default function Registration(props) {
         email: '',
         password: '',
         mobile: '',
-        referralId: ''
+        referralId: '',
+        socialSecurity: ''
     });
     const dispatch = useDispatch();
     const [countryCode, setCountryCode] = useState();
@@ -64,10 +70,22 @@ export default function Registration(props) {
     const [passwordFocus, setpasswordFocus] = useState(false)
     const [confirmPasswordFocus, setconfirmPasswordFocus] = useState(false)
     const [referralIdFocus, setreferralIdFocus] = useState(false)
-    const pickerRef1 = React.createRef();
     const useduserReferral = useSelector(state => state.usedreferralid.usedreferral);
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState('');
+    
+    const [currentStep, setCurrentStep] = useState(1);
+    const [documentImage, setDocumentImage] = useState(null);
+    const [documentImageBlob, setDocumentImageBlob] = useState(null);
+    const [selfieImage, setSelfieImage] = useState(null);
+    const [selfieImageBlob, setSelfieImageBlob] = useState(null);
+    const [biometricEnabled, setBiometricEnabled] = useState(false);
+    const [termsAccepted, setTermsAccepted] = useState(false);
+    const [emailOtp, setEmailOtp] = useState('');
+    const [emailOtpSent, setEmailOtpSent] = useState(false);
+    const [emailOtpVerified, setEmailOtpVerified] = useState(false);
+    const [emailOtpSending, setEmailOtpSending] = useState(false);
+    const [emailOtpVerifying, setEmailOtpVerifying] = useState(false);
 
     const headerTranslateY = useRef(new Animated.Value(0)).current;
     const formTranslateY = useRef(new Animated.Value(0)).current;
@@ -188,8 +206,6 @@ export default function Registration(props) {
                     }
                 }
             }
-            // Set initial user type
-            setState(prev => ({...prev, usertype: 'customer'}));
         }
     }, [settings]);
 
@@ -229,43 +245,187 @@ export default function Registration(props) {
    
 
 
-    const onPressRegister = () => {
-        const { onPressRegister } = props;
-        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-        const validatePassword = checkPasswordValidity(state.password);
-        if (re.test(state.email)) {
-            if (/\S/.test(state.firstName) && state.firstName.length > 0 && /\S/.test(state.lastName) && state.lastName.length > 0) {
-                if (!validatePassword) {
-                    if (mobileWithoutCountry && mobileWithoutCountry.length > 6) {
-                        console.log('📋 REGISTER - Datos de registro:', {
-                            mobileWithoutCountry: mobileWithoutCountry,
-                            countryCode: countryCode,
-                            fullMobile: state.mobile,
-                            email: state.email,
-                            firstName: state.firstName,
-                            lastName: state.lastName,
-                            usertype: state.usertype
-                        });
-                        
-                        const userData = { ...state };
-                        if (userData.usertype == 'customer') delete userData.carType;
-                        
-                        console.log('🚀 REGISTER - Enviando userData:', userData);
-                        onPressRegister(userData);
-                        
-                    } else {
-                        Alert.alert(t('alert'), t('mobile_no_blank_error'));
-                    }
-                } else {
-                    Alert.alert(t('alert'), validatePassword);
-                }
-            } else {
-                Alert.alert(t('alert'), t('proper_input_name'));
-            }
-        } else {
-            Alert.alert(t('alert'), t('proper_email'));
+    const validateStep1 = () => {
+        if (!/\S/.test(state.firstName) || state.firstName.length === 0 || !/\S/.test(state.lastName) || state.lastName.length === 0) {
+            Alert.alert(t('alert'), t('proper_input_name'));
+            return false;
         }
+        if (settings && settings.showSocialSecurityRiders === true && (!state.socialSecurity || state.socialSecurity.length === 0)) {
+            Alert.alert(t('alert'), t('social_security_required') || 'La seguridad social es requerida');
+            return false;
+        }
+        return true;
+    }
 
+    const validateStep2 = () => {
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        if (!re.test(state.email)) {
+            Alert.alert(t('alert'), t('proper_email'));
+            return false;
+        }
+        if (!emailOtpVerified) {
+            Alert.alert(t('alert'), t('email_verification_required') || 'Por favor verifica tu correo electrónico con el código OTP');
+            return false;
+        }
+        if (!mobileWithoutCountry || mobileWithoutCountry.length <= 6) {
+            Alert.alert(t('alert'), t('mobile_no_blank_error'));
+            return false;
+        }
+        return true;
+    }
+
+    const handleSendEmailOtp = async () => {
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        if (!re.test(state.email)) {
+            Alert.alert(t('alert'), t('proper_email'));
+            return;
+        }
+        setEmailOtpSending(true);
+        const result = await dispatch(requestEmailOtp(state.email));
+        setEmailOtpSending(false);
+        if (result.success) {
+            setEmailOtpSent(true);
+            setEmailOtpVerified(false);
+            Alert.alert(t('alert'), t('otp_sent') || 'Código OTP enviado a tu correo electrónico');
+        } else {
+            Alert.alert(t('alert'), result.error || t('error_sending_otp') || 'Error al enviar el código OTP');
+        }
+    }
+
+    const handleVerifyEmailOtp = async () => {
+        if (!emailOtp || emailOtp.length !== 6 || !/^\d+$/.test(emailOtp)) {
+            Alert.alert(t('alert'), t('invalid_otp') || 'Por favor ingresa un código OTP válido de 6 dígitos');
+            return;
+        }
+        setEmailOtpVerifying(true);
+        const result = await dispatch(verifyEmailOtp(state.email, emailOtp));
+        setEmailOtpVerifying(false);
+        if (result.success) {
+            setEmailOtpVerified(true);
+            Alert.alert(t('alert'), t('email_verified') || 'Correo electrónico verificado correctamente');
+        } else {
+            Alert.alert(t('alert'), result.error || t('invalid_otp') || 'Código OTP inválido');
+        }
+    }
+
+    useEffect(() => {
+        if (state.email && emailOtpSent) {
+            setEmailOtpSent(false);
+            setEmailOtpVerified(false);
+            setEmailOtp('');
+        }
+    }, [state.email]);
+
+    const validateStep3 = () => {
+        const validatePassword = checkPasswordValidity(state.password);
+        if (validatePassword) {
+            Alert.alert(t('alert'), validatePassword);
+            return false;
+        }
+        return true;
+    }
+
+    const handleNext = () => {
+        if (currentStep === 1) {
+            if (!validateStep1()) {
+                return;
+            }
+            setCurrentStep(2);
+        } else if (currentStep === 2) {
+            if (!validateStep2()) {
+                return;
+            }
+            setCurrentStep(3);
+        } else if (currentStep === 3) {
+            if (!validateStep3()) {
+                return;
+            }
+            if (state.usertype === 'driver') {
+                setCurrentStep(4);
+            } else {
+                setCurrentStep(6);
+            }
+        } else if (currentStep === 4) {
+            setCurrentStep(5);
+        } else if (currentStep === 5) {
+            setCurrentStep(6);
+        } else if (currentStep === 6) {
+            handleFinalSubmit();
+        }
+    }
+
+    const handleBack = () => {
+        if (currentStep === 6) {
+            if (state.usertype === 'driver') {
+                setCurrentStep(5);
+            } else {
+                setCurrentStep(3);
+            }
+        } else if (currentStep === 5) {
+            setCurrentStep(4);
+        } else if (currentStep === 4) {
+            setCurrentStep(3);
+        } else if (currentStep === 3) {
+            setCurrentStep(2);
+        } else if (currentStep === 2) {
+            setCurrentStep(1);
+        }
+    }
+
+    const handleFinalSubmit = () => {
+        const { onPressRegister } = props;
+        if (!termsAccepted) {
+            Alert.alert(t('alert'), t('terms_required') || 'Debes aceptar los términos y condiciones');
+            return;
+        }
+        
+        const userData = { 
+            ...state,
+            verifyIdImage: documentImageBlob,
+            profileImage: selfieImageBlob,
+            biometricEnabled: biometricEnabled,
+            term: termsAccepted
+        };
+        
+                        if (userData.usertype == 'customer') delete userData.carType;
+                        if (!settings || !settings.showReferralField) {
+                            delete userData.referralId;
+                        }
+                        
+                        onPressRegister(userData);
+    }
+
+    const handleDocumentImageChange = (uri, blob) => {
+        setDocumentImage(uri);
+        setDocumentImageBlob(blob);
+                    }
+
+    const handleSelfieImageChange = (uri, blob) => {
+        setSelfieImage(uri);
+        setSelfieImageBlob(blob);
+    }
+
+    const getTotalSteps = () => {
+        return state.usertype === 'driver' ? 6 : 4;
+                }
+
+    const getStepTitle = () => {
+        switch(currentStep) {
+            case 1:
+                return t('personal_information');
+            case 2:
+                return t('contact_information');
+            case 3:
+                return t('security');
+            case 4:
+                return t('upload_documents');
+            case 5:
+                return t('enable_biometric');
+            case 6:
+                return t('term_condition');
+            default:
+                return t('registration_title');
+        }
     }
 
     const upDateCountry = (text) => {
@@ -282,6 +442,12 @@ export default function Registration(props) {
         });
         
         setState({ ...state, mobile: formattedNum })
+    }
+
+    const getCountryCode = (value) => {
+        if (!value) return '';
+        const match = value.match(/\(\+(\d+)\)/);
+        return match && match[1] ? `+${match[1]}` : '';
     }
 
     // const lCom = { icon: 'ios-arrow-back', type: 'ionicon', color: colors.WHITE, size: 35, component: TouchableWithoutFeedback, onPress: props.onPressBack };
@@ -308,234 +474,478 @@ export default function Registration(props) {
                         }
                     ]}
                 >
-                    <Text style={[styles.headerStyle, {color: mode === 'dark' ? colors.WHITE: colors.BLACK}]}>{t('registration_title')}</Text>
-                    <Text style={styles.headerSubtitle}>{t('registration_subtitle')}</Text>
+                    <Text style={[styles.headerStyle, {color: mode === 'dark' ? colors.WHITE: colors.BLACK}]}>
+                        {getStepTitle()}
+                    </Text>
+                    <Text style={styles.headerSubtitle}>
+                        {(t('step') || 'Paso') + ' ' + currentStep + ' ' + (t('of') || 'de') + ' ' + getTotalSteps()}
+                    </Text>
                 </Animated.View>
                 <View style={{ height: '85%' }}>
+                    {currentStep === 1 ? (
                     <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : (__DEV__ ? null : "padding")} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} >
                         <Animated.View style={{ transform: [{ translateY: formTranslateY }] }}>
                             <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
                             <View style={[styles.containerStyle,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
-
-                                <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }]}>
                                     <View style={{width: "47%"}}>
-                                        <Text style={styles.inputLabel}>{t('first_name_placeholder')}</Text>
-                                        <TextInput
-                                            placeholder={''}
-                                            onFocus={() => setFirstNameFocus(!firstNameFocus)}
-                                            onBlur={() => setFirstNameFocus(!firstNameFocus)}
+                                        <Input
                                             value={state.firstName}
                                             onChangeText={(text) => { setState({ ...state, firstName: text }) }}
-                                            textAlign={isRTL ? 'right' : 'left'}
-                                            placeholderTextColor={colors.SHADOW}
-                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (firstNameFocus === true || state.firstName.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                            keyboardType={'email-address'}
+                                            placeholder={t('first_name_placeholder') || 'First Name'}
+                                            variant="outline"
+                                            icon={Feather}
+                                            iconName="user"
+                                            containerStyle={{ marginBottom: 0 }}
+                                            mode={mode}
                                         />
                                     </View>
                                     <View style={{width: "47%"}}>
-                                        <Text style={styles.inputLabel}>{t('last_name_placeholder')}</Text>
-                                        <TextInput
-                                            placeholder={''}
-                                            onFocus={() => setlastNameFocus(!lastNameFocus)}
-                                            onBlur={() => setlastNameFocus(!lastNameFocus)}
+                                        <Input
                                             value={state.lastName}
-                                            textAlign={isRTL ? 'right' : 'left'}
                                             onChangeText={(text) => { setState({ ...state, lastName: text }) }}
-                                            placeholderTextColor={colors.SHADOW}
-                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (lastNameFocus === true || state.lastName.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                            keyboardType={'email-address'}
+                                            placeholder={t('last_name_placeholder') || 'Last Name'}
+                                            variant="outline"
+                                            icon={Feather}
+                                            iconName="user"
+                                            containerStyle={{ marginBottom: 0 }}
+                                            mode={mode}
                                         />
                                     </View>
-
                                 </View>
+                                    {settings && settings.showSocialSecurityRiders === true && (
+                                        <View style={{width: "100%"}}>
+                                            <Input
+                                                value={state.socialSecurity}
+                                                onChangeText={(text) => {
+                                                    const numericValue = text.replace(/\D/g, '');
+                                                    setState({ ...state, socialSecurity: numericValue });
+                                                }}
+                                                keyboardType={'number-pad'}
+                                                placeholder={t('social_security') || 'Social Security'}
+                                                variant="outline"
+                                                icon={Feather}
+                                                iconName="hash"
+                                                mode={mode}
+                                            />
+                                        </View>
+                                    )}
+                                    <View style={[styles.buttonContainer]}>
+                                        <Button
+                                            title={t('next') || 'Siguiente'}
+                                            style={[styles.registerButton, {backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}, loading === true ? [styles.registerButtonClicked,{backgroundColor: colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.registerButton]}
+                                            buttonStyle={[styles.buttonStyle]}
+                                            btnClick={handleNext}
+                                            activeOpacity={0.8}
+                                            loading= {loading=== true ? true : false}
+                                            loadingColor={{ color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}
+                                        />
+                                    </View>
+                                </View>
+                                </ScrollView>
+                            </Animated.View>
+                        </KeyboardAvoidingView>
+                    ) : currentStep === 2 ? (
+                        <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : (__DEV__ ? null : "padding")} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} >
+                            <Animated.View style={{ transform: [{ translateY: formTranslateY }] }}>
+                                <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
+                                <View style={[styles.containerStyle,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
                                 <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                     <View style={{width: "100%"}}>
-                                        <Text style={styles.inputLabel}>{t('email_placeholder')}</Text>
-                                        <TextInput
-                                            placeholder={''}
-                                            onFocus={() => setEmailFocus(!EmailFocus)}
-                                            onBlur={() => setEmailFocus(!EmailFocus)}
+                                        <Input
                                             value={state.email}
-                                            placeholderTextColor={colors.SHADOW}
-                                            textAlign={isRTL ? 'right' : 'left'}
-                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (EmailFocus === true || state.email.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
                                             onChangeText={(text) => { setState({ ...state, email: text }) }}
                                             keyboardType={'email-address'}
+                                            placeholder={t('email_placeholder') || 'Email'}
+                                            variant="outline"
+                                            icon={Feather}
+                                            iconName="mail"
+                                            containerStyle={{ marginBottom: 0 }}
+                                            mode={mode}
+                                            editable={!emailOtpVerified}
                                         />
                                     </View>
                                 </View>
+                                {!emailOtpSent && !emailOtpVerified && (
+                                    <View style={{width: "100%", alignItems: 'flex-end', marginTop: -5, marginBottom: 5}}>
+                                        <TouchableOpacity 
+                                            onPress={handleSendEmailOtp}
+                                            disabled={emailOtpSending}
+                                            activeOpacity={0.7}
+                                        >
+                                            {emailOtpSending ? (
+                                                <ActivityIndicator size="small" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                            ) : (
+                                                <Text style={{ 
+                                                    color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, 
+                                                    fontSize: 14, 
+                                                    fontFamily: fonts.Bold,
+                                                    textDecorationLine: 'underline'
+                                                }}>
+                                                    {t('verify_email') || 'Verificar Email'}
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                {emailOtpSent && !emailOtpVerified && (
+                                    <View style={{width: "100%", alignItems: 'flex-end', marginTop: -5, marginBottom: 5}}>
+                                        <TouchableOpacity 
+                                            onPress={handleSendEmailOtp}
+                                            disabled={emailOtpSending}
+                                            activeOpacity={0.7}
+                                        >
+                                            {emailOtpSending ? (
+                                                <ActivityIndicator size="small" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                            ) : (
+                                                <Text style={{ 
+                                                    color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, 
+                                                    fontSize: 14, 
+                                                    fontFamily: fonts.Bold,
+                                                    textDecorationLine: 'underline'
+                                                }}>
+                                                    {t('resend_otp') || 'Reenviar OTP'}
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                {emailOtpSent && !emailOtpVerified && (
+                                    <View style={{width: "100%"}}>
+                                        <Input
+                                            value={emailOtp}
+                                            onChangeText={(text) => {
+                                                const numericValue = text.replace(/\D/g, '').slice(0, 6);
+                                                setEmailOtp(numericValue);
+                                            }}
+                                            keyboardType="numeric"
+                                            maxLength={6}
+                                            placeholder={t('otp_placeholder') || 'Código OTP'}
+                                            variant="outline"
+                                            icon={Feather}
+                                            iconName="key"
+                                            mode={mode}
+                                        />
+                                        <TouchableOpacity 
+                                            style={[styles.loginButton, { 
+                                                marginTop: 10,
+                                                backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
+                                            }]}
+                                            onPress={handleVerifyEmailOtp}
+                                            disabled={emailOtpVerifying || emailOtp.length !== 6}
+                                            activeOpacity={0.8}
+                                        >
+                                            {emailOtpVerifying ? (
+                                                <ActivityIndicator color={colors.WHITE} />
+                                            ) : (
+                                                <Text style={styles.loginButtonText}>
+                                                    {t('verify_otp') || 'Verificar OTP'}
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
+                                        {emailOtpVerified && (
+                                            <View style={{marginTop: 10, padding: 10, backgroundColor: '#d4edda', borderRadius: 5}}>
+                                                <Text style={{color: '#155724', textAlign: 'center'}}>
+                                                    {t('email_verified') || '✓ Correo electrónico verificado'}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+                                {emailOtpVerified && (
+                                    <View style={{marginTop: 10, padding: 10, backgroundColor: '#d4edda', borderRadius: 5}}>
+                                        <Text style={{color: '#155724', textAlign: 'center'}}>
+                                            {t('email_verified') || '✓ Correo electrónico verificado'}
+                                        </Text>
+                                    </View>
+                                )}
                                 <View style={styles.contactRow}>
                                     <View style={styles.countryBoxSmall}>
-                                        <Text style={styles.inputLabel}>{t('country')}</Text>
-                                        <RNPickerSelect
-                                            pickerRef={pickerRef1}
-                                            placeholder={settings?.restrictCountry ? {} : { label: '+', value: t('select_country') }}
-                                            value={countryCode}
-                                            useNativeAndroidPickerStyle={false}
-                                            onTap={() => {
-                                                if (!settings?.AllowCountrySelection && !settings?.restrictCountry) {
-                                                    return;
-                                                }
-                                                Keyboard.dismiss();
-                                                pickerRef1.current && pickerRef1.current.focus && pickerRef1.current.focus();
-                                            }}
-                                            style={{
-                                                viewContainer: styles.countryPickerContainer,
-                                                inputIOS: [
-                                                    styles.countryPickerSmall, 
-                                                    { textAlign: 'center' },
-                                                    (!settings || (!settings.AllowCountrySelection && !settings.restrictCountry)) && { opacity: 0.5 }
-                                                ],
-                                                inputAndroid: [
-                                                    styles.countryPickerSmall, 
-                                                    { textAlign: 'center', textAlignVertical: 'center' },
-                                                    (!settings || (!settings.AllowCountrySelection && !settings.restrictCountry)) && { opacity: 0.5 }
-                                                ]
-                                            }}
+                                        <Select 
+                                            selectedValue={countryCode} 
                                             onValueChange={(text) => {
                                                 if (!settings?.AllowCountrySelection && !settings?.restrictCountry) return;
                                                 upDateCountry(text);
                                             }}
-                                            items={formatCountries.map((it) => {
-                                                const match = it.value && it.value.match(/\(\+(\d+)\)/);
-                                                const codePart = match && match[1] ? `+${match[1]}` : (it.label?.startsWith('+') ? it.label : `+${it.label}`);
-                                                return { ...it, label: codePart };
-                                            })}
-                                            disabled={!settings?.AllowCountrySelection && !settings?.restrictCountry}
-                                            mode={mode}
-                                        />
+                                            isDisabled={!settings?.AllowCountrySelection && !settings?.restrictCountry}
+                                        >
+                                            <SelectTrigger 
+                                                size="md" 
+                                                variant="outline" 
+                                                bg={colors.WHITE} 
+                                                borderColor="#E2E9EC" 
+                                                borderRadius={10}
+                                                style={{ 
+                                                    height: 50, 
+                                                    width: 84,
+                                                    paddingHorizontal: 8,
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    opacity: (!settings || (!settings.AllowCountrySelection && !settings.restrictCountry)) ? 0.5 : 1
+                                                }}
+                                            >
+                                                <SelectInput 
+                                                    placeholder={settings?.restrictCountry ? '' : '+'} 
+                                                    value={getCountryCode(countryCode)}
+                                                    style={{ 
+                                                        textAlign: 'center', 
+                                                        fontSize: 13,
+                                                        color: colors.BLACK,
+                                                        flex: 0,
+                                                        width: 'auto',
+                                                        paddingRight: 0
+                                                    }}
+                                                />
+                                                <SelectIcon as={ChevronDownIcon} style={{ marginLeft: 2 }} />
+                                            </SelectTrigger>
+                                            <SelectPortal>
+                                                <SelectBackdrop />
+                                                <SelectContent>
+                                                    {formatCountries.map((it) => {
+                                                        const match = it.value && it.value.match(/\(\+(\d+)\)/);
+                                                        const codePart = match && match[1] ? `+${match[1]}` : (it.label?.startsWith('+') ? it.label : `+${it.label}`);
+                                                        return (
+                                                            <SelectItem 
+                                                                key={it.key} 
+                                                                label={codePart} 
+                                                                value={it.value} 
+                                                            />
+                                                        );
+                                                    })}
+                                                </SelectContent>
+                                            </SelectPortal>
+                                        </Select>
                                     </View>
                                     <View style={styles.contactInputWrap}>
-                                        <Text style={styles.inputLabel}>{t('mobile')}</Text>
-                                        <TextInput
-                                            placeholder={''}
-                                            onFocus={() => setNumberFocus(!numberFocus)}
-                                            onBlur={() => setNumberFocus(!numberFocus)}
+                                        <Input
                                             value={mobileWithoutCountry}
-                                            placeholderTextColor={colors.SHADOW}
-                                            textAlign={isRTL ? 'right' : 'left'}
-                                            style={[styles.textInputStyle, (state.mobile && /^\d+$/.test(state.mobile)) ? styles.inputPhone : null, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (numberFocus === true || mobileWithoutCountry.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
                                             onChangeText={(text) => {
                                                 const numericValue = text.replace(/\D/g, '');
                                                 setMobileWithoutCountry(numericValue);
                                                 if (countryCode) {
                                                     const countryPart = countryCode.split("(")[1].split(")")[0];
                                                     const fullMobile = countryPart + numericValue;
-                                                    
-                                                    console.log('📱 REGISTER - Actualizando teléfono:', {
-                                                        originalText: text,
-                                                        numericValue: numericValue,
-                                                        countryCode: countryCode,
-                                                        countryPart: countryPart,
-                                                        fullMobile: fullMobile
-                                                    });
-                                                    
                                                     setState({ ...state, mobile: fullMobile });
                                                 }
                                             }}
                                             keyboardType="numeric"
                                             maxLength={10}
+                                            placeholder={t('mobile') || 'Mobile Number'}
+                                            variant="outline"
+                                            icon={Feather}
+                                            iconName="phone"
+                                            containerStyle={{ marginBottom: 0 }}
+                                            mode={mode}
                                         />
                                     </View>
                                 </View>
-                                <View style={{width: "100%"}}>
-                                    <Text style={styles.inputLabel}>{t('password')}</Text>
-                                    <View style={[styles.passWordBox, { flexDirection: isRTL ? 'row-reverse' : 'row' },(passwordFocus === true || state.password.length > 0) ? [styles.passwordBoxFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.passWordBox]}>
-                                        <TextInput
-                                            placeholder={''}
-                                            onFocus={() => setpasswordFocus(!passwordFocus)}
-                                            onBlur={() => setpasswordFocus(!passwordFocus)}
-                                            placeholderTextColor={colors.SHADOW}
-                                            value={state.password}
-                                            textAlign={isRTL ? 'right' : 'left'}
-                                            style={[ styles.passwordInput,{paddingRight:isRTL?10:0, color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-                                            onChangeText={(text) => setState({ ...state, password: text })}
-                                            keyboardType="default"
-                                            secureTextEntry={eyePass}
-                                        />
-                                    <TouchableOpacity onPress={() => setEyePass(!eyePass)} style={styles.passwordIcon}>
-                                        <Feather name={eyePass === true ? "eye-off" : "eye"} size={22} color={(passwordFocus === true || state.password.length > 0) ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW} />
-                                    </TouchableOpacity>
-                                </View>
-                                </View>
-                                <View style={{width: "100%"}}>
-                                    <Text style={styles.inputLabel}>{t('confirm_password')}</Text>
-                                    <View style={[styles.passWordBox,  { flexDirection: isRTL ? 'row-reverse' : 'row',},(confirmPasswordFocus === true || confirmpassword.length > 0) ? [styles.passwordBoxFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.passWordBox]}>
-                                        <TextInput
-                                            placeholder={''}
-                                            secureTextEntry={eyeConfirmPass}
-                                            onFocus={() => setconfirmPasswordFocus(!confirmPasswordFocus)}
-                                            onBlur={() => setconfirmPasswordFocus(!confirmPasswordFocus)}
-                                            placeholderTextColor={colors.SHADOW}
-                                            value={confirmpassword}
-                                            textAlign={isRTL ? 'right' : 'left'}
-                                            style={[ styles.passwordInput,{paddingRight:isRTL?10:0, color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}
-                                            onChangeText={(text) => setConfirmPassword(text)}
-                                            keyboardType="default"
-                                        />
-                                    <TouchableOpacity onPress={() => setEyeConfirmPass(!eyeConfirmPass)} style={styles.passwordIcon}>
-                                        <Feather name={eyeConfirmPass === true ? "eye-off" : "eye"} size={22} color={(confirmPasswordFocus === true || confirmpassword.length > 0) ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW} />
-                                    </TouchableOpacity>
-                                </View>
-                                </View>
-                                <View style={[styles.textInputBoxStyle, { flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }]}>
-                                    <View style={{width: "35%"}}>
-                                        <Text style={styles.inputLabel}>{t('user_type')}</Text>
+                                    {settings && settings.showReferralField && (
+                                        <View>
+                                            <Input
+                                                value={state.referralId}
+                                                onChangeText={(text) => { setState({ ...state, referralId: text }) }}
+                                                placeholder={t('referral_id_placeholder') || 'Referral Id (Optional)'}
+                                                variant="outline"
+                                                icon={Feather}
+                                                iconName="gift"
+                                                mode={mode}
+                                            />
+                                        </View>
+                                    )}
+                                    <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
                                         <TouchableOpacity 
-                                            style={[styles.textInputStyle, {
-                                                flexDirection: 'row',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center'
-                                            }]}
-                                            onPress={() => {
-                                                setState(prev => ({
-                                                    ...prev, 
-                                                    usertype: prev.usertype === 'customer' ? 'driver' : 'customer'
-                                                }));
-                                            }}
+                                            style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                            onPress={handleBack}
                                         >
-                                            <Text style={{
-                                                fontSize: 14,
-                                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                fontFamily: fonts.Regular
-                                            }}>
-                                                {state.usertype === 'customer' ? t('customer') : t('driver')}
+                                            <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                                {t('back') || 'Volver'}
                                             </Text>
-                                            <Ionicons name="chevron-down" size={14} color={colors.SHADOW} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[styles.loginButton, { 
+                                                flex: 1, 
+                                                backgroundColor: emailOtpVerified ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : '#ccc',
+                                                opacity: emailOtpVerified ? 1 : 0.6
+                                            }]}
+                                            onPress={handleNext}
+                                            disabled={!emailOtpVerified || loading}
+                                            activeOpacity={0.8}
+                                        >
+                                            {loading ? (
+                                                <ActivityIndicator color={colors.WHITE} />
+                                            ) : (
+                                                <Text style={styles.loginButtonText}>
+                                                    {t('next') || 'Siguiente'}
+                                                </Text>
+                                            )}
                                         </TouchableOpacity>
                                     </View>
-                                    <View style={{width: "60%"}}>
-                                        <Text style={styles.inputLabel}>{t('referral_id_placeholder')}</Text>
-                                        <TextInput
-                                            editable={true}
-                                            placeholder={''}
-                                            onFocus={() => setreferralIdFocus(!referralIdFocus)}
-                                            onBlur={() => setreferralIdFocus(!referralIdFocus)}
-                                            placeholderTextColor={colors.SHADOW}
-                                            value={state.referralId}
-                                            textAlign={isRTL ? 'right' : 'left'}
-                                            style={[styles.textInputStyle, { width: "100%", color: mode === 'dark' ? colors.WHITE : colors.BLACK }, (referralIdFocus === true || state.referralId.length > 0) ? [styles.inputFocused, {borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.textInputStyle]}
-                                            onChangeText={(text) => { setState({ ...state, referralId: text }) }}
-                                            keyboardType={'email-address'}
-                                        />
+                                </View>
+                                </ScrollView>
+                            </Animated.View>
+                        </KeyboardAvoidingView>
+                    ) : currentStep === 3 ? (
+                        <KeyboardAvoidingView style={styles.form} behavior={Platform.OS === 'ios' ? 'padding' : (__DEV__ ? null : "padding")} keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0} >
+                            <Animated.View style={{ transform: [{ translateY: formTranslateY }] }}>
+                                <ScrollView style={styles.scrollViewStyle} showsVerticalScrollIndicator={false}>
+                                <View style={[styles.containerStyle,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
+                                <View style={{width: "100%"}}>
+                                    <Input
+                                        value={state.password}
+                                        onChangeText={(text) => setState({ ...state, password: text })}
+                                        secureTextEntry={eyePass}
+                                        placeholder={t('password') || 'Password'}
+                                        variant="outline"
+                                        icon={Feather}
+                                        iconName="lock"
+                                        mode={mode}
+                                        rightComponent={() => (
+                                            <TouchableOpacity onPress={() => setEyePass(!eyePass)}>
+                                                <Feather name={eyePass === true ? "eye-off" : "eye"} size={22} color={colors.SHADOW} />
+                                            </TouchableOpacity>
+                                        )}
+                                    />
+                                </View>
+                                <View style={{width: "100%"}}>
+                                    <Input
+                                        value={confirmpassword}
+                                        onChangeText={(text) => setConfirmPassword(text)}
+                                        secureTextEntry={eyeConfirmPass}
+                                        placeholder={t('confirm_password') || 'Confirm Password'}
+                                        variant="outline"
+                                        icon={Feather}
+                                        iconName="lock"
+                                        mode={mode}
+                                        rightComponent={() => (
+                                            <TouchableOpacity onPress={() => setEyeConfirmPass(!eyeConfirmPass)}>
+                                                <Feather name={eyeConfirmPass === true ? "eye-off" : "eye"} size={22} color={colors.SHADOW} />
+                                            </TouchableOpacity>
+                                        )}
+                                    />
+                                </View>
+                                    <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                                        <TouchableOpacity 
+                                            style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                            onPress={handleBack}
+                                        >
+                                            <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                                {t('back') || 'Volver'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                            onPress={handleNext}
+                                            activeOpacity={0.8}
+                                        >
+                                            {loading ? (
+                                                <ActivityIndicator color={colors.WHITE} />
+                                            ) : (
+                                                <Text style={styles.loginButtonText}>
+                                                    {t('next') || 'Siguiente'}
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
-                                <View style={[styles.buttonContainer]}>
-                                    <Button
-                                        title={t('register_button')}
-                                        style={[styles.registerButton, {backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}, loading === true ? [styles.registerButtonClicked,{backgroundColor: colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}] : styles.registerButton]}
-                                        buttonStyle={[styles.buttonStyle]}
-                                        btnClick={onPressRegister}
+                                </ScrollView>
+                            </Animated.View>
+                        </KeyboardAvoidingView>
+                    ) : currentStep === 4 ? (
+                        <View style={{ flex: 1 }}>
+                            <RegistrationDocumentStep
+                                documentImage={documentImage}
+                                selfieImage={selfieImage}
+                                onDocumentImageChange={handleDocumentImageChange}
+                                onSelfieImageChange={handleSelfieImageChange}
+                                mode={mode}
+                            />
+                            <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 }}>
+                                <TouchableOpacity 
+                                    style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleBack}
+                                >
+                                    <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                        {t('back') || 'Volver'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleNext}
+                                    activeOpacity={0.8}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>
+                                            {t('next') || 'Siguiente'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : currentStep === 5 ? (
+                        <View style={{ flex: 1 }}>
+                            <RegistrationBiometricStep
+                                onContinue={handleNext}
+                                onBiometricEnabled={setBiometricEnabled}
+                                mode={mode}
+                            />
+                            <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 }}>
+                                <TouchableOpacity 
+                                    style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleBack}
+                                >
+                                    <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                        {t('back') || 'Volver'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleNext}
                                         activeOpacity={0.8}
-                                        loading= {loading=== true ? true : false}
-                                        loadingColor={{ color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}
-                                    />
-                                   
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>
+                                            {t('next') || 'Siguiente'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={{ flex: 1 }}>
+                            <RegistrationTermsStep
+                                onContinue={handleNext}
+                                onTermsAccepted={setTermsAccepted}
+                                mode={mode}
+                            />
+                            <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 }}>
+                                <TouchableOpacity 
+                                    style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleBack}
+                                >
+                                    <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                        {t('back') || 'Volver'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleNext}
+                                    activeOpacity={0.8}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>
+                                            {t('register_button') || 'Registrarse'}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
                                 </View>
                             </View>
-                            </ScrollView>
-                        </Animated.View>
-                    </KeyboardAvoidingView>
+                    )}
                 </View>
             </SafeAreaView>
         </View>
@@ -571,28 +981,7 @@ const styles = StyleSheet.create({
     },
     countryBoxSmall: {
         width: 84,
-        height: 50,
-    },
-    countryPickerContainer: {
-        height: '100%',
-        justifyContent: 'center'
-    },
-    countryPickerSmall: {
-        height: 50,
-        color: colors.BLACK,
-        fontFamily: fonts.Regular,
-        fontSize: 13,
-        width: '100%',
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: '#E2E9EC',
-        backgroundColor: colors.WHITE,
-        textAlignVertical: 'center',
-        textAlign: 'center',
-        justifyContent: 'center',
-        alignItems: 'center'
+        minHeight: 50,
     },
     contactInputWrap: {
         flex: 1
@@ -611,11 +1000,12 @@ const styles = StyleSheet.create({
     containerStyle: {
         flexDirection: 'column',
         marginTop: 10,
-        width: '100%',
-        gap:10
+        width: width - 40,
+        alignSelf: 'center',
+        gap: 10
     },
     textInputBoxStyle: {
-        width: width-25,
+        width: '100%',
         justifyContent: 'space-between',
         alignItems:'center',
         position: 'relative',
@@ -630,7 +1020,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderRadius: 10,
         paddingLeft: 10,
-        width: width-25,
+        width: '100%',
         borderColor: '#E2E9EC',
         justifyContent:"center",
         height:45
@@ -665,10 +1055,10 @@ const styles = StyleSheet.create({
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        width: width-25,
+        width: '100%',
         position: 'relative',
         marginBottom: 30,
-        marginTop:10
+        marginTop: 10
     },
     registerButton: {
         width: '100%',
@@ -731,6 +1121,7 @@ const styles = StyleSheet.create({
     },
     scrollViewStyle: {
         flex: 1,
+        width: '100%',
     },
     headerStyle: {
         fontSize: 28,
@@ -740,7 +1131,7 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         marginBottom: 20,
-        width: width-25,
+        width: width - 40,
         alignSelf: 'center'
     },
     headerSubtitle: {
@@ -853,6 +1244,56 @@ const styles = StyleSheet.create({
         color: colors.ProfileDetails_Text,
         fontFamily:fonts.Bold,
         fontSize: 13
+    },
+    navigationButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        paddingTop: 10,
+    },
+    backButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 10,
+        height: 50,
+    },
+    backButtonText: {
+        fontSize: 16,
+        fontFamily: fonts.Bold,
+        marginLeft: 8,
+    },
+    loginButton: {
+        width: '100%',
+        backgroundColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4
+    },
+    loginButtonText: {
+        color: colors.WHITE,
+        fontSize: 16,
+        fontFamily: fonts.Bold
+    },
+    loginRegisterButton: {
+        backgroundColor: colors.WHITE,
+        borderWidth: 2,
+        borderColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4
+    },
+    loginRegisterButtonText: {
+        color: '#1369B4',
+        fontSize: 14,
+        fontFamily: fonts.Bold
     }
 });
 

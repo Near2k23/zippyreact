@@ -36,6 +36,7 @@ import MoneyIcon from '@mui/icons-material/Money';
 import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
 import {calcEst, showEst, optionsRequired} from '../common/sharedFunctions';
 import SosIcon from '@mui/icons-material/Sos';
+import PublicIcon from '@mui/icons-material/Public';
 import { FONT_FAMILY } from "../common/sharedFunctions"
 import AnnouncementOutlinedIcon from '@mui/icons-material/AnnouncementOutlined';
 import GeneralNotifications from './GeneralNotifications';
@@ -172,6 +173,7 @@ export default function ResponsiveDrawer(props) {
             {name : t('user'), url:'/users/0', icon: <EmojiPeopleIcon />, access: ['admin','fleetadmin']},
 
             {name : t('car_type'), url:'/cartypes', icon: <CarIcon/>, access: ['admin']},
+            {name : t('zones'), url:'/zones', icon: <PublicIcon/>, access: ['admin']},
             {name : t('cars'), url:'/cars', icon: <CarIcon/>, access: ['admin','fleetadmin','driver']},
             
             {name : t('withdraws_web'), url:'/withdraws', icon: <MoneyIcon />, access: ['admin']},

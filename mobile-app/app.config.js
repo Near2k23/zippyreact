@@ -11,7 +11,7 @@ export default {
     ios: {
         associatedDomains: ['applinks:' + AppConfig.expo_slug + '.page.link'],
     },
-    runtimeVersion: AppConfig.ios_app_version,
+    runtimeVersion: "1.0.17",
     userInterfaceStyle: "automatic",
     platforms: [
         "ios",
@@ -63,6 +63,7 @@ export default {
             "NSLocationWhenInUseUsageDescription": "For a reliable ride, App collects location data from the time you open the app until a trip ends. This improves pickups, support, and more.",
             "NSCameraUsageDescription": "This app uses the camera to take your profile picture.",
             "NSPhotoLibraryUsageDescription": "This app uses Photo Library for uploading your profile picture.",
+            "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication.",
             "ITSAppUsesNonExemptEncryption": false,
             "UIBackgroundModes": [
                 "location",
@@ -95,7 +96,7 @@ export default {
             googleMapsApiKey: GoogleMapApiConfig.ios
         },
         googleServicesFile: "./GoogleService-Info.plist",
-        buildNumber: AppConfig.ios_app_version
+        buildNumber: "1.0.17"
     },
     android: {
         package: AppConfig.app_identifier,
@@ -132,6 +133,7 @@ export default {
         "expo-font",
         "expo-audio",
         "expo-apple-authentication",
+        "expo-local-authentication",
         "expo-localization",
         "@react-native-firebase/app",
         "@react-native-firebase/auth",
@@ -166,6 +168,12 @@ export default {
             {
                 "photosPermission": "This app uses Photo Library for uploading your profile picture.",
                 "cameraPermission": "This app uses the camera to take your profile picture."
+            }
+        ],
+        [
+            "expo-camera",
+            {
+                "cameraPermission": "This app uses the camera to take your identity document photo."
             }
         ],
         [

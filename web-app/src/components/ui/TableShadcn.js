@@ -12,7 +12,7 @@ import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import AddIcon from '@mui/icons-material/Add';
 import { useTranslation } from 'react-i18next';
 
-export default function TableShadcn({ columns, data, renderActions, enableRowSelection = true, initialFilterColumn, onAdd, addButtonLabel }){
+export default function TableShadcn({ columns, data, renderActions, enableRowSelection = true, initialFilterColumn, onAdd, addButtonLabel, toolbarRight, columnsButtonLabel }){
   const [sorting, setSorting] = React.useState([]);
   const [columnFilters, setColumnFilters] = React.useState([]);
   const [columnVisibility, setColumnVisibility] = React.useState({});
@@ -86,9 +86,10 @@ export default function TableShadcn({ columns, data, renderActions, enableRowSel
           ) : null}
         </div>
         
-        <div className="flex justify-end">
+        <div className="flex justify-end items-center gap-2">
+          {toolbarRight || null}
           <Button variant="outlined" onClick={handleOpenMenu} endIcon={<MoreHorizIcon/>} className="w-full sm:w-auto">
-            Columnas
+            {columnsButtonLabel || 'Columnas'}
           </Button>
         </div>
         

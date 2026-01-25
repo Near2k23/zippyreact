@@ -488,6 +488,60 @@ const GeneralSettings = (props) => {
                   }
                   label={ <Typography className={classes.typography}>{t('vehicle_registration_card_required')}</Typography>}
                 />
+                <Typography component="h1" variant="h5" style={{ marginTop: '15px', textAlign: isRTL === 'rtl' ? 'right' : 'left', fontFamily:FONT_FAMILY }}>
+                  {t('social_security_settings') || 'Social Security Settings'}
+                </Typography>
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.showSocialSecurityDrivers !== undefined ? data.showSocialSecurityDrivers : false}
+                      onChange={handleSwitchChange}
+                      name="showSocialSecurityDrivers"
+                      color="primary"
+                    />
+                  }
+                  label={ <Typography className={classes.typography}>{t('show_social_security_drivers') || 'Mostrar Social Security en Conductores'}</Typography>}
+                />
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.showSocialSecurityRiders !== undefined ? data.showSocialSecurityRiders : false}
+                      onChange={handleSwitchChange}
+                      name="showSocialSecurityRiders"
+                      color="primary"
+                    />
+                  }
+                  label={ <Typography className={classes.typography}>{t('show_social_security_riders') || 'Mostrar Social Security en Pasajeros'}</Typography>}
+                />
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.socialSecurityRequired !== undefined ? data.socialSecurityRequired : false}
+                      onChange={handleSwitchChange}
+                      name="socialSecurityRequired"
+                      color="primary"
+                    />
+                  }
+                  label={ <Typography className={classes.typography}>{t('social_security_required') || 'Social Security Requerido'}</Typography>}
+                />
+                <Typography component="h1" variant="h5" style={{ marginTop: '15px', textAlign: isRTL === 'rtl' ? 'right' : 'left', fontFamily:FONT_FAMILY }}>
+                  {t('referral_settings') || 'Referral Settings'}
+                </Typography>
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.showReferralField !== undefined ? data.showReferralField : false}
+                      onChange={handleSwitchChange}
+                      name="showReferralField"
+                      color="primary"
+                    />
+                  }
+                  label={ <Typography className={classes.typography}>{t('show_referral_field') || 'Mostrar Campo de Referido en Registro'}</Typography>}
+                />
                 <Grid container spacing={2}>
                   <Grid item xs={12} sm={12} md={12} lg={12}>
                     <Typography component="h1" variant="h5" style={{ marginTop: '13px', textAlign: isRTL === 'rtl' ? 'right' : 'left', fontFamily:FONT_FAMILY }}>
@@ -754,6 +808,18 @@ const GeneralSettings = (props) => {
                   }
                   label={ <Typography className={classes.typography}>{t('social_login')}</Typography>}
 
+                />
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.emailVerificationRequired !== undefined ? data.emailVerificationRequired : false}
+                      onChange={handleSwitchChange}
+                      name="emailVerificationRequired"
+                      color="primary"
+                    />
+                  }
+                  label={ <Typography className={classes.typography}>{t('email_verification_required') || 'Verificación de Email Requerida'}</Typography>}
                 />
                 <Typography component="h1" variant="h5" style={{ marginTop: '15px', textAlign: isRTL === 'rtl' ? 'right' : 'left', fontFamily:FONT_FAMILY }}>
                   {t('driver_setting')}

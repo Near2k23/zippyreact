@@ -91,6 +91,15 @@ const Footer = () => {
                   {t('term_condition')}
                 </button>
               </li>
+              <li>
+                <button
+                  onClick={() => handleNavigation('/driver-agreement')}
+                  className="text-gray-300 hover:text-white transition-colors duration-200"
+                  style={{fontFamily: FONT_FAMILY}}
+                >
+                  {t('driver_agreement')}
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -190,6 +199,13 @@ const Footer = () => {
                 style={{fontFamily: FONT_FAMILY}}
               >
                 {t('privacy_policy')}
+              </button>
+              <button
+                onClick={() => handleNavigation('/driver-agreement')}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-sm"
+                style={{fontFamily: FONT_FAMILY}}
+              >
+                {t('driver_agreement')}
               </button>
             </div>
           </div>

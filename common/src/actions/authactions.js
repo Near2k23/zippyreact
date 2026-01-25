@@ -17,7 +17,7 @@ import {
 import store from '../store/store';
 import { firebase } from '../config/configureFirebase';
 import { onValue, update, set, off } from "firebase/database";
-import { onAuthStateChanged, signInWithCredential, signInWithPopup, signOut, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithCustomToken } from "firebase/auth";
+import { onAuthStateChanged, signInWithCredential, signInWithPopup, signOut, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithCustomToken, sendEmailVerification } from "firebase/auth";
 import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import base64 from 'react-native-base64';
 import AccessKey from '../other/AccessKey';
@@ -33,8 +33,41 @@ export const fetchUser = () => (dispatch) => {
     type: FETCH_USER,
     payload: null
   });
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, async user => {
     if (user) {
+      const settings = store.getState().settingsdata?.settings;
+      
+      if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
+        const isSocialLogin = user.providerData && user.providerData.length > 0 && 
+          (user.providerData[0].providerId === "google.com" || user.providerData[0].providerId === "apple.com");
+        
+        if (!isSocialLogin) {
+          try {
+            await sendEmailVerification(user);
+            await signOut(auth);
+            dispatch({
+              type: FETCH_USER_FAILED,
+              payload: { 
+                code: store.getState().languagedata?.defaultLanguage?.auth_error || 'auth_error', 
+                message: store.getState().languagedata?.defaultLanguage?.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión. Se ha enviado un correo de verificación.'
+              }
+            });
+            return;
+          } catch (error) {
+            console.error('Error sending email verification:', error);
+            await signOut(auth);
+            dispatch({
+              type: FETCH_USER_FAILED,
+              payload: { 
+                code: store.getState().languagedata?.defaultLanguage?.auth_error || 'auth_error', 
+                message: store.getState().languagedata?.defaultLanguage?.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión.'
+              }
+            });
+            return;
+          }
+        }
+      }
+      
       onValue(singleUserRef(user.uid), async snapshot => {
         if (snapshot.val()) {
           let profile = snapshot.val();
@@ -211,7 +244,7 @@ export const requestPhoneOtpDevice = (verificationId) => async (dispatch) => {
     }); 
 }
 
-export const mobileSignIn = (verficationId, code) => (dispatch) => {
+export const mobileSignIn = (verficationId, code) => async (dispatch) => {
   const {
     auth,
     mobileAuthCredential,
@@ -222,8 +255,35 @@ export const mobileSignIn = (verficationId, code) => (dispatch) => {
     payload: null
   });
   signInWithCredential(auth, mobileAuthCredential(verficationId, code))
-    .then((user) => {
-      //OnAuthStateChange takes care of Navigation
+    .then(async (userCredential) => {
+      const user = userCredential.user;
+      const settings = store.getState().settingsdata?.settings;
+      
+      if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
+        try {
+          await sendEmailVerification(user);
+          await signOut(auth);
+          dispatch({
+            type: USER_SIGN_IN_FAILED,
+            payload: { 
+              code: 'auth/email-not-verified', 
+              message: store.getState().languagedata?.defaultLanguage?.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión. Se ha enviado un correo de verificación.'
+            }
+          });
+        } catch (error) {
+          console.error('Error sending email verification:', error);
+          await signOut(auth);
+          dispatch({
+            type: USER_SIGN_IN_FAILED,
+            payload: { 
+              code: 'auth/email-not-verified', 
+              message: store.getState().languagedata?.defaultLanguage?.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión.'
+            }
+          });
+        }
+      } else {
+        //OnAuthStateChange takes care of Navigation
+      }
     }).catch(error => {
       dispatch({
         type: USER_SIGN_IN_FAILED,
@@ -560,19 +620,105 @@ export const sendResetMail = (email) => async (dispatch) => {
   });
 };
 
+const getFirebaseErrorMessage = (error, defaultLanguage) => {
+  const code = error?.code || '';
+  const errorCodeMap = {
+    'auth/user-not-found': defaultLanguage?.not_registred || 'Usuario no encontrado. Verifica tu correo electrónico o número de teléfono.',
+    'auth/wrong-password': defaultLanguage?.wrong_password || 'Contraseña incorrecta. Por favor intenta nuevamente.',
+    'auth/invalid-credential': defaultLanguage?.auth_invalid_credential || 'Credenciales inválidas. Verifica tu correo electrónico y contraseña.',
+    'auth/invalid-email': defaultLanguage?.auth_invalid_email || 'Correo electrónico inválido. Por favor verifica el formato.',
+    'auth/user-disabled': defaultLanguage?.auth_user_disabled || 'Esta cuenta ha sido deshabilitada. Contacta al soporte.',
+    'auth/too-many-requests': defaultLanguage?.auth_too_many_requests || 'Demasiados intentos fallidos. Por favor espera unos minutos e intenta nuevamente.',
+    'auth/network-request-failed': defaultLanguage?.auth_network_error || 'Error de conexión. Verifica tu conexión a internet.',
+    'auth/email-not-verified': defaultLanguage?.email_not_verified || 'Por favor verifica tu correo electrónico antes de iniciar sesión.',
+    'auth/invalid-verification-code': defaultLanguage?.auth_invalid_verification_code || 'Código de verificación inválido. Por favor intenta nuevamente.',
+    'auth/code-expired': defaultLanguage?.auth_code_expired || 'El código de verificación ha expirado. Solicita uno nuevo.',
+    'auth/session-cookie-expired': defaultLanguage?.auth_session_expired || 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
+    'auth/operation-not-allowed': defaultLanguage?.auth_operation_not_allowed || 'Esta operación no está permitida.',
+    'auth/weak-password': defaultLanguage?.auth_weak_password || 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.',
+    'auth/email-already-in-use': defaultLanguage?.auth_email_already_in_use || 'Este correo electrónico ya está en uso.',
+    'auth/phone-number-already-exists': defaultLanguage?.auth_phone_already_exists || 'Este número de teléfono ya está registrado.',
+    'auth/invalid-phone-number': defaultLanguage?.auth_invalid_phone_number || 'Número de teléfono inválido. Verifica el formato.',
+    'auth/missing-phone-number': defaultLanguage?.auth_missing_phone_number || 'Número de teléfono requerido.',
+    'auth/quota-exceeded': defaultLanguage?.auth_quota_exceeded || 'Se ha excedido la cuota. Por favor intenta más tarde.',
+    'auth/app-deleted': defaultLanguage?.auth_app_deleted || 'La aplicación ha sido eliminada.',
+    'auth/app-not-authorized': defaultLanguage?.auth_app_not_authorized || 'La aplicación no está autorizada.',
+    'auth/argument-error': defaultLanguage?.auth_argument_error || 'Error en los argumentos proporcionados.',
+    'auth/invalid-api-key': defaultLanguage?.auth_invalid_api_key || 'Error de configuración. Contacta al soporte.',
+    'auth/invalid-user-token': defaultLanguage?.auth_invalid_user_token || 'Token de usuario inválido. Por favor inicia sesión nuevamente.',
+    'auth/requires-recent-login': defaultLanguage?.auth_requires_recent_login || 'Por seguridad, necesitas iniciar sesión nuevamente.',
+  };
+  
+  if (errorCodeMap[code]) {
+    return {
+      code: code,
+      message: errorCodeMap[code]
+    };
+  }
+  
+  const originalMessage = error?.message || '';
+  if (originalMessage && !originalMessage.includes('Firebase: Error')) {
+    return {
+      code: code,
+      message: originalMessage
+    };
+  }
+  
+  return {
+    code: code,
+    message: defaultLanguage?.auth_error || 'Ocurrió un error. Por favor intenta nuevamente.'
+  };
+};
+
 export const verifyEmailPassword = (email, pass) => async (dispatch) => {
   const {
     authRef
   } = firebase;
+  const defaultLanguage = store.getState().languagedata?.defaultLanguage || {};
 
   signInWithEmailAndPassword(authRef(), email, pass)
-    .then((user) => {
-      //OnAuthStateChange takes care of Navigation
+    .then(async (userCredential) => {
+      const user = userCredential.user;
+      const settings = store.getState().settingsdata?.settings;
+      
+      console.log('🔐 LOGIN DEBUG - Email password login:', {
+        email: user.email,
+        emailVerified: user.emailVerified,
+        emailVerificationRequired: settings?.emailVerificationRequired
+      });
+      
+      if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
+        console.log('⚠️ LOGIN DEBUG - Email not verified, sending verification email');
+        try {
+          await sendEmailVerification(user);
+          await signOut(authRef());
+          dispatch({
+            type: USER_SIGN_IN_FAILED,
+            payload: { 
+              code: 'auth/email-not-verified', 
+              message: defaultLanguage.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión. Se ha enviado un correo de verificación.'
+            }
+          });
+        } catch (error) {
+          console.error('Error sending email verification:', error);
+          await signOut(authRef());
+          dispatch({
+            type: USER_SIGN_IN_FAILED,
+            payload: { 
+              code: 'auth/email-not-verified', 
+              message: defaultLanguage.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión.'
+            }
+          });
+        }
+      } else {
+        //OnAuthStateChange takes care of Navigation
+      }
     })
     .catch((error) => {
+      const friendlyError = getFirebaseErrorMessage(error, defaultLanguage);
       dispatch({
         type: USER_SIGN_IN_FAILED,
-        payload: error
+        payload: friendlyError
       });
     });
 }
@@ -637,8 +783,34 @@ export const verifyMobileOtp = (mobile, otp) => async (dispatch) => {
     const result = await response.json();
     if(result.token){
       signInWithCustomToken(auth,result.token)
-        .then((user) => {
-          //OnAuthStateChange takes care of Navigation
+        .then(async (userCredential) => {
+          const user = userCredential.user;
+          
+          if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
+            try {
+              await sendEmailVerification(user);
+              await signOut(auth);
+              dispatch({
+                type: USER_SIGN_IN_FAILED,
+                payload: { 
+                  code: 'auth/email-not-verified', 
+                  message: store.getState().languagedata?.defaultLanguage?.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión. Se ha enviado un correo de verificación.'
+                }
+              });
+            } catch (error) {
+              console.error('Error sending email verification:', error);
+              await signOut(auth);
+              dispatch({
+                type: USER_SIGN_IN_FAILED,
+                payload: { 
+                  code: 'auth/email-not-verified', 
+                  message: store.getState().languagedata?.defaultLanguage?.email_not_verified || 'Por favor verifica tu email antes de iniciar sesión.'
+                }
+              });
+            }
+          } else {
+            //OnAuthStateChange takes care of Navigation
+          }
         })
         .catch((error) => {
           dispatch({
@@ -658,6 +830,91 @@ export const verifyMobileOtp = (mobile, otp) => async (dispatch) => {
       type: USER_SIGN_IN_FAILED,
       payload: error
     });
+  }
+}
+
+export const requestEmailOtp = (email) => async (dispatch) => {
+  const {
+    config
+  } = firebase;
+  dispatch({
+    type: REQUEST_OTP,
+    payload: true
+  }); 
+
+  const settings = store.getState().settingsdata.settings;
+  const isWeb = typeof window !== 'undefined' && window.location;
+  let host = isWeb && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
+  let url = `${host}/request_email_otp`;
+  try{
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: email })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+    }
+    const result = await response.json();
+    if(result.success){
+      dispatch({
+        type: REQUEST_OTP_SUCCESS,
+        payload: true
+      });
+      return { success: true };
+    }else{
+      dispatch({
+        type: REQUEST_OTP_FAILED,
+        payload: result.error
+      });
+      return { success: false, error: result.error };
+    }
+  }catch(error){
+    console.log('Error in requestEmailOtp:', error);
+    dispatch({
+      type: REQUEST_OTP_FAILED,
+      payload: error.message || 'Network error'
+    });
+    return { success: false, error: error.message || 'Network error' };
+  }
+}
+
+export const verifyEmailOtp = (email, otp) => async (dispatch) => {
+  const {
+    config
+  } = firebase;
+  const body = {
+    email: email,
+    otp: otp
+  };
+  try{
+    const settings = store.getState().settingsdata.settings;
+    const isWeb = typeof window !== 'undefined' && window.location;
+    let host = isWeb && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
+    let url = `${host}/verify_email_otp`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+    }
+    const result = await response.json();
+    if(result.success){
+      return { success: true };
+    }else{
+      return { success: false, error: result.error || 'OTP verification failed' };
+    }
+  }catch(error){
+    console.log('Error in verifyEmailOtp:', error);
+    return { success: false, error: error.message || 'Network error' };
   }
 }
 
@@ -693,5 +950,28 @@ export const updateAuthMobile = async ( mobile, otp) => {
     }
   }catch(error){
     return {success: false, error: error}
+  }
+}
+
+export const resendEmailVerification = () => async (dispatch) => {
+  const {
+    auth
+  } = firebase;
+
+  const user = auth.currentUser;
+  
+  if (!user) {
+    return { success: false, error: 'No user logged in' };
+  }
+
+  if (!user.email) {
+    return { success: false, error: 'User has no email' };
+  }
+
+  try {
+    await sendEmailVerification(user);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message || 'Error sending verification email' };
   }
 }

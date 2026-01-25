@@ -37,6 +37,7 @@ import * as complainactions from './actions/complainactions';
 import * as usedreferralaction from "./actions/usedreferralaction";
 import * as fetchFleetAdminEarnings from "./actions/fleetadminearningaction";
 import * as vietnameseFunctions from './other/vietnameseFunctions';
+import * as zoneactions from './actions/zoneactions';
 
 const api = {
     ...authactions,
@@ -72,6 +73,7 @@ const api = {
     ...usedreferralaction,
     ...fetchFleetAdminEarnings,
     ...vietnameseFunctions,
+    ...zoneactions,
     countries: countries
 };
 

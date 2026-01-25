@@ -100,7 +100,7 @@ const HeroSection = () => {
                 />
               </div>
               
-              <div className="absolute -top-7 -right-7 sm:-top-10 sm:-right-10 lg:-top-14 lg:-right-14 transform -rotate-6 hover:rotate-0 transition-all duration-500 ease-out delay-200 hover:scale-105">
+              <div className="absolute -top-12 -right-12 sm:-top-16 sm:-right-16 lg:-top-20 lg:-right-20 transform -rotate-6 hover:rotate-0 transition-all duration-500 ease-out delay-200 hover:scale-105">
                 <div className="absolute inset-0 rounded-3xl blur-xl scale-110" style={{background: 'var(--mockup-gradient-2)'}}></div>
                 <img 
                   src={require("../../../assets/img/app2.png")} 

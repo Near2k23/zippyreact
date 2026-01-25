@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -29,6 +29,7 @@ import { fonts } from '../common/font';
 import * as ImagePicker from 'expo-image-picker';
 import ActionSheet from "react-native-actions-sheet";
 import { getLangKey } from 'common/src/other/getLangKey';
+import { getFilteredCarTypesByZone } from 'common/src/other/ZonePriceHelper';
 
 export default function CarEditScreen(props) {
     const { t } = i18n;
@@ -37,17 +38,29 @@ export default function CarEditScreen(props) {
     const {
         updateUserCar,
         updateUserCarWithImage,
-        editCar
+        editCar,
+        detectZoneByLocation,
+        fetchZones,
+        setCurrentZone
     } = api;
     const carlistdata = useSelector(state => state.carlistdata);
     const cartypes = useSelector(state => state.cartypes.cars);
     const settings = useSelector(state => state.settingsdata.settings);
     const auth = useSelector(state => state.auth);
+    const gps = useSelector(state => state.gpsdata);
+    const zonesdata = useSelector(state => state.zonesdata);
     const [carTypes, setCarTypes] = useState(null);
     const [loading, setLoading] = useState(false);
     const [capturedImage, setCapturedImage] = useState(null);
     const [focusedInput, setFocusedInput] = useState(null);
+    const focusedInputRef = useRef(null);
     const actionSheetRef = useRef(null);
+    const scrollViewRef = useRef(null);
+    const inputRefs = useRef({});
+    const hasScrolledForCurrentInput = useRef(false);
+    const scrollOffsetRef = useRef(0);
+    const isKeyboardVisible = useRef(false);
+    const [currentZone, setCurrentZoneState] = useState(null);
     const [cars, setCars] = useState({});
     const [updateCalled, setUpdateCalled] = useState(false);
 
@@ -85,16 +98,45 @@ export default function CarEditScreen(props) {
     useEffect(() => {
         if (cartypes) {
             let arr = [];
-            const sorted = cartypes.sort((a, b) => a.pos - b.pos);
+            const filteredCartypes = getFilteredCarTypesByZone(cartypes, currentZone?.id);
+
+            const sorted = filteredCartypes.sort((a, b) => (a.pos || 0) - (b.pos || 0));
             for (let i = 0; i < sorted.length; i++) {
                 arr.push({ label: t(getLangKey(sorted[i].name)), value: sorted[i].name });
             }
-            if (arr.length > 0) {
-                setState({ ...state, carType: arr[0].value })
+            
+            if (!car || !car.id) {
+                const type1Car = sorted.find(carType => carType.id === "type1");
+                if (type1Car) {
+                    setState(prevState => ({ ...prevState, carType: type1Car.name }));
+                } else if (arr.length > 0) {
+                    setState(prevState => ({ ...prevState, carType: arr[0].value }));
+                }
             }
+            
             setCarTypes(arr);
         }
-    }, [cartypes]);
+    }, [cartypes, currentZone]);
+
+    useEffect(() => {
+        dispatch(fetchZones());
+    }, [dispatch, fetchZones]);
+
+    useEffect(() => {
+        if (gps.location && zonesdata.zones && zonesdata.zones.length > 0) {
+            try{ console.log('ZONES_GPS_CAREDIT', { lat: gps.location.lat, lng: gps.location.lng }); }catch(e){}
+            const detectedZone = detectZoneByLocation(gps.location.lat, gps.location.lng, zonesdata.zones);
+
+            const hasGeometryMatch = !!(detectedZone && detectedZone.geometry);
+
+            if (hasGeometryMatch) {
+                setCurrentZoneState(detectedZone);
+                dispatch(setCurrentZone(detectedZone));
+            } else {
+                setCurrentZoneState(null);
+            }
+        }
+    }, [gps.location, zonesdata.zones, dispatch, setCurrentZone]);
 
     useEffect(() => {
         if (carlistdata.cars) {
@@ -115,6 +157,59 @@ export default function CarEditScreen(props) {
             setCars([]);
         }
     }, [carlistdata.cars, updateCalled]);
+
+    const inputLayouts = useRef({});
+
+    useEffect(() => {
+        focusedInputRef.current = focusedInput;
+        hasScrolledForCurrentInput.current = false;
+    }, [focusedInput]);
+
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+        (e) => {
+            isKeyboardVisible.current = true;
+            const currentFocusedInput = focusedInputRef.current;
+            if (currentFocusedInput && inputRefs.current[currentFocusedInput] && scrollViewRef.current && !hasScrolledForCurrentInput.current) {
+                inputRefs.current[currentFocusedInput].measure((x, y, width, height, pageX, pageY) => {
+                    const keyboardHeight = e.endCoordinates.height;
+                    const screenHeight = Dimensions.get('window').height;
+                    const visibleHeight = screenHeight - keyboardHeight;
+                    
+                    if (pageY + height + 50 > visibleHeight) {
+                        const inputContainer = inputLayouts.current[currentFocusedInput];
+                        if (inputContainer && inputContainer.baseY !== undefined) {
+                            const targetScrollY = scrollOffsetRef.current + inputContainer.baseY - 100;
+                            hasScrolledForCurrentInput.current = true;
+                            setTimeout(() => {
+                                if (scrollViewRef.current && isKeyboardVisible.current) {
+                                    scrollViewRef.current.scrollTo({
+                                        y: Math.max(0, targetScrollY),
+                                        animated: true
+                                    });
+                                }
+                            }, Platform.OS === 'ios' ? 100 : 200);
+                        }
+                    }
+                });
+            }
+        }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+        () => {
+            isKeyboardVisible.current = false;
+            hasScrolledForCurrentInput.current = false;
+        }
+    );
+
+    return () => {
+        keyboardDidShowListener.remove();
+        keyboardDidHideListener.remove();
+    };
+}, []);
     
     // Crear blob para la imagen existente cuando se carga el componente
     useEffect(() => {
@@ -319,24 +414,60 @@ export default function CarEditScreen(props) {
         props.navigation.goBack()
     }
 
-    const RemoteImage = ({ uri, desiredWidth }) => {
+    const RemoteImage = React.memo(({ uri, desiredWidth }) => {
         const [desiredHeight, setDesiredHeight] = useState(0);
-        Image.getSize(uri, (width, height) => setDesiredHeight(desiredWidth / width * height));
-        return <Image source={{ uri }} style={{ width: desiredWidth, height: desiredHeight }} />
-    }
+        
+        useEffect(() => {
+            if (uri) {
+                setDesiredHeight(0);
+                Image.getSize(
+                    uri,
+                    (width, height) => {
+                        setDesiredHeight(desiredWidth / width * height);
+                    },
+                    (error) => {
+                        console.error('Error getting image size:', error);
+                        setDesiredHeight(desiredWidth * 0.75);
+                    }
+                );
+            }
+        }, [uri, desiredWidth]);
+        
+        return (
+            <Image 
+                source={{ uri }} 
+                style={{ 
+                    width: desiredWidth, 
+                    height: desiredHeight || desiredWidth * 0.75 
+                }} 
+            />
+        );
+    });
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>
             <KeyboardAvoidingView 
                 style={styles.keyboardAvoidingView} 
-                behavior={Platform.OS === "ios" ? "padding" : "padding"}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+                enabled={true}
             >
                 <ScrollView 
+                    ref={scrollViewRef}
                     style={styles.scrollViewStyle} 
                     showsVerticalScrollIndicator={false} 
                     contentContainerStyle={{ paddingHorizontal: 12.5, paddingBottom: 30 }}
                     keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled={true}
+                    onScroll={(event) => {
+                        scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+                    }}
+                    onContentSizeChange={() => {
+                        if (!isKeyboardVisible.current) {
+                            hasScrolledForCurrentInput.current = false;
+                        }
+                    }}
+                    scrollEventThrottle={16}
                 >
                   
                     <View style={styles.form}>
@@ -406,11 +537,11 @@ export default function CarEditScreen(props) {
                             )}
 
                         <View style={styles.containerStyle}>
-                            <View style={styles.inputContainerStyle}>
-                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
-                                    {t('select_vehicle_type')}
-                                </Text>
-                                {car && car.id ? (
+                            {car && car.id ? (
+                                <View style={styles.inputContainerStyle}>
+                                    <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                        {t('select_vehicle_type')}
+                                    </Text>
                                     <TextInput
                                         editable={false}
                                         value={t(getLangKey(car.carType))}
@@ -423,51 +554,25 @@ export default function CarEditScreen(props) {
                                             }
                                         ]}
                                     />
-                                ) : (
-                                    carTypes && carTypes.length > 0 ? (
-                                        <RNPickerSelect
-                                            pickerRef={pickerRef1}
-                                            placeholder={{ label: t('select_vehicle_type'), value: null }}
-                                            value={state.carType}
-                                            useNativeAndroidPickerStyle={false}
-                                            style={{
-                                                inputIOS: [
-                                                    styles.textInputStyle,
-                                                    { 
-                                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                        borderColor: focusedInput === 'carType' ? colors.INPUT_FOCUS : '#E2E9EC'
-                                                    }
-                                                ],
-                                                inputAndroid: [
-                                                    styles.textInputStyle,
-                                                    { 
-                                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                        borderColor: focusedInput === 'carType' ? colors.INPUT_FOCUS : '#E2E9EC'
-                                                    }
-                                                ]
-                                            }}
-                                            onOpen={() => setFocusedInput('carType')}
-                                            onClose={() => setFocusedInput(null)}
-                                            onValueChange={(value) => setState({ ...state, carType: value })}
-                                            items={carTypes}
-                                        />
-                                    ) : (
-                                        <View style={[styles.textInputStyle, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE, justifyContent: 'center' }]}>
-                                            <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK, opacity: 0.6 }}>
-                                                {t('loading')}
-                                            </Text>
-                                        </View>
-                                    )
-                                )}
-                            </View>
+                                </View>
+                            ) : null}
 
-                            <View style={styles.inputContainerStyle}>
+                            <View 
+                                style={styles.inputContainerStyle}
+                                onLayout={(event) => {
+                                    const layout = event.nativeEvent.layout;
+                                    if (inputLayouts.current['vehicleMake']?.baseY !== layout.y) {
+                                        inputLayouts.current['vehicleMake'] = { 
+                                            baseY: layout.y
+                                        };
+                                    }
+                                }}
+                            >
                                 <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
                                     {t('vehicle_model_name')}
                                 </Text>
                                 <TextInput
+                                    ref={(ref) => inputRefs.current['vehicleMake'] = ref}
                                     editable={!(car && car.id)}
                                     value={state.vehicleMake}
                                     onChangeText={(text) => setState({ ...state, vehicleMake: text })}
@@ -486,11 +591,22 @@ export default function CarEditScreen(props) {
                                 />
                             </View>
 
-                            <View style={styles.inputContainerStyle}>
+                            <View 
+                                style={styles.inputContainerStyle}
+                                onLayout={(event) => {
+                                    const layout = event.nativeEvent.layout;
+                                    if (inputLayouts.current['vehicleModel']?.baseY !== layout.y) {
+                                        inputLayouts.current['vehicleModel'] = { 
+                                            baseY: layout.y
+                                        };
+                                    }
+                                }}
+                            >
                                 <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
                                     {t('vehicle_model_no')}
                                 </Text>
                                 <TextInput
+                                    ref={(ref) => inputRefs.current['vehicleModel'] = ref}
                                     editable={!(car && car.id)}
                                     value={state.vehicleModel}
                                     onChangeText={(text) => setState({ ...state, vehicleModel: text })}
@@ -509,11 +625,20 @@ export default function CarEditScreen(props) {
                                 />
                             </View>
 
-                            <View style={styles.inputContainerStyle}>
+                            <View 
+                                style={styles.inputContainerStyle}
+                                onLayout={(event) => {
+                                    const layout = event.nativeEvent.layout;
+                                    inputLayouts.current['vehicleNumber'] = { 
+                                        baseY: layout.y
+                                    };
+                                }}
+                            >
                                 <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
                                     {t('vehicle_reg_no')}
                                 </Text>
                                 <TextInput
+                                    ref={(ref) => inputRefs.current['vehicleNumber'] = ref}
                                     editable={!(car && car.id)}
                                     value={state.vehicleNumber}
                                     onChangeText={(text) => setState({ ...state, vehicleNumber: text })}
@@ -532,11 +657,22 @@ export default function CarEditScreen(props) {
                                 />
                             </View>
 
-                            <View style={styles.inputContainerStyle}>
+                            <View 
+                                style={styles.inputContainerStyle}
+                                onLayout={(event) => {
+                                    const layout = event.nativeEvent.layout;
+                                    if (inputLayouts.current['other_info']?.baseY !== layout.y) {
+                                        inputLayouts.current['other_info'] = { 
+                                            baseY: layout.y
+                                        };
+                                    }
+                                }}
+                            >
                                 <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
                                     {t('other_info')}
                                 </Text>
                                 <TextInput
+                                    ref={(ref) => inputRefs.current['other_info'] = ref}
                                     editable={!(car && car.id)}
                                     value={state.other_info}
                                     onChangeText={(text) => setState({ ...state, other_info: text })}

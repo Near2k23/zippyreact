@@ -135,12 +135,7 @@ export default function SearchScreen(props) {
   }, [settingsdata]);
 
   const setAddressOnMap = (item)=>{
-    props.navigation.dispatch(StackActions.pop(1));
-    if(locationType == 'pickup'){
-      dispatch(updateTripPickup({...tripdata.pickup, source:"mapSelect"}));
-    }else{
-      dispatch(updateTripDrop({...tripdata.drop, source:"mapSelect"}));
-    }
+    props.navigation.navigate('Map', { selectFromMap: true, locationType: locationType });
   }
 
   useEffect(() => {
@@ -459,21 +454,59 @@ export default function SearchScreen(props) {
       :null }
 
       {searchKeyword && isShowingResults ?
-        <FlatList
-          keyboardShouldPersistTaps='always'
-          data={searchResults}
-          renderItem={({ item, index }) => {
-            return (
-              <TouchableOpacity
-                key={item.description}
-                style={styles.resultItem}
-                onPress={() => updateLocation(item)}>
-                <Text numberOfLines={1} style={{fontSize: 16,fontFamily:fonts.Regular, textAlign: isRTL ? "right" : "left", width: width-20, color: mode === 'dark' ? colors.WHITE : colors.BLACK}}>{item.description}</Text>
-              </TouchableOpacity>
-            );
-          }}
-          style={styles.searchResultsContainer}
-        />
+        <View style={styles.mainSearchResultsWrapper}>
+          <View style={[styles.searchResultsCard, {
+            backgroundColor: mode === 'dark' ? '#2A2A2A' : colors.WHITE,
+            borderWidth: mode === 'dark' ? 1 : 0,
+            borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'transparent'
+          }]}>
+            <FlatList
+              keyboardShouldPersistTaps='always'
+              data={searchResults}
+              keyExtractor={(item, index) => item.place_id || item.description || `result-${index}`}
+              renderItem={({ item, index }) => {
+                const isLast = index === searchResults.length - 1;
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={[styles.resultItem, {
+                      borderBottomWidth: isLast ? 0 : 1,
+                      borderBottomColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : '#F0F0F0',
+                      backgroundColor: mode === 'dark' ? 'transparent' : 'transparent'
+                    }]}
+                    onPress={() => updateLocation(item)}>
+                    <View style={[styles.resultIconContainer, {
+                      marginRight: isRTL ? 0 : 8,
+                      marginLeft: isRTL ? 8 : 0
+                    }]}>
+                      <View style={[styles.resultDot, {
+                        backgroundColor: locationType === 'pickup' ? colors.GREEN : colors.RED
+                      }]} />
+                    </View>
+                    <View style={styles.resultTextContainer}>
+                      <Text 
+                        numberOfLines={2} 
+                        style={[styles.resultItemText, {
+                          textAlign: isRTL ? "right" : "left", 
+                          color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                        }]}>
+                        {item.description}
+                      </Text>
+                    </View>
+                    <MaterialIcons 
+                      name={isRTL ? "keyboard-arrow-left" : "keyboard-arrow-right"} 
+                      size={20} 
+                      color={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : colors.SECONDARY} 
+                    />
+                  </TouchableOpacity>
+                );
+              }}
+              contentContainerStyle={styles.searchResultsContent}
+              style={styles.searchResultsContainer}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </View>
         : null}
 
         {loading ?
@@ -829,28 +862,58 @@ const styles = StyleSheet.create({
      lineHeight: 20
    },
   resultItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
      width: '100%',
-     justifyContent: 'center',
-     borderBottomWidth: 0,
-     backgroundColor: colors.WHITE,
-     alignItems: 'flex-start',
-     minHeight: 56,
-     justifyContent:'center',
+     minHeight: 64,
      paddingHorizontal: 16,
-     paddingVertical: 12,
-     marginVertical: 2,
-     borderRadius: 12,
+     paddingVertical: 14
+   },
+  resultIconContainer: {
+     width: 24,
+     height: 40,
+     justifyContent: 'center',
+     alignItems: 'center'
+   },
+  resultDot: {
+     width: 12,
+     height: 12,
+     borderRadius: 6
+   },
+  resultTextContainer: {
+     flex: 1,
+     justifyContent: 'center'
+   },
+  resultItemText: {
+     fontSize: 15,
+     fontFamily: fonts.Medium,
+     lineHeight: 20,
+     letterSpacing: 0.2
+   },
+  mainSearchResultsWrapper: {
+     marginTop: 12,
+     paddingHorizontal: 16,
+     width: '100%'
+   },
+  searchResultsCard: {
+     width: '100%',
+     borderRadius: 16,
+     overflow: 'hidden',
      shadowColor: colors.BLACK,
-     shadowOffset: { width: 0, height: 1 },
-     shadowOpacity: 0.04,
-     shadowRadius: 2,
-     elevation: 1
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.12,
+     shadowRadius: 8,
+     elevation: 5,
+     maxHeight: height * 0.5,
+     minHeight: 100
    },
   searchResultsContainer: {
-      width: width,
-      paddingHorizontal: 16,
-      paddingTop: 12
-    },
+     width: '100%',
+     flexGrow: 0
+   },
+  searchResultsContent: {
+     paddingVertical: 8
+   },
   headerTitleStyle: {
     color: colors.WHITE,
     fontFamily: fonts.Bold,

@@ -250,7 +250,8 @@ export const prepareEstimateObject =  async (tripdata, instructionData) => {
             pickup: { coords: { lat: tripdata.pickup.lat, lng: tripdata.pickup.lng }, description: tripdata.pickup.add },
             drop: { coords: { lat: tripdata.drop.lat, lng: tripdata.drop.lng }, description: tripdata.drop.add, waypointsStr: waypoints != '' ? waypoints : null, waypoints: waypoints != '' ? tripdata.drop.waypoints : null },
             carDetails: tripdata.carType,
-            routeDetails: routeDetails
+            routeDetails: routeDetails,
+            currentZoneId: tripdata.currentZoneId || null
         };
         return { estimateObject };
     } catch (err) {

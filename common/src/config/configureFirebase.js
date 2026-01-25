@@ -98,6 +98,8 @@ const createFullStructure = (app, db, auth, storage, config) => {
         editComplainRef:(id) => ref(db, "complain/" +id),
         paymentSettingsRef: ref(db, "payment_settings"),
         usedreferralRef:ref(db,'usedreferral'),
+        zonesRef: ref(db, 'zones'),
+        zonesEditRef:(id) => ref(db, "zones/" + id),
     }
 }
 

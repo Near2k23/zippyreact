@@ -156,3 +156,7 @@ AccessKey.*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Carpeta .cursor
+.cursor/
+.cursor/

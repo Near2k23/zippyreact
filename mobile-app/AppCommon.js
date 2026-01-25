@@ -21,16 +21,20 @@ TaskManager.defineTask(LOCATION_TASK_NAME, ({ data: { locations }, error }) => {
     console.log(error);
     return;
   }
-  if (locations.length > 0) {
+  if (locations && locations.length > 0) {
     let location = locations[locations.length - 1];
-    if (location.coords) {
-      store.dispatch({
-        type: 'UPDATE_GPS_LOCATION',
-        payload: {
-          lat: location.coords.latitude,
-          lng: location.coords.longitude
-        }
-      });
+    if (location && location.coords) {
+      try {
+        store.dispatch({
+          type: 'UPDATE_GPS_LOCATION',
+          payload: {
+            lat: location.coords.latitude,
+            lng: location.coords.longitude
+          }
+        });
+      } catch (e) {
+        console.log('Error dispatching location update:', e);
+      }
     }
   }
 });
@@ -47,6 +51,7 @@ export default function AppCommon({ children }) {
   const lastLocation = useSelector(state => state.locationdata.coords);
   const auth = useSelector(state => state.auth);
   const settings = useSelector(state => state.settingsdata.settings);
+  const zonesdata = useSelector(state => state.zonesdata);
   const watcher = useRef();
   const locationOn = useRef(false);
   const [bounceAnim] = useState(new Animated.Value(1));
@@ -163,6 +168,7 @@ export default function AppCommon({ children }) {
         dispatch(api.fetchSettings());
         dispatch(api.fetchLanguages());
         dispatch(api.fetchCarTypes());
+        dispatch(api.fetchZones());
         langCalled.current = true;
     }
   }, [api]);
@@ -233,6 +239,19 @@ export default function AppCommon({ children }) {
       }
     }
   }
+
+  useEffect(() => {
+    if (gps.location && gps.location.lat && gps.location.lng && zonesdata.zones && zonesdata.zones.length > 0) {
+      const detectedZone = api.detectZoneByLocation(gps.location.lat, gps.location.lng, zonesdata.zones);
+      if (detectedZone) {
+        dispatch(api.setCurrentZone(detectedZone));
+        AsyncStorage.setItem('currentZone', JSON.stringify(detectedZone));
+      } else {
+        dispatch(api.setCurrentZone(null));
+        AsyncStorage.removeItem('currentZone');
+      }
+    }
+  }, [gps.location, zonesdata.zones]);
 
   useEffect(() => {
     if (gps.location && gps.location.lat && gps.location.lng) {
@@ -390,25 +409,19 @@ export default function AppCommon({ children }) {
   }
 
   const StartBackgroundLocation = async () => {
+    if (watcher.current) {
+      watcher.current.remove();
+      watcher.current = null;
+    }
     let permResp = await Location.requestForegroundPermissionsAsync();
-    let tempWatcher = await Location.watchPositionAsync({
-      accuracy: Location.Accuracy.Balanced
-    }, location => {
-      store.dispatch({
-        type: 'UPDATE_GPS_LOCATION',
-        payload: {
-          lat: location.coords.latitude,
-          lng: location.coords.longitude
-        }
-      });
-      tempWatcher.remove();
-    })
     if (permResp.status == 'granted') {
       try {
         let { status } = await Location.requestBackgroundPermissionsAsync();
         if (status === 'granted') {
           await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-            accuracy: Location.Accuracy.BestForNavigation,
+            accuracy: Location.Accuracy.High,
+            timeInterval: 3000,
+            distanceInterval: 5,
             showsBackgroundLocationIndicator: true,
             activityType: Location.ActivityType.AutomotiveNavigation,
             foregroundService: {

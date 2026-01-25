@@ -6,5 +6,7 @@ export const FirebaseConfig = {
   "apiKey": "AIzaSyBMyI9AA3BPl7otA-lhOtky8OQU7D71338",
   "authDomain": "waygo-561e9.firebaseapp.com",
   "messagingSenderId": "210137526589",
-  "measurementId": "G-V21PVQH3XP"
+  "measurementId": "G-V21PVQH3XP",
+  "projectNumber": "210137526589",
+  "version": "2"
 };

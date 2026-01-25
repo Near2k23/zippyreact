@@ -369,6 +369,12 @@ async function validateSignupData(config, userData, appSettings) {
   if (userData.currency_code) userProfile.currency_code = userData.currency_code;
   if (userData.swipe_symbol) userProfile.swipe_symbol = userData.swipe_symbol;
   if (userData.symbol) userProfile.symbol = userData.symbol;
+  if (userData.socialSecurity !== undefined && userData.socialSecurity !== null && userData.socialSecurity !== '') {
+    userProfile.socialSecurity = userData.socialSecurity;
+  }
+  if (userData.ageRange !== undefined && userData.ageRange !== null && userData.ageRange !== '') {
+    userProfile.ageRange = userData.ageRange;
+  }
 
   // Validar tipo de usuario
   const validUserTypes = ['driver', 'customer', 'fleetadmin'];
@@ -428,6 +434,43 @@ async function checkOTP(config, mobile, otpDatabase) {
 }
 
 /**
+ * Verifica códigos OTP de email
+ * @param {Object} config - Configuración del proyecto
+ * @param {string} email - Dirección de email
+ * @param {Object} otpDatabase - Base de datos de OTPs
+ * @param {Object} language - Traducciones del idioma
+ * @returns {Promise<Object>} Resultado de la verificación
+ */
+async function checkEmailOtp(config, email, otpDatabase, language = {}) {
+  const otpKeys = Object.keys(otpDatabase || {});
+  
+  for (const key of otpKeys) {
+    const otpData = otpDatabase[key];
+    
+    if (otpData.email === email) {
+      if (otpData.count >= 2) {
+        return { errorStr: language.maximum_tries_exceeded || 'Maximum tries exceeded' };
+      }
+
+      const currentTime = new Date();
+      const otpTime = new Date(otpData.dated);
+      const timeDiffMinutes = (currentTime - otpTime) / 60000;
+      
+      if (timeDiffMinutes > 5) {
+        return { errorStr: language.otp_valid_5_mins_only || 'OTP is valid for 5 mins only' };
+      }
+
+      return {
+        data: otpData,
+        key: key,
+      };
+    }
+  }
+
+  return { errorStr: language.no_db_match_otp || 'No db match for OTP' };
+}
+
+/**
  * Envía SMS a través de gateway externo
  * @param {Object} config - Configuración del proyecto
  * @param {Object} smsConfig - Configuración del SMS
@@ -484,5 +527,6 @@ module.exports = {
   apiCallGoogle,
   validateSignupData,
   checkOTP,
+  checkEmailOtp,
   callMessageAPI
 };

@@ -18,6 +18,7 @@ import {
     KeyboardAvoidingView,
     Animated
 } from "react-native";
+import { Input } from '../../components/ui/input';
 import { useDispatch, useSelector } from 'react-redux';
 import { api } from 'common';
 import { colors } from '../common/theme';
@@ -34,6 +35,7 @@ import ClientIds from '../../config/ClientIds';
 import { fonts } from "../common/font";
 import { Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal, SelectBackdrop, SelectContent, SelectItem, ChevronDownIcon } from '@gluestack-ui/themed';
 import RNPickerSelect from '../components/RNPickerSelect';
+import WaygoDialog from '../components/WaygoDialog';
 
 GoogleSignin.configure(ClientIds);
 
@@ -144,15 +146,76 @@ export default function LoginScreen(props) {
     const isAnimatingRef = useRef(false);
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
+    const [authErrorDialogVisible, setAuthErrorDialogVisible] = useState(false);
+    const [authErrorDialogMessage, setAuthErrorDialogMessage] = useState('');
 
     const handleContactChange = useCallback((value) => {
+        const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        const isEmail = re.test(value);
+        
         if (!settings.emailLogin) {
             const numericValue = value.replace(/[^0-9]/g, '');
-            setState(prevState => ({ ...prevState, contact: numericValue }));
+            setState(prevState => ({ 
+                ...prevState, 
+                contact: numericValue,
+                verificationId: null
+            }));
         } else {
-            setState(prevState => ({ ...prevState, contact: value }));
+            setState(prevState => ({ 
+                ...prevState, 
+                contact: value,
+                verificationId: isEmail ? null : prevState.verificationId
+            }));
         }
     }, [settings.emailLogin]);
+
+    const getAuthErrorMessage = () => {
+        const error = auth?.error?.msg;
+        const defaultLang = languagedata?.defaultLanguage || {};
+        if (!error) {
+            return defaultLang.auth_error || t('auth_error') || t('login_error');
+        }
+        
+        const code = error.code || '';
+        const errorMessage = error.message || '';
+        
+        const errorCodeMap = {
+            'auth/user-not-found': defaultLang.not_registred || t('auth_user_not_found') || 'Usuario no encontrado. Verifica tu correo electrónico o número de teléfono.',
+            'auth/wrong-password': defaultLang.wrong_password || t('auth_wrong_password') || 'Contraseña incorrecta. Por favor intenta nuevamente.',
+            'auth/invalid-credential': t('auth_invalid_credential') || 'Credenciales inválidas. Verifica tu correo electrónico y contraseña.',
+            'auth/invalid-email': t('auth_invalid_email') || 'Correo electrónico inválido. Por favor verifica el formato.',
+            'auth/user-disabled': t('auth_user_disabled') || 'Esta cuenta ha sido deshabilitada. Contacta al soporte.',
+            'auth/too-many-requests': t('auth_too_many_requests') || 'Demasiados intentos fallidos. Por favor espera unos minutos e intenta nuevamente.',
+            'auth/network-request-failed': t('auth_network_error') || 'Error de conexión. Verifica tu conexión a internet.',
+            'auth/email-not-verified': defaultLang.email_not_verified || t('auth_email_not_verified') || 'Por favor verifica tu correo electrónico antes de iniciar sesión.',
+            'auth/invalid-verification-code': t('auth_invalid_verification_code') || 'Código de verificación inválido. Por favor intenta nuevamente.',
+            'auth/code-expired': t('auth_code_expired') || 'El código de verificación ha expirado. Solicita uno nuevo.',
+            'auth/session-cookie-expired': t('auth_session_expired') || 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.',
+            'auth/operation-not-allowed': t('auth_operation_not_allowed') || 'Esta operación no está permitida.',
+            'auth/weak-password': t('auth_weak_password') || 'La contraseña es demasiado débil. Debe tener al menos 6 caracteres.',
+            'auth/email-already-in-use': t('auth_email_already_in_use') || 'Este correo electrónico ya está en uso.',
+            'auth/phone-number-already-exists': t('auth_phone_already_exists') || 'Este número de teléfono ya está registrado.',
+            'auth/invalid-phone-number': t('auth_invalid_phone_number') || 'Número de teléfono inválido. Verifica el formato.',
+            'auth/missing-phone-number': t('auth_missing_phone_number') || 'Número de teléfono requerido.',
+            'auth/quota-exceeded': t('auth_quota_exceeded') || 'Se ha excedido la cuota. Por favor intenta más tarde.',
+            'auth/app-deleted': t('auth_app_deleted') || 'La aplicación ha sido eliminada.',
+            'auth/app-not-authorized': t('auth_app_not_authorized') || 'La aplicación no está autorizada.',
+            'auth/argument-error': t('auth_argument_error') || 'Error en los argumentos proporcionados.',
+            'auth/invalid-api-key': t('auth_invalid_api_key') || 'Error de configuración. Contacta al soporte.',
+            'auth/invalid-user-token': t('auth_invalid_user_token') || 'Token de usuario inválido. Por favor inicia sesión nuevamente.',
+            'auth/requires-recent-login': t('auth_requires_recent_login') || 'Por seguridad, necesitas iniciar sesión nuevamente.',
+        };
+        
+        if (errorCodeMap[code]) {
+            return errorCodeMap[code];
+        }
+        
+        if (errorMessage && !errorMessage.includes('Firebase: Error')) {
+            return errorMessage;
+        }
+        
+        return defaultLang.auth_error || t('auth_error') || t('login_error') || 'Ocurrió un error. Por favor intenta nuevamente.';
+    };
 
     useEffect(() => {
         AsyncStorage.getItem('theme', (err, result) => {
@@ -222,7 +285,9 @@ export default function LoginScreen(props) {
         if (auth.error && auth.error.msg && pageActive.current && auth.error.msg.message !== t('not_logged_in')) {
             pageActive.current = false;
             setState({ ...state, verificationCode: '' });
-            Alert.alert(t('alert'), t('login_error'));
+            const message = getAuthErrorMessage();
+            setAuthErrorDialogMessage(message);
+            setAuthErrorDialogVisible(true);
 
             dispatch(clearLoginError());
             setLoading(false);
@@ -248,7 +313,7 @@ export default function LoginScreen(props) {
                     setLoading(false);
                     return;
                 } else if (isNaN(state.contact)) {
-                    setState({ ...state, entryType: 'email' });
+                    setState({ ...state, entryType: 'email', verificationId: null });
                     const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
                     if (re.test(state.contact)) {
                         pageActive.current = true;
@@ -474,9 +539,13 @@ export default function LoginScreen(props) {
         }
     }
 
-    const openRegister = () => {
+    const openRegister = (usertype = 'customer') => {
         pageActive.current = false;
-        props.navigation.navigate("Register")
+        if (usertype === 'driver') {
+            props.navigation.navigate("RegisterDriver");
+        } else {
+            props.navigation.navigate("Register");
+        }
     }
 
     const openTerms = async () => {
@@ -595,6 +664,7 @@ export default function LoginScreen(props) {
     }, []);
 
     return (
+        <>
         <SafeAreaView style={styles.safeArea}>
             <KeyboardAvoidingView 
                 style={{flex:1}} 
@@ -735,34 +805,36 @@ export default function LoginScreen(props) {
                                 </View>
                             ) : null}
                             <View style={styles.contactInputWrap}>
-                                <TextInput
-                                    style={[styles.input, (state.contact && /^\d+$/.test(state.contact) && settings.mobileLogin) ? styles.inputPhone : null]}
-                                    placeholder={''}
-                                    placeholderTextColor={colors.SHADOW}
+                                <Input
                                     value={state.contact ?? ''}
                                     onChangeText={handleContactChange}
                                     autoCapitalize="none"
                                     keyboardType={(settings.emailLogin && settings.mobileLogin) ? 'default' : settings.emailLogin ? 'email-address' : 'number-pad'}
+                                    placeholder={settings.emailLogin && settings.mobileLogin ? (t('contact_placeholder') || 'Mobile Number Or Email') : settings.emailLogin ? (t('email_placeholder') || 'Email') : (t('mobile') || 'Mobile Number')}
+                                    variant="outline"
+                                    containerStyle={{ marginBottom: 0 }}
+                                    icon={Feather}
+                                    iconName={settings.emailLogin && !settings.mobileLogin ? 'mail' : 'phone'}
                                 />
                             </View>
                         </View>
 
                         { (isNaN(state.contact) || (settings.emailLogin && !settings.mobileLogin)) ? (
                             <View style={styles.passwordContainer}>
-                                <Text style={styles.inputLabel}>{t('password')}</Text>
-                                <View style={styles.inputWrapper}>
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder={''}
-                                        placeholderTextColor={colors.SHADOW}
-                                        secureTextEntry={eyePass}
-                                        value={state.verificationCode ?? ''}
-                                        onChangeText={(value) => setState({ ...state, verificationCode: value })}
-                                    />
-                                    <TouchableOpacity onPress={() => setEyePass(!eyePass)} style={styles.eyeToggle}>
-                                        <Feather name={eyePass ? 'eye-off' : 'eye'} size={20} color={colors.BLACK} />
-                                    </TouchableOpacity>
-                                </View>
+                                <Input
+                                    secureTextEntry={eyePass}
+                                    value={state.verificationCode ?? ''}
+                                    onChangeText={(value) => setState({ ...state, verificationCode: value })}
+                                    placeholder={t('password') || 'Password'}
+                                    variant="outline"
+                                    icon={Feather}
+                                    iconName="lock"
+                                    rightComponent={() => (
+                                        <TouchableOpacity onPress={() => setEyePass(!eyePass)}>
+                                            <Feather name={eyePass ? 'eye-off' : 'eye'} size={20} color={colors.BLACK} />
+                                        </TouchableOpacity>
+                                    )}
+                                />
                             </View>
                         ) : null }
 
@@ -774,15 +846,15 @@ export default function LoginScreen(props) {
 
                         { !!state.verificationId ? (
                             <>
-                                <Text style={styles.inputLabel}>{t('otp_here')}</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder={''}
-                                    placeholderTextColor={colors.SHADOW}
+                                <Input
                                     value={state.verificationCode ?? ''}
                                     onChangeText={(value) => setState({ ...state, verificationCode: value })}
                                     keyboardType={'number-pad'}
                                     secureTextEntry={true}
+                                    placeholder={t('otp_here') || 'Enter OTP'}
+                                    variant="outline"
+                                    icon={Feather}
+                                    iconName="shield"
                                 />
                                 <TouchableOpacity style={styles.loginButton} onPress={onSignIn}>
                                     {loading ? (
@@ -793,15 +865,20 @@ export default function LoginScreen(props) {
                                 </TouchableOpacity>
                             </>
                         ) : (
-                            <TouchableOpacity style={styles.loginButton} onPress={onPressLogin}>
-                                {loading ? (
-                                    <ActivityIndicator color={colors.WHITE} />
-                                ) : (
-                                    <Text style={styles.loginButtonText}>
-                                        {settings.mobileLogin ? (isNaN(state.contact) ? t('signIn') : t('request_otp')) : t('signIn')}
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
+                            <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+                                <TouchableOpacity style={[styles.registerButton, { width: 'auto', paddingHorizontal: 20 }]} onPress={() => openRegister('customer')}>
+                                    <Text style={styles.registerButtonText}>{t('register') || 'Registrarse'}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.loginButton, { flex: 1 }]} onPress={onPressLogin}>
+                                    {loading ? (
+                                        <ActivityIndicator color={colors.WHITE} />
+                                    ) : (
+                                        <Text style={styles.loginButtonText}>
+                                            {settings.mobileLogin ? (isNaN(state.contact) ? t('signIn') : t('request_otp')) : t('signIn')}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         )}
                     </Animated.View>
 
@@ -836,8 +913,8 @@ export default function LoginScreen(props) {
                     : null}
 
                     <View style={styles.bottomLinksContainer}>
-                        <TouchableOpacity onPress={openRegister} style={styles.bottomLinkItem}>
-                            <Text style={styles.bottomLinkText}>{t('register_as_driver')}</Text>
+                        <TouchableOpacity onPress={() => openRegister('driver')} style={styles.bottomLinkItem}>
+                            <Text style={styles.bottomLinkText}>{t('are_you_driver') || '¿Eres conductor?'}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={openTerms} style={styles.bottomLinkItem}>
                             <Text style={styles.bottomLinkText}>{t('terms')}</Text>
@@ -846,6 +923,16 @@ export default function LoginScreen(props) {
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
+        <WaygoDialog
+            visible={authErrorDialogVisible}
+            onClose={() => setAuthErrorDialogVisible(false)}
+            title={t('alert')}
+            message={authErrorDialogMessage}
+            showButtons={true}
+            onConfirm={() => setAuthErrorDialogVisible(false)}
+            confirmText={t('ok')}
+        />
+        </>
     );
 }
 
@@ -947,6 +1034,22 @@ const styles = StyleSheet.create({
     loginButtonText: {
         color: colors.WHITE,
         fontSize: 16,
+        fontFamily: fonts.Bold
+    },
+    registerButton: {
+        backgroundColor: colors.WHITE,
+        borderWidth: 2,
+        borderColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4
+    },
+    registerButtonText: {
+        color: '#1369B4',
+        fontSize: 14,
         fontFamily: fonts.Bold
     },
     bottomLinksContainer: {

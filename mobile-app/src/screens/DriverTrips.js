@@ -28,13 +28,17 @@ export default function DriverTrips(props) {
         updateProfile,
         updateBooking,
         fetchTasks,
-        RequestPushMsg
+        RequestPushMsg,
+        detectZoneByLocation,
+        fetchZones,
+        setCurrentZone
     } = api;
     const dispatch = useDispatch();
     const tasks = useSelector(state => state.taskdata.tasks);
     const settings = useSelector(state => state.settingsdata.settings);
     const auth = useSelector(state => state.auth);
     const bookinglistdata = useSelector(state => state.bookinglistdata);
+    const zonesdata = useSelector(state => state.zonesdata);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [activeBookings, setActiveBookings] = useState([]);
@@ -62,6 +66,9 @@ export default function DriverTrips(props) {
 
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
+    const [isInZone, setIsInZone] = useState(true);
+    const [currentZone, setCurrentZoneState] = useState(null);
+    const [zoneDetectionMessage, setZoneDetectionMessage] = useState('');
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -89,6 +96,30 @@ export default function DriverTrips(props) {
             setMode('light');
         }
     }, [auth, colorScheme]);
+
+    useEffect(() => {
+        dispatch(fetchZones());
+    }, [dispatch, fetchZones]);
+
+    useEffect(() => {
+        if (gps.location && zonesdata.zones && zonesdata.zones.length > 0) {
+            try{ console.log('ZONES_GPS_DRIVER', { lat: gps.location.lat, lng: gps.location.lng }); }catch(e){}
+            const detectedZone = detectZoneByLocation(gps.location.lat, gps.location.lng, zonesdata.zones);
+
+            const hasGeometryMatch = !!(detectedZone && detectedZone.geometry);
+
+            if (hasGeometryMatch) {
+                setCurrentZoneState(detectedZone);
+                setIsInZone(true);
+                setZoneDetectionMessage('');
+                dispatch(setCurrentZone(detectedZone));
+            } else {
+                setIsInZone(false);
+                setZoneDetectionMessage('No estás en una zona de servicio. No puedes recibir solicitudes aquí.');
+                setCurrentZoneState(null);
+            }
+        }
+    }, [gps.location, zonesdata.zones, dispatch, setCurrentZone]);
 
     const [checks, setChecks] = useState({
         driverActiveStatus: true
@@ -763,6 +794,36 @@ export default function DriverTrips(props) {
                         </View>
                     </View>
                     
+                    {/* Banner de advertencia fuera de zona */}
+                    {!isInZone && zoneDetectionMessage ? (
+                        <View style={[styles.zoneWarningBanner, { 
+                            backgroundColor: '#FF6B6B',
+                            marginHorizontal: 20,
+                            marginVertical: 10,
+                            padding: 15,
+                            borderRadius: 10,
+                            flexDirection: isRTL ? 'row-reverse' : 'row',
+                            alignItems: 'center'
+                        }]}>
+                            <Icon 
+                                name="warning" 
+                                type="ionicon" 
+                                size={20} 
+                                color={colors.WHITE}
+                                style={{ marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}
+                            />
+                            <Text style={[styles.zoneWarningText, { 
+                                color: colors.WHITE,
+                                flex: 1,
+                                fontSize: 14,
+                                fontFamily: fonts.Bold,
+                                textAlign: isRTL ? 'right' : 'left'
+                            }]}>
+                                {zoneDetectionMessage}
+                            </Text>
+                        </View>
+                    ) : null}
+                    
                     <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', width: '90%', alignSelf: 'center', marginVertical:10}}>
                         <Text style={{ color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize:windoHight > 1000? 30: 20, fontWeight: 'bold' }}>{t('today_text')}</Text>
                         <MaterialIcons
@@ -1273,6 +1334,19 @@ const styles = StyleSheet.create({
         color: colors.WHITE,
         fontSize: 14,
         fontFamily: fonts.Bold,
+    },
+    zoneWarningBanner: {
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    zoneWarningText: {
+        lineHeight: 20,
     },
 
 });

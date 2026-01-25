@@ -16,7 +16,8 @@ import {
     useColorScheme,
     TouchableOpacity,
     SafeAreaView,
-    Modal
+    Modal,
+    BackHandler
 } from 'react-native';
 import { Icon } from 'react-native-elements';
 import { colors } from '../common/theme';
@@ -29,6 +30,7 @@ import { api, FirebaseContext } from 'common';
 import * as DecodePolyLine from '@mapbox/polyline';
 import { OptionModal } from '../components/OptionModal';
 import BookingModal, { appConsts, prepareEstimateObject } from '../common/sharedFunctions';
+import { getCarTypeWithZonePrices, getFilteredCarTypesWithZonePrices as getFilteredCarTypesWithZonePricesHelper } from 'common/src/other/ZonePriceHelper';
 import HeaderGradient from '../components/HeaderGradient';
 import WaygoDialog from '../components/WaygoDialog';
 import MapView, { PROVIDER_GOOGLE, Marker, Polyline } from 'react-native-maps';
@@ -61,7 +63,11 @@ export default function MapScreen(props) {
         updateProfile,
         updateProfileWithEmail,
         checkUserExists,
-        storeAddresses
+        storeAddresses,
+        detectZoneByLocation,
+        fetchZones,
+        setCurrentZone,
+        isPointInZone
     } = api;
     const dispatch = useDispatch();
     const { config } = useContext(FirebaseContext);
@@ -76,6 +82,8 @@ export default function MapScreen(props) {
     const estimatedata = useSelector(state => state.estimatedata);
     const providers = useSelector(state => state.paymentmethods.providers);
     const gps = useSelector(state => state.gpsdata);
+    const zonesdata = useSelector(state => state.zonesdata);
+    const currentZoneFromStore = zonesdata?.currentZone;
     const activeBookings = useSelector(state => state.bookinglistdata.active);
     const bookings = useSelector(state => state.bookinglistdata.bookings);
     const addressdata = useSelector(state => state.addressdata);
@@ -92,8 +100,14 @@ export default function MapScreen(props) {
         if (props.route.params?.selectFromMap && props.route.params?.locationType) {
             setSelectFromMap(true);
             setMapSelectionType(props.route.params.locationType);
+            setShowInitialScreen(false);
+            dispatch(updatSelPointType(props.route.params.locationType));
         }
     }, [props.route.params]);
+
+    useEffect(() => {
+        dispatch(fetchZones());
+    }, [dispatch, fetchZones]);
     const [pickerConfig, setPickerConfig] = useState({
         selectedDateTime: new Date(),
         dateModalOpen: false,
@@ -161,6 +175,15 @@ export default function MapScreen(props) {
     const [loadingLocation, setLoadingLocation] = useState(false);
     const [showRecentTripsModal, setShowRecentTripsModal] = useState(false);
     const [recentTrips, setRecentTrips] = useState([]);
+    const [isInZone, setIsInZone] = useState(true);
+    const [outOfZoneDialog, setOutOfZoneDialog] = useState(false);
+    const [currentZone, setCurrentZoneState] = useState(null);
+    const [zoneDetectionMessage, setZoneDetectionMessage] = useState('');
+    const [showTermsDialog, setShowTermsDialog] = useState(false);
+
+    const handleTermsCancel = () => {
+        BackHandler.exitApp();
+    };
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -247,6 +270,57 @@ export default function MapScreen(props) {
             setDeliveryWithBid(settings.bookingFlow == "2" ? true : false)
         }
     }, [settings])
+
+    useEffect(() => {
+        if (gps.location && zonesdata.zones && zonesdata.zones.length > 0) {
+            const detectedZone = detectZoneByLocation(gps.location.lat, gps.location.lng, zonesdata.zones);
+
+            const hasGeometryMatch = !!(detectedZone && detectedZone.geometry);
+
+            if (hasGeometryMatch) {
+                setCurrentZoneState(detectedZone);
+                setIsInZone(true);
+                setZoneDetectionMessage('');
+                dispatch(setCurrentZone(detectedZone));
+                
+                console.log('Tu zona:', {
+                    id: detectedZone.id,
+                    name: detectedZone.name,
+                    symbol: detectedZone.symbol,
+                    code: detectedZone.code,
+                    decimal: detectedZone.decimal
+                });
+            } else {
+                setIsInZone(false);
+                setZoneDetectionMessage(t('out_of_zone_message'));
+                setCurrentZoneState(null);
+            }
+        }
+    }, [gps.location, zonesdata.zones, dispatch, setCurrentZone]);
+
+    useEffect(() => {
+        if (currentZone && cars) {
+            resetCars();
+            
+            const filteredCars = getFilteredCarTypesWithZonePrices();
+            
+            console.log('Nombre de tus cartypes disponibles:', filteredCars.map(c => c.name));
+            
+            if (filteredCars.length > 0) {
+                const pricesInfo = filteredCars.map(car => ({
+                    name: car.name,
+                    base_fare: car.base_fare,
+                    rate_per_unit_distance: car.rate_per_unit_distance,
+                    rate_per_hour: car.rate_per_hour,
+                    min_fare: car.min_fare,
+                    convenience_fees: car.convenience_fees,
+                    convenience_fee_type: car.convenience_fee_type,
+                    fleet_admin_fee: car.fleet_admin_fee,
+                }));
+                console.log('Precios de tus cartype:', pricesInfo);
+            }
+        }
+    }, [currentZone, cars]);
     
     const profileInitData = {
         firstName: auth && auth.profile && auth.profile.firstName ? auth.profile.firstName : "",
@@ -260,17 +334,25 @@ export default function MapScreen(props) {
     
     useEffect(() => {
         if (auth.profile) {
-            setTimeout(()=>{
-                setTerm(true)
-            },2000);
-            setCheckTerm(auth.profile.term ? true : false)
+            setTimeout(() => {
+                setTerm(true);
+            }, 2000);
+            const accepted = auth.profile.term ? true : false;
+            setCheckTerm(accepted);
+            if (settings && settings.term_required) {
+                if (!accepted) {
+                    setShowTermsDialog(true);
+                } else {
+                    setShowTermsDialog(false);
+                }
+            }
             if(bookingOnWait){
                 finaliseBooking(bookingOnWait);
                 setBookingOnWait(null);
                 setBookModelLoading(false);
             }
         }
-    }, [auth.profile,bookingOnWait])
+    }, [auth.profile, settings, bookingOnWait])
 
     useEffect(() => {
         if (settings) {
@@ -403,10 +485,12 @@ export default function MapScreen(props) {
     }, [isEditing]);
 
     useEffect(() => {
-        if (cars) {
+        if (cars && currentZone) {
             resetCars();
+        } else if (cars && !currentZone) {
+            setAllCarTypes([]);
         }
-    }, [cars]);
+    }, [cars, currentZone]);
 
     useEffect(() => {
         if (tripdata.pickup && drivers) {
@@ -488,7 +572,11 @@ export default function MapScreen(props) {
         if (tripdata.pickup && tripdata.drop && !showInitialScreen) {
             const requestEstimate = async () => {
                 if (tripdata.carType && drivers && drivers.length > 0) {
-                    let result = await prepareEstimateObject(tripdata, instructionData);
+                    let tripdataWithZonePrices = { ...tripdata, currentZoneId: currentZone?.id || null };
+                    if (currentZone && currentZone.id && tripdata.carType) {
+                        tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
+                    }
+                    let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
                     if (!result.error) {
                         dispatch(getEstimate(result.estimateObject));
                     }
@@ -599,18 +687,26 @@ export default function MapScreen(props) {
         }
     }, [region, mapRef.current]);
 
+    const getFilteredCarTypesWithZonePrices = () => {
+        return getFilteredCarTypesWithZonePricesHelper(cars, currentZone?.id);
+    };
+
+
     const resetCars = () => {
-        if (cars) {
+        const filteredCarsWithPrices = getFilteredCarTypesWithZonePrices();
+        
+        if (filteredCarsWithPrices.length > 0) {
             let carWiseArr = [];
-            const sorted = cars.sort((a, b) => a.pos - b.pos);
-            for (let i = 0; i < sorted.length; i++) {
-                let temp = { ...sorted[i], minTime: '', available: false, active: i === 0 };
+            for (let i = 0; i < filteredCarsWithPrices.length; i++) {
+                let temp = { ...filteredCarsWithPrices[i], minTime: '', available: false, active: i === 0 };
                 carWiseArr.push(temp);
             }
             setAllCarTypes(carWiseArr);
-            if (sorted.length > 0 && !tripdata.carType) {
-                dispatch(updateTripCar(sorted[0]));
+            if (!tripdata.carType) {
+                dispatch(updateTripCar(filteredCarsWithPrices[0]));
             }
+        } else {
+            setAllCarTypes([]);
         }
     }
 
@@ -747,7 +843,8 @@ export default function MapScreen(props) {
                 try {
                     const tempTripData = {
                         ...tripdata,
-                        carType: carType
+                        carType: carType,
+                        currentZoneId: currentZone?.id || null
                     };
                     
                     const result = await prepareEstimateObject(tempTripData, instructionData);
@@ -780,6 +877,10 @@ export default function MapScreen(props) {
     };
 
     const selectCarType = (value, key) => {
+        if(!isInZone){
+            try{ setOutOfZoneDialog(true); }catch(e){}
+            return;
+        }
         let carTypes = allCarTypes;
         for (let i = 0; i < carTypes.length; i++) {
             carTypes[i].active = false;
@@ -799,7 +900,13 @@ export default function MapScreen(props) {
                 carTypes[i].active = false;
             }
         }
-        dispatch(updateTripCar(value));
+        
+        let carTypeWithZonePrices = value;
+        if (currentZone && currentZone.id) {
+            carTypeWithZonePrices = getCarTypeWithZonePrices(value, currentZone.id);
+        }
+        
+        dispatch(updateTripCar(carTypeWithZonePrices));
         
         setTimeout(() => {
             calculateAllCarTypeEstimates();
@@ -851,9 +958,11 @@ export default function MapScreen(props) {
                     let driver = { ...sortedDrivers[i] };
                     if (distArr[i].found && cars) {
                         driver.arriveTime = distArr[i];
-                        for (let i = 0; i < cars.length; i++) {
-                            if (cars[i].name == driver.carType) {
-                                driver.carImage = cars[i].image;
+                        const filteredCars = getFilteredCarTypesWithZonePrices();
+                        for (let j = 0; j < filteredCars.length; j++) {
+                            if (filteredCars[j].name == driver.carType) {
+                                driver.carImage = filteredCars[j].image;
+                                break;
                             }
                         }
                         let carType = driver.carType;
@@ -895,19 +1004,20 @@ export default function MapScreen(props) {
                 }
             }
 
+            const filteredCarsWithPrices = getFilteredCarTypesWithZonePrices();
             let carWiseArr = [];
-            if (cars) {
-                for (let i = 0; i < cars.length; i++) {
-                    let temp = { ...cars[i] };
-                    if (arr[cars[i].name]) {
-                        temp['nearbyData'] = arr[cars[i].name].drivers;
-                        temp['minTime'] = arr[cars[i].name].minTime;
+            if (filteredCarsWithPrices && filteredCarsWithPrices.length > 0) {
+                for (let i = 0; i < filteredCarsWithPrices.length; i++) {
+                    let temp = { ...filteredCarsWithPrices[i] };
+                    if (arr[filteredCarsWithPrices[i].name]) {
+                        temp['nearbyData'] = arr[filteredCarsWithPrices[i].name].drivers;
+                        temp['minTime'] = arr[filteredCarsWithPrices[i].name].minTime;
                         temp['available'] = true;
                     } else {
                         temp['minTime'] = '';
                         temp['available'] = false;
                     }
-                    temp['active'] = (tripdata.carType && (tripdata.carType.name == cars[i].name)) ? true : false;
+                    temp['active'] = (tripdata.carType && (tripdata.carType.name == filteredCarsWithPrices[i].name)) ? true : false;
                     carWiseArr.push(temp);
                 }
             }
@@ -1064,17 +1174,19 @@ export default function MapScreen(props) {
         props.navigation.navigate('WalletDetails');
     };
 
-    const handleQuickBooking = (carType) => {
-        // Limpiar datos anteriores
+    const handleQuickBooking = (carTypeName) => {
+        if(!isInZone){
+            try{ setOutOfZoneDialog(true); }catch(e){}
+            return;
+        }
         dispatch(clearTripPoints());
         
-        // Seleccionar tipo de auto
-        if (cars && cars.length > 0) {
-            const selectedCar = cars.find(car => car.name === carType) || cars[0];
+        const filteredCars = getFilteredCarTypesWithZonePrices();
+        if (filteredCars.length > 0) {
+            const selectedCar = filteredCars.find(car => car.name === carTypeName) || filteredCars[0];
             dispatch(updateTripCar(selectedCar));
         }
         
-        // Configurar pickup con ubicación actual
         if (gps && gps.location && gps.location.lat && gps.location.lng) {
             dispatch(updateTripPickup({
                 lat: gps.location.lat,
@@ -1084,7 +1196,6 @@ export default function MapScreen(props) {
             }));
         }
         
-        // Ir al MapScreen con el cartype seleccionado
         dispatch(updatSelPointType('drop'));
         setShowInitialScreen(false);
     };
@@ -1094,6 +1205,34 @@ export default function MapScreen(props) {
         if (!address || !address.lat || !address.lng) {
             console.warn('Address missing coordinates:', address);
             return;
+        }
+        
+        // Validar que la dirección esté dentro de una zona válida
+        if (zonesdata.zones && zonesdata.zones.length > 0) {
+            const addressZone = detectZoneByLocation(address.lat, address.lng, zonesdata.zones);
+            
+            if (!addressZone) {
+                Alert.alert(
+                    t('out_of_zone_title') || 'Fuera de Zona de Servicio',
+                    t('out_of_zone_message') || 'Esta dirección está fuera de nuestra zona de servicio.',
+                    [{ text: t('ok') || 'OK' }]
+                );
+                return;
+            }
+            
+            // Verificar si la zona tiene geometría válida
+            const hasValidGeometry = addressZone.geometry && 
+                ((addressZone.geometry.type === 'polygon' && addressZone.geometry.coordinates && addressZone.geometry.coordinates.length > 0) ||
+                 (addressZone.geometry.type === 'circle' && addressZone.geometry.center && addressZone.geometry.radius));
+            
+            if (!hasValidGeometry && !addressZone.isDefault) {
+                Alert.alert(
+                    t('out_of_zone_title') || 'Fuera de Zona de Servicio',
+                    t('out_of_zone_message') || 'Esta dirección está fuera de nuestra zona de servicio.',
+                    [{ text: t('ok') || 'OK' }]
+                );
+                return;
+            }
         }
         
         // Limpiar datos anteriores
@@ -1178,13 +1317,19 @@ export default function MapScreen(props) {
         }
     };
 
+    const locationWatcherRef = useRef(null);
+    
     const locateUser = async () => {
+        if (locationWatcherRef.current) {
+            locationWatcherRef.current.remove();
+            locationWatcherRef.current = null;
+        }
         setLoadingLocation(true);
         try {
-            let tempWatcher = await Location.watchPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-                timeInterval: 1000,
-                distanceInterval: 1
+            locationWatcherRef.current = await Location.watchPositionAsync({
+                accuracy: Location.Accuracy.High,
+                timeInterval: 2000,
+                distanceInterval: 3
             }, location => {
                 if (location && location.coords && location.coords.latitude && location.coords.longitude) {
                     dispatch({
@@ -1198,17 +1343,41 @@ export default function MapScreen(props) {
                         latitude: location.coords.latitude,
                         longitude: location.coords.longitude
                     });
-                    tempWatcher.remove();
+                    if (locationWatcherRef.current) {
+                        locationWatcherRef.current.remove();
+                        locationWatcherRef.current = null;
+                    }
+                    setLoadingLocation(false);
                 } else {
                     console.warn('Invalid location data received:', location);
                     setLoadingLocation(false);
                 }
             });
+            setTimeout(() => {
+                if (locationWatcherRef.current) {
+                    locationWatcherRef.current.remove();
+                    locationWatcherRef.current = null;
+                }
+                setLoadingLocation(false);
+            }, 15000);
         } catch (error) {
             console.warn('Error getting location:', error);
             setLoadingLocation(false);
+            if (locationWatcherRef.current) {
+                locationWatcherRef.current.remove();
+                locationWatcherRef.current = null;
+            }
         }
     };
+    
+    useEffect(() => {
+        return () => {
+            if (locationWatcherRef.current) {
+                locationWatcherRef.current.remove();
+                locationWatcherRef.current = null;
+            }
+        };
+    }, []);
 
     const handleHomeTrip = () => {
         const homeAddress = savedAddresses.find(addr => addr.name?.toLowerCase() === t('home').toLowerCase());
@@ -1278,7 +1447,11 @@ export default function MapScreen(props) {
                                     setOptionModalStatus(true);
                                     setBookLaterLoading(false);
                                 } else {
-                                    let result = await prepareEstimateObject(tripdata, instructionData);
+                                    let tripdataWithZonePrices = { ...tripdata, currentZoneId: currentZone?.id || null };
+                                    if (currentZone && currentZone.id && tripdata.carType) {
+                                        tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
+                                    }
+                                    let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
                                     if (result.error) {
                                         setBookLoading(false);
                                         Alert.alert(t('alert'), result.msg);
@@ -1411,7 +1584,11 @@ export default function MapScreen(props) {
                         setOptionModalStatus(true);
                         setBookLaterLoading(false);
                     } else {
-                        let result = await prepareEstimateObject(tripdata, instructionData);
+                        let tripdataWithZonePrices = { ...tripdata, currentZoneId: currentZone?.id || null };
+                        if (currentZone && currentZone.id && tripdata.carType) {
+                            tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
+                        }
+                        let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
                         if (result.error) {
                             setBookLoading(false);
                             Alert.alert(t('alert'), result.msg);
@@ -1434,7 +1611,11 @@ export default function MapScreen(props) {
         }
         setOptionModalStatus(false);
         setShouldRequestEstimate(true);
-        let result = await prepareEstimateObject(tripdata, instructionData);
+        let tripdataWithZonePrices = { ...tripdata, currentZoneId: currentZone?.id || null };
+        if (currentZone && currentZone.id && tripdata.carType) {
+            tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
+        }
+        let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
         if (result.error) {
             setBookLoading(false);
             Alert.alert(t('alert'), result.msg);
@@ -1665,12 +1846,26 @@ export default function MapScreen(props) {
          } 
     }
     const onTermAccept =  () => {        
-        if(checkTerm == false){
-           dispatch(updateProfile({term: true}));
-       }
-   }
-    const  onTermLink  = async () => {
+        if (checkTerm == false) {
+            dispatch(updateProfile({ term: true }));
+            setCheckTerm(true);
+            setShowTermsDialog(false);
+        }
+    }
+    const onTermLink  = async () => {
         Linking.openURL(settings.CompanyTermCondition).catch(err => console.error("Couldn't load page", err));
+   }
+   
+   const onSocialSecurityNavigate = () => {
+       props.navigation.navigate('Profile');
+   }
+   
+   const needsSocialSecurity = () => {
+       if (!settings || !settings.socialSecurityRequired) return false;
+       const hasSocialSecurity = auth.profile.socialSecurity && auth.profile.socialSecurity.trim() !== '';
+       const shouldShowForDriver = auth.profile.usertype === 'driver' && settings.showSocialSecurityDrivers;
+       const shouldShowForRider = auth.profile.usertype === 'customer' && settings.showSocialSecurityRiders;
+       return (shouldShowForDriver || shouldShowForRider) && !hasSocialSecurity;
    }
 
 const onMapSelectComplete = () => {
@@ -1682,9 +1877,13 @@ const onMapSelectComplete = () => {
        }
     }
     if(selectFromMap && mapSelectionType){
+        if(mapSelectionType === 'pickup'){
+            dispatch(updateTripPickup({...tripdata.pickup, source:"region-change"}))
+        } else if(mapSelectionType === 'drop'){
+            dispatch(updateTripDrop({...tripdata.drop, source:"region-change"}))
+        }
         setSelectFromMap(false);
         setMapSelectionType(null);
-        props.navigation.goBack();
     }
   }
 
@@ -1821,63 +2020,102 @@ const onMapSelectComplete = () => {
                 </ImageBackground>
             </View>
 
-            {gps.error || (!checkTerm && settings.term_required) || (!auth.profile.approved) ?
+            {!showInitialScreen && (gps.error || (!checkTerm && settings.term_required) || (!auth.profile.approved) || needsSocialSecurity()) ?
                 <View style={{
-                    position: 'absolute', width: width - 20, margin: 10, borderRadius: 8, flexDirection: 'column', alignItems: 'center', backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
-                    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.75, shadowRadius: 4, elevation: 5,justifyContent:'space-evenly',
-                    top: Platform.OS == 'android' ? (__DEV__ ? 65 : 65) : (hasNotch ? 85 : 80), height: 10 +(gps.error ? 70 : 0) +(!checkTerm && settings.term_required ? 70 : 0) +(!auth.profile.approved ? 70 : 0)
+                    position: 'absolute',
+                    width: width - 20,
+                    margin: 10,
+                    borderRadius: 8,
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
+                    shadowColor: "#000",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.75,
+                    shadowRadius: 4,
+                    elevation: 5,
+                    justifyContent: 'space-evenly',
+                    top: Platform.OS == 'android' ? (__DEV__ ? 65 : 65) : (hasNotch ? 85 : 80),
+                    height: 10 +
+                        (gps.error ? 70 : 0) +
+                        (!checkTerm && settings.term_required ? 70 : 0) +
+                        (!auth.profile.approved ? 70 : 0) +
+                        (needsSocialSecurity() ? 70 : 0)
                 }}>
-                {gps.error ?
-                    <View style={[styles.alrt,{flexDirection:isRTL?'row-reverse':'row'}]}>
-                        <View style={[styles.alrt1,{flexDirection:isRTL? 'row-reverse':'row'}]}>
-                            <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                            <Text style={{ fontSize: 14, fontFamily:fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('allow_only')}</Text>
+                    {gps.error ?
+                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
+                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('allow_only')}</Text>
+                            </View>
+                            <Button
+                                btnClick={changePermission}
+                                title={t('fix')}
+                                loading={false}
+                                loadingColor={{ color: colors.WHITE }}
+                                buttonStyle={styles.checkButtonTitle}
+                                style={styles.checkButtonStyle}
+                            />
                         </View>
-                        <Button btnClick={changePermission}
-                            title={t('fix')} 
-                            loading={false}
-                            loadingColor={{ color: colors.WHITE }}
-                            buttonStyle={styles.checkButtonTitle} 
-                            style={styles.checkButtonStyle} 
-                        />
-                    </View>
-                :null}
-                {!checkTerm && settings.term_required && term?
-                    <View style={[styles.alrt,{flexDirection:isRTL?'row-reverse':'row'}]}>
-                        <TouchableOpacity onPress={onTermLink} style={[styles.alrt1,{flexDirection:isRTL? 'row-reverse':'row',width:width-180,height:50}]}>
-                            <Icon name="document-text" type="ionicon" color={colors.RED} size={18} />
-                            <Text style={{ fontSize: 14, fontFamily:fonts.Bold, color: colors.BLUE, marginLeft: 3,textDecorationLine:'underline' }}>{t('term_condition')}</Text>
-                        </TouchableOpacity>
-                        <Button btnClick={onTermAccept}
-                            loading={false}
-                            loadingColor={{ color: colors.WHITE }}
-                            title={t('accept')}
-                            style={styles.checkButtonStyle}
-                            buttonStyle={styles.checkButtonTitle} 
-                        />
-                    </View>
-                : null}
-                 {!auth.profile.approved ?
-                    <View style={[styles.alrt,{flexDirection:isRTL?'row-reverse':'row'}]}>
-                        <View style={[styles.alrt1,{flexDirection:isRTL? 'row-reverse':'row'}]}>
-                            <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
-                            <Text style={{ fontSize: 14, fontFamily:fonts.Bold, color: mode === 'dark' ? colors.WHITE :colors.BLACK, marginLeft: 3 }}>{t('admin_contact')}</Text>
+                        : null}
+                    {!checkTerm && settings.term_required && term ?
+                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <TouchableOpacity onPress={onTermLink} style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', width: width - 180, height: 50 }]}>
+                                <Icon name="document-text" type="ionicon" color={colors.RED} size={18} />
+                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: colors.BLUE, marginLeft: 3, textDecorationLine: 'underline' }}>{t('term_condition')}</Text>
+                            </TouchableOpacity>
+                            <Button
+                                btnClick={onTermAccept}
+                                loading={false}
+                                loadingColor={{ color: colors.WHITE }}
+                                title={t('accept')}
+                                style={styles.checkButtonStyle}
+                                buttonStyle={styles.checkButtonTitle}
+                            />
                         </View>
-                    </View>
-                :null}
+                        : null}
+                    {needsSocialSecurity() ?
+                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <TouchableOpacity onPress={onSocialSecurityNavigate} style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', width: width - 180, height: 50 }]}>
+                                <Icon name="card" type="ionicon" color={colors.RED} size={18} />
+                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: colors.BLUE, marginLeft: 3, textDecorationLine: 'underline' }}>{t('social_security')}</Text>
+                            </TouchableOpacity>
+                            <Button
+                                btnClick={onSocialSecurityNavigate}
+                                loading={false}
+                                loadingColor={{ color: colors.WHITE }}
+                                title={t('complete') || 'Completar'}
+                                style={styles.checkButtonStyle}
+                                buttonStyle={styles.checkButtonTitle}
+                            />
+                        </View>
+                        : null}
+                    {!auth.profile.approved ?
+                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
+                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('admin_contact')}</Text>
+                            </View>
+                        </View>
+                        : null}
                 </View>
-            :
-                showInitialScreen ? (
+                : null}
+
+                {showInitialScreen ? (
                     <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
                         <StatusBar 
                             translucent
                             backgroundColor="transparent"
                             barStyle="light-content"
                         />
-                        
-                        {/* Header */}
+                        {mode !== 'dark' && (
+                            <Image 
+                                source={require('../../assets/images/wall.jpg')}
+                                style={styles.headerBackgroundImage}
+                                resizeMode="cover"
+                            />
+                        )}
                         <View style={[styles.headerContainer]}>
-                            <HeaderGradient mode={mode} />
                             <View style={[styles.header]}>
                                 <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                     <View style={[styles.profileSection, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1935,54 +2173,32 @@ const onMapSelectComplete = () => {
                                         />
                                     </TouchableOpacity>
                                 </View>
+                                <Text style={[styles.searchTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                    {t('where_can_we_take_you')}
+                                </Text>
                                 <TouchableOpacity 
-                                    onPress={handleNewTrip}
+                                    onPress={isInZone ? handleNewTrip : () => setOutOfZoneDialog(true)}
                                     style={[styles.searchInput, { 
                                         backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
                                         borderColor: mode === 'dark' ? colors.WHITE + '20' : colors.SHADOW + '20',
+                                        opacity: isInZone ? 1 : 0.5
                                     }]}
                                 >
                                     <Icon 
                                         name="search" 
                                         type="ionicon" 
                                         size={20} 
-                                        color={colors.SHADOW} 
+                                        color={mode === 'dark' ? colors.WHITE : colors.BLACK} 
                                     />
                                     <Text style={[styles.searchPlaceholder, { color: colors.SHADOW }]}>
-                                        {t('map_screen_drop_input_text')}
+                                        {t('write_the_address')}
                                     </Text>
+                                    <Image 
+                                        source={require('../../assets/images/map.png')}
+                                        style={styles.mapIcon}
+                                        resizeMode="contain"
+                                    />
                                 </TouchableOpacity>
-                                
-                                {/* Chips de direcciones guardadas */}
-                                <ScrollView 
-                                    horizontal 
-                                    showsHorizontalScrollIndicator={false}
-                                    style={styles.chipScrollContainer}
-                                    contentContainerStyle={styles.chipContainer}
-                                >
-                                    {savedAddresses
-                                        .filter(address => address && address.lat && address.lng) // Filtrar direcciones válidas
-                                        .map((address, index) => (
-                                        <TouchableOpacity 
-                                            key={index}
-                                            onPress={() => handleAddressSelect(address)}
-                                            style={[styles.chip, { 
-                                                backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                                borderWidth: 1,
-                                                borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
-                                                marginRight: isRTL ? 0 : 8,
-                                                marginLeft: isRTL ? 8 : 0,
-                                            }]}
-                                        >
-                                            <Text style={[styles.chipText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} numberOfLines={1} ellipsizeMode="tail">
-                                                {(address.description || address.name || '').length > 20 
-                                                    ? (address.description || address.name || '').substring(0, 20) + '...'
-                                                    : (address.description || address.name || '')
-                                                }
-                                            </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
                             </View>
                         </View>
 
@@ -1991,61 +2207,227 @@ const onMapSelectComplete = () => {
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={styles.scrollContent}
                         >
-
-                            {/* Service Types */}
-                            {cars && cars.length > 0 && (
-                                <View style={styles.serviceTypesContainer}>
-                                    <Text style={[styles.sectionTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                        {t('choose_service')}
-                                    </Text>
-                                    <View style={styles.serviceTypes}>
-                                        {cars.slice(0, 4).map((car, index) => (
-                                            <TouchableOpacity 
-                                                key={index}
-                                                onPress={() => handleQuickBooking(car.name)}
-                                                style={[styles.serviceTypeCard, { 
-                                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                                    shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
-                                                }]}
-                                            >
-                                                <View style={[styles.serviceTypeIcon, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20' }]}>
-                                                    <Icon 
-                                                        name="directions-car" 
-                                                        type="material" 
-                                                        size={24} 
-                                                        color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} 
-                                                    />
-                                                </View>
-                                                <Text style={[styles.serviceTypeName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                                    {car.name}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
+                            {savedAddresses.filter(address => address && address.lat && address.lng).length > 0 && (
+                                <View style={[styles.chipWrapper, { marginTop: -20, marginBottom: 20 }]}>
+                                    <ScrollView 
+                                        horizontal 
+                                        showsHorizontalScrollIndicator={false}
+                                        style={styles.chipScrollContainer}
+                                        contentContainerStyle={styles.chipContainer}
+                                    >
+                                        {savedAddresses
+                                            .filter(address => address && address.lat && address.lng)
+                                            .map((address, index) => (
+                                                <TouchableOpacity 
+                                                    key={index}
+                                                    onPress={() => handleAddressSelect(address)}
+                                                    style={[styles.chip, { 
+                                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                        borderWidth: 1,
+                                                        borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
+                                                        marginRight: isRTL ? 0 : 8,
+                                                        marginLeft: isRTL ? 8 : 0,
+                                                    }]}
+                                                >
+                                                    <Text style={[styles.chipText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} numberOfLines={1} ellipsizeMode="tail">
+                                                        {(address.description || address.name || '').length > 20 
+                                                            ? (address.description || address.name || '').substring(0, 20) + '...'
+                                                            : (address.description || address.name || '')
+                                                        }
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                    </ScrollView>
                                 </View>
                             )}
 
-                            {/* Main Action Buttons */}
-                            <View style={styles.actionButtonsContainer}>
-                                <TouchableOpacity 
-                                    onPress={handleRecentTrips}
-                                    style={[styles.primaryButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
-                                >
-                                    <Text style={styles.primaryButtonText}>{t('recent_trips')}</Text>
-                                </TouchableOpacity>
+                            {(() => {
+                                const isLoading = !currentZone || !cars || cars.length === 0;
+                                const filteredCars = getFilteredCarTypesWithZonePrices();
                                 
-                                <TouchableOpacity 
-                                    onPress={handleWallet}
-                                    style={[styles.secondaryButton, { 
-                                        borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
-                                        backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND
-                                    }]}
-                                >
-                                    <Text style={[styles.secondaryButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                                        {t('my_wallet_tile')}
+                                if (isLoading) {
+                                    return (
+                                        <View style={styles.serviceTypesContainer}>
+                                            <View style={[styles.serviceTypes, { justifyContent: 'center', alignItems: 'center', minHeight: 150 }]}>
+                                                <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                            </View>
+                                        </View>
+                                    );
+                                }
+                                return filteredCars.length > 0 ? (
+                                    <View style={styles.serviceTypesContainer}>
+                                        <ScrollView 
+                                            horizontal 
+                                            showsHorizontalScrollIndicator={false}
+                                            style={styles.serviceTypesScrollView}
+                                            contentContainerStyle={styles.serviceTypesContent}
+                                            nestedScrollEnabled={true}
+                                        >
+                                            {filteredCars.map((car, index) => (
+                                                <TouchableOpacity 
+                                                    key={index}
+                                                    onPress={() => handleQuickBooking(car.name)}
+                                                    style={[styles.serviceTypeCard, { 
+                                                        backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                        shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
+                                                    }]}
+                                                >
+                                                    <View style={[styles.serviceTypeIcon, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20' }]}>
+                                                        <Image 
+                                                            resizeMode="contain" 
+                                                            source={car.image ? { uri: car.image } : require('../../assets/images/microBlackCar.png')} 
+                                                            style={styles.serviceTypeImage} 
+                                                        />
+                                                    </View>
+                                                    <Text style={[styles.serviceTypeName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                                        {car.name}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </ScrollView>
+                                    </View>
+                                ) : null;
+                            })()}
+
+                            {(gps.error || (!checkTerm && settings.term_required) || (!auth.profile.approved) || needsSocialSecurity()) && (
+                                <View style={{ width: '100%', marginTop: 16, marginBottom: 8 }}>
+                                    {gps.error ?
+                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
+                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('allow_only')}</Text>
+                                            </View>
+                                            <Button
+                                                btnClick={changePermission}
+                                                title={t('fix')}
+                                                loading={false}
+                                                loadingColor={{ color: colors.WHITE }}
+                                                buttonStyle={styles.checkButtonTitle}
+                                                style={styles.checkButtonStyle}
+                                            />
+                                        </View>
+                                        : null}
+
+                                    {!checkTerm && settings.term_required && term ?
+                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: gps.error ? 10 : 0 }]}>
+                                            <TouchableOpacity onPress={onTermLink} style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', width: width - 180, height: 50 }]}>
+                                                <Icon name="document-text" type="ionicon" color={colors.RED} size={18} />
+                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: colors.BLUE, marginLeft: 3, textDecorationLine: 'underline' }}>{t('term_condition')}</Text>
+                                            </TouchableOpacity>
+                                            <Button
+                                                btnClick={onTermAccept}
+                                                loading={false}
+                                                loadingColor={{ color: colors.WHITE }}
+                                                title={t('accept')}
+                                                style={styles.checkButtonStyle}
+                                                buttonStyle={styles.checkButtonTitle}
+                                            />
+                                        </View>
+                                        : null}
+
+                                    {needsSocialSecurity() ?
+                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: (!checkTerm && settings.term_required && term) || gps.error ? 10 : 0 }]}>
+                                            <TouchableOpacity onPress={onSocialSecurityNavigate} style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row', width: width - 180, height: 50 }]}>
+                                                <Icon name="card" type="ionicon" color={colors.RED} size={18} />
+                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: colors.BLUE, marginLeft: 3, textDecorationLine: 'underline' }}>{t('social_security')}</Text>
+                                            </TouchableOpacity>
+                                            <Button
+                                                btnClick={onSocialSecurityNavigate}
+                                                loading={false}
+                                                loadingColor={{ color: colors.WHITE }}
+                                                title={t('complete') || 'Completar'}
+                                                style={styles.checkButtonStyle}
+                                                buttonStyle={styles.checkButtonTitle}
+                                            />
+                                        </View>
+                                        : null}
+
+                                    {!auth.profile.approved ?
+                                        <View style={[styles.alrt, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: (needsSocialSecurity() || (!checkTerm && settings.term_required && term) || gps.error) ? 10 : 0 }]}>
+                                            <View style={[styles.alrt1, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                                <Icon name="alert-circle" type="ionicon" color={colors.RED} size={18} />
+                                                <Text style={{ fontSize: 14, fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginLeft: 3 }}>{t('admin_contact')}</Text>
+                                            </View>
+                                        </View>
+                                        : null}
+                                </View>
+                            )}
+
+                            {(() => {
+                                const filteredCarsForButtons = getFilteredCarTypesWithZonePrices();
+                                const hasAvailableCars = filteredCarsForButtons.length > 0;
+                                if (!hasAvailableCars) {
+                                    return null;
+                                }
+                                return (
+                                    <>
+                                        <View style={styles.actionButtonsContainer}>
+                                            <TouchableOpacity 
+                                                onPress={handleRecentTrips}
+                                                style={[styles.primaryButton, { 
+                                                    backgroundColor: mode === 'dark' ? colors.WHITE : colors.BLACK, 
+                                                    borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK, 
+                                                    borderWidth: 2
+                                                }]}
+                                            >
+                                                <Text style={[styles.primaryButtonText, { color: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>{t('recent_trips')}</Text>
+                                            </TouchableOpacity>
+                                            
+                                            <TouchableOpacity 
+                                                onPress={handleWallet}
+                                                style={[styles.secondaryButton, { 
+                                                    borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                    backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND
+                                                }]}
+                                            >
+                                                <Text style={[styles.secondaryButtonText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                                    {t('my_wallet_tile')}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                        
+                                        <View style={{ width: '100%', alignItems: 'center' }}>
+                                            <Image 
+                                                source={require('../../assets/images/banner.png')}
+                                                style={styles.bannerImage}
+                                                resizeMode="cover"
+                                            />
+                                        </View>
+                                    </>
+                                );
+                            })()}
+
+                            {!isInZone && zoneDetectionMessage ? (
+                                <View style={[styles.zoneWarningBanner, { 
+                                    backgroundColor: '#FF6B6B',
+                                    width: '100%',
+                                    alignSelf: 'stretch',
+                                    marginHorizontal: 0,
+                                    marginTop: 10,
+                                    marginBottom: 20,
+                                    padding: 15,
+                                    borderRadius: 10,
+                                    flexDirection: isRTL ? 'row-reverse' : 'row',
+                                    alignItems: 'center'
+                                }]}> 
+                                    <Icon 
+                                        name="warning" 
+                                        type="ionicon" 
+                                        size={20} 
+                                        color={colors.WHITE}
+                                        style={{ marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}
+                                    />
+                                    <Text style={[styles.zoneWarningText, { 
+                                        color: colors.WHITE,
+                                        flex: 1,
+                                        fontSize: 14,
+                                        fontFamily: fonts.Bold,
+                                        textAlign: isRTL ? 'right' : 'left'
+                                    }]}> 
+                                        {zoneDetectionMessage}
                                     </Text>
-                                </TouchableOpacity>
-                            </View>
+                                </View>
+                            ) : null}
                         </ScrollView>
                     </SafeAreaView>
                 ) : null
@@ -2083,20 +2465,34 @@ const onMapSelectComplete = () => {
             {settings && settings.horizontal_view ?
                 <View style={styles.fullCarView}>
                     <ScrollView horizontal={true} style={styles.fullCarScroller} showsHorizontalScrollIndicator={false}>
-                        {allCarTypes.map((prop, key) => {
-                            return (
-                                <View key={key} style={[styles.cabDivStyle, { shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK, borderWidth: 2, borderColor: prop.active == true ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND}]}>
-                                    <CarHorizontal
-                                        onPress={() => { selectCarType(prop, key) }}
-                                        carData={prop}
-                                        settings={settings}
-                                        styles={styles}
-                                        mode={mode}
-                                        formatAmount={formatAmount}
-                                    />
-                                </View>
-                            );
-                        })}
+                        {(() => {
+                            const isLoading = !currentZone || !cars || cars.length === 0;
+                            const filteredCars = getFilteredCarTypesWithZonePrices();
+                            
+                            if (isLoading) {
+                                return (
+                                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 150, paddingHorizontal: 20 }}>
+                                        <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                    </View>
+                                );
+                            }
+                            
+                            return filteredCars.map((prop, key) => {
+                                const activeProp = allCarTypes.find(ct => ct.name === prop.name) || prop;
+                                return (
+                                    <View key={key} style={[styles.cabDivStyle, { shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK, borderWidth: 2, borderColor: activeProp.active == true ? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : colors.SHADOW, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND}]}>
+                                        <CarHorizontal
+                                            onPress={() => { selectCarType({ ...prop, active: activeProp.active }, key) }}
+                                            carData={{ ...prop, active: activeProp.active }}
+                                            settings={settings}
+                                            styles={styles}
+                                            mode={mode}
+                                            formatAmount={formatAmount}
+                                        />
+                                    </View>
+                                );
+                            });
+                        })()}
                     </ScrollView>
                 </View>
                 :
@@ -2149,16 +2545,29 @@ const onMapSelectComplete = () => {
                                 
                                 {showCarTypesExpanded && (
                                 <View style={{ paddingBottom: 15 }}>
-                        {allCarTypes && allCarTypes.length > 0 ?
+                        {(() => {
+                            const isLoading = !currentZone || !cars || cars.length === 0;
+                            const filteredCars = getFilteredCarTypesWithZonePrices();
+                            
+                            if (isLoading) {
+                                return (
+                                    <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center' }}>
+                                        <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
+                                    </View>
+                                );
+                            }
+                            
+                            return filteredCars && filteredCars.length > 0 ? (
                                         <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 5 }}>
                                             <View style={{ flexDirection: 'row', gap: 10 }}>
-                                {allCarTypes.map((prop, index) => {
+                                {filteredCars.map((prop, index) => {
+                                    const activeProp = allCarTypes.find(ct => ct.name === prop.name) || prop;
                                     return (
                                                         <TouchableOpacity 
                                             key={index}
-                                                            onPress={() => { selectCarType(prop, index) }}
+                                                            onPress={() => { selectCarType({ ...prop, active: activeProp.active }, index) }}
                                                             style={[styles.carTypeCard, { 
-                                                                borderColor: prop.active ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : colors.SHADOW,
+                                                                borderColor: activeProp.active ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : colors.SHADOW,
                                                                 backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND 
                                                             }]}
                                                         >
@@ -2179,9 +2588,9 @@ const onMapSelectComplete = () => {
                                                     '...'
                                                 )}
                                             </Text>
-                                                            {prop.minTime && (
+                                                            {activeProp.minTime && (
                                                                 <Text style={[styles.carTypeTime, { color: colors.SHADOW }]}>
-                                                                    {prop.minTime}
+                                                                    {activeProp.minTime}
                                                                 </Text>
                                                             )}
                                                         </TouchableOpacity>
@@ -2189,9 +2598,10 @@ const onMapSelectComplete = () => {
                                 })}
                                             </View>
                             </ScrollView>
-                            :
+                            ) : (
                                         <Text style={{ color: colors.HEADER,fontFamily:fonts.Bold, fontSize: 20, textAlign: 'center' }}>{t("service_start_soon")}</Text>
-                        }
+                            );
+                        })()}
                 </View>
                                 )}
                                 <View style={[styles.buttonBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -2288,7 +2698,6 @@ const onMapSelectComplete = () => {
                 theme='light'
             />
 
-            {/* Modal de Viajes Recientes */}
             <WaygoDialog
                 visible={showRecentTripsModal}
                 onClose={() => setShowRecentTripsModal(false)}
@@ -2297,6 +2706,79 @@ const onMapSelectComplete = () => {
                 showIcon={false}
                 customContent={renderRecentTripsContent()}
             />
+
+            <WaygoDialog
+                visible={outOfZoneDialog}
+                onClose={() => setOutOfZoneDialog(false)}
+                title={t('out_of_zone_title') || 'Fuera de Zona de Servicio'}
+                message={zoneDetectionMessage}
+                showButtons={true}
+                showIcon={true}
+                type="warning"
+                confirmText={t('ok')}
+                cancelText={t('cancel')}
+                onConfirm={() => setOutOfZoneDialog(false)}
+            />
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={!checkTerm && settings && settings.term_required && term && showTermsDialog}
+                onRequestClose={handleTermsCancel}
+            >
+                <View style={styles.termsModalOverlay}>
+                    <View style={[styles.termsModalContent, { backgroundColor: mode === 'dark' ? '#272A2C' : colors.WHITE }]}>
+                        <View style={styles.termsModalHeader}>
+                            <View style={styles.termsIconContainer}>
+                                <Icon name="document-text" type="ionicon" color={colors.RED} size={24} />
+                            </View>
+                            <Text style={[styles.termsModalTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                {t('term_condition')}
+                            </Text>
+                        </View>
+                        
+                        <View style={styles.termsModalBody}>
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' }}>
+                                <Text style={[styles.termsModalText, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)' }]}>
+                                    {t('continue_accept_terms')}
+                                </Text>
+                                <TouchableOpacity onPress={onTermLink}>
+                                    <Text style={[styles.termsModalLink, { color: colors.BLUE }]}>
+                                        {t('term_condition')}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                        
+                        <View style={[styles.termsButtonContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <TouchableOpacity 
+                                style={[styles.termsButton, styles.termsRejectButton, {
+                                    backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#E2E9EC',
+                                    marginRight: isRTL ? 0 : 10,
+                                    marginLeft: isRTL ? 10 : 0,
+                                }]}
+                                onPress={handleTermsCancel}
+                            >
+                                <Text style={[styles.termsButtonText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                    {t('no_accept')}
+                                </Text>
+                            </TouchableOpacity>
+                            
+                            <TouchableOpacity 
+                                style={[styles.termsButton, styles.termsAcceptButton, {
+                                    backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
+                                    marginLeft: isRTL ? 0 : 10,
+                                    marginRight: isRTL ? 10 : 0,
+                                }]}
+                                onPress={onTermAccept}
+                            >
+                                <Text style={[styles.termsButtonText, { color: colors.WHITE }]}>
+                                    {t('accept')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 
@@ -2840,11 +3322,19 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        overflow: 'hidden',
+        overflow: 'visible',
         paddingTop: Platform.OS === 'ios' ? (hasNotch ? 70 : 60) : 60,
         height: Platform.OS === 'ios' ? (hasNotch ? 240 : 230) : 230,
         backgroundColor: 'transparent',
         zIndex: 1,
+    },
+    headerBackgroundImage: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: width,
+        height: height,
+        zIndex: 0,
     },
     backHeaderContainer: {
         position: 'absolute',
@@ -2869,13 +3359,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center'
     },
-    chipScrollContainer: {
+    chipWrapper: {
         marginTop: 10,
+        marginBottom: Platform.OS === 'ios' ? 5 : 25,
+        marginHorizontal: -20,
+    },
+    chipScrollContainer: {
     },
     chipContainer: {
         flexDirection: 'row',
-        paddingHorizontal: 0,
-        paddingRight: 20,
+        paddingLeft: 20,
+        paddingRight: 0,
     },
     chip: {
         paddingHorizontal: 12,
@@ -2943,49 +3437,70 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 20,
-        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 200 : 200) : 200,
+        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 220 : 220) : 220,
         paddingBottom: 20,
     },
     searchInput: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 15,
-        paddingVertical: 16,
+        paddingVertical: 12,
         borderRadius: 12,
         borderWidth: 1,
         marginHorizontal: 0,
         marginTop: 15,
+        height: 50,
+    },
+    searchTitle: {
+        fontSize: 24,
+        fontFamily: fonts.Bold,
+        marginTop: 15,
+        marginBottom: 10,
     },
     searchPlaceholder: {
         marginLeft: 10,
         fontSize: 16,
         fontFamily: fonts.Regular,
+        flex: 1,
+    },
+    mapIcon: {
+        width: 72,
+        height: 72,
     },
     sectionTitle: {
         fontSize: 20,
         fontFamily: fonts.Bold,
         marginBottom: 15,
+        marginTop: Platform.OS === 'ios' ? 0 : 30,
     },
     serviceTypesContainer: {
-        marginBottom: 25,
+        marginBottom: 20
+    },
+    serviceTypesScrollView: {
+        marginHorizontal: -20,
+    },
+    serviceTypesContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 5,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
     },
     serviceTypes: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
     },
     serviceTypeCard: {
-        width: (width - 60) / 2,
+        width: 120,
         borderRadius: 12,
         padding: 20,
-        marginBottom: 15,
+        marginRight: 12,
         alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: colors.WHITE,
         elevation: 2,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 2,
-        minHeight: 120,
+        minHeight: 160,
     },
     serviceTypeIcon: {
         width: 50,
@@ -2994,6 +3509,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 10,
+        alignSelf: 'center',
+    },
+    serviceTypeImage: {
+        width: 40,
+        height: 40,
     },
     serviceTypeName: {
         fontSize: 16,
@@ -3031,7 +3551,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: fonts.Bold,
     },
-    // Estilos para el modal de viajes recientes - Tarjetas compactas
     recentTripsScrollView: {
         maxHeight: 400,
     },
@@ -3073,6 +3592,89 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: fonts.Medium,
     },
+    termsModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 24,
+    },
+    termsModalContent: {
+        width: '100%',
+        maxWidth: 400,
+        borderRadius: 20,
+        shadowColor: colors.BLACK,
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+        elevation: 16,
+        paddingBottom: 20,
+        overflow: 'hidden',
+        maxHeight: '90%',
+    },
+    termsModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        marginBottom: 20,
+    },
+    termsIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: 'rgba(128, 128, 128, 0.1)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
+    },
+    termsModalTitle: {
+        fontSize: 18,
+        fontFamily: fonts.Bold,
+        lineHeight: 22,
+        flex: 1,
+    },
+    termsModalBody: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        minHeight: 80,
+    },
+    termsModalText: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+    termsModalLink: {
+        fontSize: 14,
+        fontFamily: fonts.Bold,
+        textDecorationLine: 'underline',
+    },
+    termsButtonContainer: {
+        flexDirection: 'row',
+        paddingHorizontal: 20,
+        marginTop: 20,
+    },
+    termsButton: {
+        flex: 1,
+        height: 44,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    termsRejectButton: {
+    },
+    termsAcceptButton: {
+    },
+    termsButtonText: {
+        fontSize: 14,
+        fontFamily: fonts.Medium,
+        lineHeight: 18,
+    },
     routeConnector: {
         width: 2,
         height: 12,
@@ -3089,5 +3691,25 @@ const styles = StyleSheet.create({
         fontFamily: fonts.Regular,
         textAlign: 'center',
         color: colors.SHADOW,
+    },
+    zoneWarningBanner: {
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    zoneWarningText: {
+        lineHeight: 20,
+    },
+    bannerImage: {
+        width: '100%',
+        height: 120,
+        marginTop: 15,
+        marginBottom: 10,
+        borderRadius: 12,
     }
 });

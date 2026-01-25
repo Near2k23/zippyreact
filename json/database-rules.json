@@ -24,6 +24,10 @@
             ".read": "true",
             ".write": "root.child('users').child(auth.uid).child('usertype').val() === 'admin'"
         },
+        "zones": {
+            ".read": "true",
+            ".write": "root.child('users').child(auth.uid).child('usertype').val() === 'admin'"
+        },
         "savedAddresses": {
             ".read": "auth != null",
             ".write": "root.child('users').child(auth.uid).child('usertype').val() === 'customer' || root.child('users').child(auth.uid).child('usertype').val() === 'driver'"

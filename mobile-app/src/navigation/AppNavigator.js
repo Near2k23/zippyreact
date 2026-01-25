@@ -32,6 +32,7 @@ import {
     WithdrawMoneyScreen,
     DriverIncomeScreen,
     RegistrationPage,
+    RegistrationDriverPage,
     Notifications as NotificationsPage,
     SettingsScreen,
     CarsScreen,
@@ -283,10 +284,10 @@ export default function AppContainer() {
 
                         let iconName, iconType;
                         if (route.name === 'Home') {
-                            iconName = 'directions-car';
+                            iconName = 'home';
                             iconType = 'material';
                         } else if (route.name === 'DriverTrips') {
-                            iconName = 'directions-car';
+                            iconName = 'home';
                             iconType = 'material';
                         } else if (route.name === 'RideList') {
                             iconName = 'history';
@@ -493,6 +494,7 @@ export default function AppContainer() {
                         }
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Register" component={RegistrationPage} />
+                        <Stack.Screen name="RegisterDriver" component={RegistrationDriverPage} />
                     </Stack.Group>
                 }
             </Stack.Navigator>

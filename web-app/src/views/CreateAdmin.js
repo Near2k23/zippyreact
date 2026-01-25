@@ -13,6 +13,7 @@ import theme from "styles/tableStyle";
 import TableShadcn from '../components/ui/TableShadcn';
 import IconButton from '../components/ui/icon-button';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,16 @@ import {
   DialogTitle,
   DialogOverlay,
 } from '../components/ui/dialog';
+import {
+  AlertDialog as ShadAlertDialog,
+  AlertDialogAction as ShadAlertDialogAction,
+  AlertDialogCancel as ShadAlertDialogCancel,
+  AlertDialogContent as ShadAlertDialogContent,
+  AlertDialogDescription as ShadAlertDialogDescription,
+  AlertDialogFooter as ShadAlertDialogFooter,
+  AlertDialogHeader as ShadAlertDialogHeader,
+  AlertDialogTitle as ShadAlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { useToast } from '../components/Toast';
 
 export default function Users() {
@@ -44,6 +55,8 @@ export default function Users() {
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
   const initialEditForm = React.useMemo(()=>({
     firstName: '',
     lastName: '',
@@ -158,6 +171,25 @@ export default function Users() {
     closeEditDialog();
   };
 
+  const handleDeleteClick = (row) => {
+    if (row.id === 'admin0001') {
+      showToast(t('first_admin_deleted'), 'error');
+      return;
+    }
+    setItemToDelete(row);
+    setConfirmDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (itemToDelete) {
+      dispatch(deleteUser(itemToDelete.id));
+      dispatch(fetchUsersOnce());
+      showToast(t('user_deleted'), 'success');
+      setConfirmDeleteOpen(false);
+      setItemToDelete(null);
+    }
+  };
+
   const handleEditCancel = () => closeEditDialog();
   const handleInputChange = (field, value) => setEditForm(prev => ({...prev, [field]: value}));
 
@@ -185,6 +217,9 @@ export default function Users() {
               <div className="flex gap-2 md:gap-3">
                 <IconButton aria-label="edit" onClick={() => handleEditClick(row)}>
                   <EditIcon fontSize='small' />
+                </IconButton>
+                <IconButton aria-label="delete" onClick={() => handleDeleteClick(row)}>
+                  <DeleteIcon fontSize='small' />
                 </IconButton>
               </div>
             )}
@@ -242,6 +277,22 @@ export default function Users() {
           </DialogContent>
         </Dialog>
      </ThemeProvider>
+
+      <ShadAlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <ShadAlertDialogContent>
+          <ShadAlertDialogHeader>
+            <ShadAlertDialogTitle>{t('delete_account_modal_title')}</ShadAlertDialogTitle>
+            <ShadAlertDialogDescription>
+              {t('delete_user_confirmation')}
+            </ShadAlertDialogDescription>
+          </ShadAlertDialogHeader>
+          <ShadAlertDialogFooter>
+            <ShadAlertDialogCancel onClick={()=>setConfirmDeleteOpen(false)}>{t('cancel')}</ShadAlertDialogCancel>
+            <ShadAlertDialogAction onClick={handleDeleteConfirm}>{t('delete')}</ShadAlertDialogAction>
+          </ShadAlertDialogFooter>
+        </ShadAlertDialogContent>
+      </ShadAlertDialog>
+
       <ToastContainer />
     </>
   );

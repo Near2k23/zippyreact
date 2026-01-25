@@ -88,6 +88,8 @@
       { "source": "/checksmtpdetails", "function": "checksmtpdetails"},
       { "source": "/request_mobile_otp", "function": "request_mobile_otp"},
       { "source": "/verify_mobile_otp", "function": "verify_mobile_otp"},
+      { "source": "/request_email_otp", "function": "request_email_otp"},
+      { "source": "/verify_email_otp", "function": "verify_email_otp"},
       { "source": "/update_auth_mobile", "function": "update_auth_mobile"},
       { "source": "/check_auth_exists", "function": "check_auth_exists"},
       { "source": "/sos", "destination": "/index.html" },

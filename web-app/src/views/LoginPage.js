@@ -106,6 +106,7 @@ export default function LoginPage(props) {
     selectedcountry:null,
     usertype:'customer',
     referralId:'',
+    socialSecurity: '',
     entryType: null
   });
 
@@ -279,7 +280,7 @@ export default function LoginPage(props) {
   };
 
   const handleShowSignup = ()=>{
-    setData({...data, email:"", firstName:"", lastName:"", password:"", confirmpassword:"",usertype:"customer",referralId:""})
+    setData({...data, email:"", firstName:"", lastName:"", password:"", confirmpassword:"",usertype:"customer",referralId:"", socialSecurity:""})
     setMobileWithoutCountry("")
     setIsLoading(false)
     setShowSignUp(!showSignUp)
@@ -358,7 +359,7 @@ export default function LoginPage(props) {
                     showToast(t('user_exists'), 'error', 4000, 'top-right', t('error') || 'Error');
                     setIsLoading(false);
                   }else{
-              if (userData.referralId && userData.referralId.length > 0){
+              if (settings && settings.showReferralField && userData.referralId && userData.referralId.length > 0){
                 validateReferer(userData.referralId).then((referralInfo)=>{
                   if (referralInfo.uid) {
                     delete userData.country;
@@ -381,6 +382,9 @@ export default function LoginPage(props) {
                 });
               }else{
                 delete userData.country;
+                if (!settings || !settings.showReferralField) {
+                  delete userData.referralId;
+                }
                 mainSignUp(userData).then((res)=>{
                   if(res.uid){
                     handleSuccessfulRegistration();
@@ -414,7 +418,7 @@ export default function LoginPage(props) {
   }
 
   const handleSuccessfulRegistration = () => {
-    setData({...data, email:"", firstName:"", lastName:"", password:"", confirmpassword:"",usertype:"customer",referralId:""});
+    setData({...data, email:"", firstName:"", lastName:"", password:"", confirmpassword:"",usertype:"customer",referralId:"", socialSecurity:""});
     setMobileWithoutCountry("");
     setIsLoading(false);
     
@@ -599,22 +603,49 @@ export default function LoginPage(props) {
                         />
                       </div>
 
-                      <div>
-                        <TextField
-                          fullWidth
-                          variant="outlined"
-                          label={t("referralId")}
-                          value={data.referralId}
-                          onChange={(e) => setData({...data, referralId: e.target.value})}
-                          className={isRTL === "rtl" ? inputClasses.rootRtl_1 : inputClasses.textField}
-                          style={{direction: isRTL === 'rtl' ? 'rtl' : 'ltr'}}
-                          InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
-                          inputProps={{
-                            style: { fontFamily: FONT_FAMILY },
-                            autoComplete: 'new-password'
-                          }}
-                        />
-                      </div>
+                      {settings && settings.showReferralField && (
+                        <div>
+                          <TextField
+                            fullWidth
+                            variant="outlined"
+                            label={t("referralId")}
+                            value={data.referralId}
+                            onChange={(e) => setData({...data, referralId: e.target.value})}
+                            className={isRTL === "rtl" ? inputClasses.rootRtl_1 : inputClasses.textField}
+                            style={{direction: isRTL === 'rtl' ? 'rtl' : 'ltr'}}
+                            InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                            inputProps={{
+                              style: { fontFamily: FONT_FAMILY },
+                              autoComplete: 'new-password'
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {((data.usertype === 'customer' && settings && settings.showSocialSecurityRiders) || 
+                        (data.usertype === 'driver' && settings && settings.showSocialSecurityDrivers)) && (
+                        <div>
+                          <TextField
+                            fullWidth
+                            variant="outlined"
+                            label={t('social_security')}
+                            value={data.socialSecurity}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '');
+                              setData({...data, socialSecurity: value});
+                            }}
+                            className={isRTL === "rtl" ? inputClasses.rootRtl_1 : inputClasses.textField}
+                            style={{direction: isRTL === 'rtl' ? 'rtl' : 'ltr'}}
+                            InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                            inputProps={{
+                              style: { fontFamily: FONT_FAMILY },
+                              autoComplete: 'new-password',
+                              inputMode: 'numeric',
+                              pattern: '[0-9]*'
+                            }}
+                          />
+                        </div>
+                      )}
 
                       <button
                         type="button"

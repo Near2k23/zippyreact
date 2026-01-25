@@ -243,7 +243,8 @@ const MyProfile = () => {
     email: '',
     mobile: '',
     usertype: '',
-    verifyId: ''
+    verifyId: '',
+    socialSecurity: ''
   });
 
   const [otp, setOtp] = useState("");
@@ -280,7 +281,8 @@ const MyProfile = () => {
         mobile: auth.profile.mobile,
         usertype: auth.profile.usertype,
         profile_image: auth.profile.profile_image ? auth.profile.profile_image : '',
-        verifyId: auth.profile.verifyId ? auth.profile.verifyId : ''
+        verifyId: auth.profile.verifyId ? auth.profile.verifyId : '',
+        socialSecurity: auth.profile.socialSecurity ? auth.profile.socialSecurity : ''
       });
       if (updateCalled) {
         setLoading(false);
@@ -306,6 +308,7 @@ const MyProfile = () => {
       email: data.email,
       mobile: data.mobile,
       verifyId: data.verifyId,
+      socialSecurity: data.socialSecurity,
       lang: { langLocale: multiLanguage[arr[langSelection]].langLocale, dateLocale: multiLanguage[arr[langSelection]].dateLocale }
     }));
 
@@ -327,6 +330,14 @@ const MyProfile = () => {
       setCommonAlert({ open: true, msg: t('update_any') })
     } else {
       if (data.firstName && data.firstName.length > 0 && data.lastName && data.lastName.length > 0) {
+        if (settings && settings.socialSecurityRequired) {
+          const shouldShowField = (auth.profile.usertype === 'driver' && settings.showSocialSecurityDrivers) || 
+                                  (auth.profile.usertype === 'customer' && settings.showSocialSecurityRiders);
+          if (shouldShowField && (!data.socialSecurity || data.socialSecurity.trim() === '')) {
+            setCommonAlert({ open: true, msg: t('social_security_required') || 'Social Security es requerido' });
+            return;
+          }
+        }
         if (data.email !== auth.profile.email) {
           const re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
           if (re.test(data.email)) {
@@ -572,6 +583,28 @@ const MyProfile = () => {
                   name="verifyId"
                   value={data.verifyId}
                   onChange={updateData}
+                />
+                : null}
+              {((auth.profile.usertype === 'driver' && settings && settings.showSocialSecurityDrivers) || 
+                (auth.profile.usertype === 'customer' && settings && settings.showSocialSecurityRiders)) ?
+                <TextField
+                  className={isRTL === "rtl" ? classes.rootRtl : classes.textField}
+                  variant="outlined"
+                  margin="normal"
+                  fullWidth
+                  required={settings && settings.socialSecurityRequired}
+                  id="socialSecurity"
+                  label={t('social_security')}
+                  name="socialSecurity"
+                  value={data.socialSecurity}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    setData({ ...data, socialSecurity: value });
+                  }}
+                  inputProps={{
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*'
+                  }}
                 />
                 : null}
 

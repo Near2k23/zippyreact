@@ -624,6 +624,29 @@ export default function ProfileScreen(props) {
                     />
                     </View>
 
+                {((auth.profile.usertype === 'driver' && settings && settings.showSocialSecurityDrivers) || 
+                  (auth.profile.usertype === 'customer' && settings && settings.showSocialSecurityRiders)) ?
+                    <View style={styles.fieldContainer}>
+                        <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
+                            {t('social_security')}
+                        </Text>
+                        <TextInput
+                            style={[styles.fieldInput, { 
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+                            }]}
+                            value={profileData?.socialSecurity || ''}
+                            onChangeText={(text) => {
+                                const numericValue = text.replace(/\D/g, '');
+                                setProfileData({ ...profileData, socialSecurity: numericValue });
+                            }}
+                            placeholder={t('social_security')}
+                            placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
+                            keyboardType="numeric"
+                        />
+                    </View>
+                : null}
+
                 {langSelection && languagedata && languagedata.langlist && languagedata.langlist.length > 1 && (
                     <View style={styles.fieldContainer}>
                         <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
@@ -713,11 +736,20 @@ export default function ProfileScreen(props) {
                     style={[styles.updateButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
                                 onPress={() => {
                         if (profileData.firstName && profileData.lastName) {
+                            if (settings && settings.socialSecurityRequired) {
+                                const shouldShowField = (auth.profile.usertype === 'driver' && settings.showSocialSecurityDrivers) || 
+                                                        (auth.profile.usertype === 'customer' && settings.showSocialSecurityRiders);
+                                if (shouldShowField && (!profileData.socialSecurity || profileData.socialSecurity.trim() === '')) {
+                                    Alert.alert(t('alert'), t('social_security_required') || 'Social Security es requerido');
+                                    return;
+                                }
+                            }
                             let userData = {
                                 firstName: profileData.firstName,
                                 lastName: profileData.lastName,
                                 email: profileData.email,
-                                mobile: profileData.mobile
+                                mobile: profileData.mobile,
+                                socialSecurity: profileData.socialSecurity || ''
                             };
                             setUpdateCalled(true);
                             dispatch(updateProfile(userData));

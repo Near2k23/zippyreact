@@ -1024,33 +1024,137 @@ exports.user_signup = onRequest(async (request, response) => {
             return response.send(regData);
         } else {
             console.log('🔐 SIGNUP DEBUG - Creating user with auth...');
-            const userRecord = await auth.createUser({
-                email: userDetails.email,
-                phoneNumber: userDetails.mobile,
-                password: userDetails.password,
-                emailVerified: true
-            });
-            console.log('🔐 SIGNUP DEBUG - User created:', userRecord.uid);
-
-            if (userRecord && userRecord.uid) {
-                console.log('🔐 SIGNUP DEBUG - Saving user data to database...');
-                await db.ref('users/' + userRecord.uid).set(regData);
+            try {
+                let emailVerified = settings.emailVerificationRequired ? false : true;
                 
-                if (userDetails.signupViaReferral && settings.bonus > 0) {
-                    console.log('🔐 SIGNUP DEBUG - Adding referral bonus...');
-                    await addToWallet(userDetails.signupViaReferral, settings.bonus, "Admin Credit", null);
-                    await addToWallet(userRecord.uid, settings.bonus, "Admin Credit", null);
+                if (userDetails.email && settings.emailVerificationRequired) {
+                    const emailKey = userDetails.email.replace(/\./g, '_dot_').replace(/@/g, '_at_');
+                    const verifiedSnapshot = await db.ref(`/otp_email_verified/${emailKey}`).once('value');
+                    const verifiedData = verifiedSnapshot.val();
+                    
+                    console.log('🔐 SIGNUP DEBUG - Checking email verification:', {
+                        email: userDetails.email,
+                        emailKey: emailKey,
+                        verifiedDataExists: !!verifiedData,
+                        verifiedData: verifiedData
+                    });
+                    
+                    if (verifiedData && verifiedData.email === userDetails.email) {
+                        const currentTime = new Date().getTime();
+                        const verifiedAt = verifiedData.verifiedAt;
+                        const timeDiffMinutes = (currentTime - verifiedAt) / 60000;
+                        
+                        console.log('🔐 SIGNUP DEBUG - Email verification timing:', {
+                            currentTime: currentTime,
+                            verifiedAt: verifiedAt,
+                            timeDiffMinutes: timeDiffMinutes,
+                            isValid: timeDiffMinutes <= 30
+                        });
+                        
+                        if (timeDiffMinutes <= 30) {
+                            emailVerified = true;
+                            await db.ref(`/otp_email_verified/${emailKey}`).remove();
+                            console.log('✅ SIGNUP DEBUG - Email was verified with OTP, marking as verified');
+                        } else {
+                            await db.ref(`/otp_email_verified/${emailKey}`).remove();
+                            console.log('⏰ SIGNUP DEBUG - Email verification expired');
+                        }
+                    } else {
+                        console.log('❌ SIGNUP DEBUG - No email verification record found or email mismatch');
+                    }
                 }
-                console.log('🔐 SIGNUP DEBUG - Registration completed successfully');
-                return response.send({ uid: userRecord.uid });
-            } else {
-                console.log('🔐 SIGNUP DEBUG - User record is null or missing uid');
-                return response.send({ error: "User Not Created" });
+                
+                console.log('🔐 SIGNUP DEBUG - Final emailVerified status:', emailVerified);
+                
+                const userRecord = await auth.createUser({
+                    email: userDetails.email,
+                    phoneNumber: userDetails.mobile,
+                    password: userDetails.password,
+                    emailVerified: emailVerified
+                });
+                console.log('🔐 SIGNUP DEBUG - User created:', {
+                    uid: userRecord.uid,
+                    email: userRecord.email,
+                    emailVerified: userRecord.emailVerified
+                });
+
+                if (userRecord && userRecord.uid) {
+                    console.log('🔐 SIGNUP DEBUG - Saving user data to database...');
+                    await db.ref('users/' + userRecord.uid).set(regData);
+                    
+                    if (settings.emailVerificationRequired && userDetails.email && !emailVerified) {
+                        try {
+                            const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
+                            const language = Object.values(langSnap.val())[0].keyValuePairs;
+                            const verificationLink = await auth.generateEmailVerificationLink(userDetails.email);
+                            const smtpData = await db.ref("smtpdata").once("value");
+                            const smtpDetails = smtpData.val();
+                            
+                            if (smtpDetails && smtpDetails.smtpDetails) {
+                                const transporter = nodemailer.createTransport(smtpDetails.smtpDetails);
+                                const emailHtml = `
+                                    <!DOCTYPE html>
+                                    <html>
+                                    <head>
+                                        <meta charset="UTF-8" />
+                                        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                                        <title>${language.email_verification || 'Email Verification'}</title>
+                                    </head>
+                                    <body style="font-family: Arial, sans-serif; padding: 20px;">
+                                        <h2>${language.email_verification_title || 'Verifica tu Email'}</h2>
+                                        <p>${language.email_verification_message || 'Por favor, haz clic en el siguiente enlace para verificar tu dirección de email:'}</p>
+                                        <p><a href="${verificationLink}" style="background-color: #008d99; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">${language.verify_email || 'Verificar Email'}</a></p>
+                                        <p>${language.email_verification_footer || 'Si no solicitaste este correo, puedes ignorarlo.'}</p>
+                                    </body>
+                                    </html>
+                                `;
+                                await transporter.sendMail({
+                                    from: smtpDetails.fromEmail,
+                                    to: userDetails.email,
+                                    subject: language.email_verification_subject || 'Verifica tu Email',
+                                    html: emailHtml
+                                });
+                                console.log('🔐 SIGNUP DEBUG - Verification email sent');
+                            }
+                        } catch (emailError) {
+                            console.log('🔐 SIGNUP DEBUG - Error sending verification email:', emailError);
+                        }
+                    }
+                    
+                    if (userDetails.signupViaReferral && settings.bonus > 0) {
+                        console.log('🔐 SIGNUP DEBUG - Adding referral bonus...');
+                        await addToWallet(userDetails.signupViaReferral, settings.bonus, "Admin Credit", null);
+                        await addToWallet(userRecord.uid, settings.bonus, "Admin Credit", null);
+                    }
+                    console.log('🔐 SIGNUP DEBUG - Registration completed successfully');
+                    return response.send({ uid: userRecord.uid });
+                } else {
+                    console.log('🔐 SIGNUP DEBUG - User record is null or missing uid');
+                    return response.send({ error: "User Not Created" });
+                }
+            } catch (authError) {
+                console.log('🔐 SIGNUP DEBUG - Auth error:', authError);
+                if (authError.code === 'auth/email-already-exists') {
+                    return response.send({ error: "Email already exists" });
+                } else if (authError.code === 'auth/phone-number-already-exists') {
+                    return response.send({ error: "Phone number already exists" });
+                } else if (authError.code === 'auth/invalid-email') {
+                    return response.send({ error: "Invalid email format" });
+                } else if (authError.code === 'auth/invalid-phone-number') {
+                    if (authError.errorInfo && authError.errorInfo.message === 'TOO_SHORT') {
+                        return response.send({ error: "Phone number is too short. Please enter a valid phone number with country code." });
+                    }
+                    return response.send({ error: "Invalid phone number format" });
+                } else if (authError.code === 'auth/weak-password') {
+                    return response.send({ error: "Password is too weak" });
+                } else {
+                    return response.send({ error: "User Not Created: " + (authError.message || authError.code) });
+                }
             }
         }
     } catch (error) {
         console.log('🔐 SIGNUP DEBUG - Catch error:', error);
-        return response.send({ error: "User Not Created" });
+        return response.send({ error: "User Not Created: " + (error.message || error.code || "Unknown error") });
     }
 });
 
@@ -1170,6 +1274,28 @@ exports.check_auth_exists = onRequest(async (request, response) => {
     }
     response.set("Access-Control-Allow-Headers", "Content-Type");
     let data = JSON.parse(request.body.data);
+    
+    if (settings && settings.emailVerificationRequired && data.uid) {
+        try {
+            const auth = getAuth();
+            const userRecord = await auth.getUser(data.uid);
+            
+            if (userRecord.email && !userRecord.emailVerified) {
+                const isSocialLogin = userRecord.providerData && userRecord.providerData.length > 0 && 
+                    (userRecord.providerData[0].providerId === "google.com" || userRecord.providerData[0].providerId === "apple.com");
+                
+                if (!isSocialLogin) {
+                    return response.send({ 
+                        error: 'Email not verified. Please verify your email before logging in.',
+                        uid: null 
+                    });
+                }
+            }
+        } catch (error) {
+            console.log('Error checking email verification:', error);
+        }
+    }
+    
     const userData = await rgf.formatUserProfile(request, config, data);
     if(userData.uid){
         db.ref('users/' + userData.uid).set(userData);
@@ -1295,6 +1421,163 @@ exports.verify_mobile_otp = onRequest(async (request, response) => {
         }
     }else{ 
         return response.send({ error: "Request mobile not found" });
+    }
+});
+
+exports.request_email_otp = onRequest(async (request, response) => {
+  const db = getDatabase();
+  response.set("Access-Control-Allow-Origin", "*");
+  response.set("Access-Control-Allow-Headers", "Content-Type");
+  const email = request.body.email;
+  
+  if (!email) {
+    return response.send({ error: "Email is required" });
+  }
+  
+  const timestamp = new Date().getTime();
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  
+  try {
+    const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
+    const langData = langSnap.val();
+    const language = langData && Object.values(langData)[0] ? Object.values(langData)[0].keyValuePairs : null;
+    let settingdata = await db.ref('settings').once("value");
+    let settings = settingdata.val();
+    
+    if(!language){
+      return response.send({ error: "Setup error: Language not configured" });
+    }
+    
+    if(settings && !settings.AllowCriticalEditsAdmin){
+      return response.send({ success: true });
+    }
+    
+    try{ 
+      const emailList = await db.ref("/otp_email_requests").orderByChild("email").equalTo(email).once('value');
+      const listData = emailList.val();
+      const info = Object.keys(listData? listData: {});
+      if(info && info.length > 0){
+        const removePromises = [];
+        for(let i=0;i<info.length; i++){
+          if(listData[info[i]].email === email){
+            removePromises.push(db.ref(`/otp_email_requests/${info[i]}`).remove());
+          }
+        }
+        if(removePromises.length > 0){
+          await Promise.all(removePromises);
+        }
+      }
+    } catch(error){
+      console.log('Error removing previous email OTP:', error);
+    }
+
+    const smtpData = await db.ref("smtpdata").once("value");
+    const smtpDetails = smtpData.val();
+    
+    if (!smtpDetails || !smtpDetails.smtpDetails) {
+      return response.send({ error: language.email_configuration_not_found || "Email configuration not found" });
+    }
+    
+    try {
+      const transporter = nodemailer.createTransport(smtpDetails.smtpDetails);
+      const emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>${language.email_otp_subject || 'Código de Verificación'}</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2>${language.email_otp_title || 'Código de Verificación'}</h2>
+          <p>${language.email_otp_message || 'Tu código de verificación es:'}</p>
+          <p style="font-size: 24px; font-weight: bold; color: #008d99; letter-spacing: 5px;">${otp}</p>
+          <p>${language.email_otp_expiry || 'Este código expira en 5 minutos.'}</p>
+          <p>${language.email_otp_footer || 'Si no solicitaste este código, puedes ignorarlo.'}</p>
+        </body>
+        </html>
+      `;
+      await transporter.sendMail({
+        from: smtpDetails.fromEmail,
+        to: email,
+        subject: language.email_otp_subject || 'Código de Verificación',
+        html: emailHtml
+      });
+
+      const data = {
+        email: email,
+        dated: timestamp,
+        otp: otp
+      };
+      await db.ref(`/otp_email_requests`).push(data);
+      return response.send({"success" : true});
+    } catch (emailError) {
+      console.log('Error sending email OTP:', emailError);
+      return response.send({ error: language.error_sending_email || "Error sending email" });
+    }
+  } catch (error) {
+    console.log('Error in request_email_otp:', error);
+    const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
+    const langData = langSnap.val();
+    const language = langData && Object.values(langData)[0] ? Object.values(langData)[0].keyValuePairs : {};
+    return response.send({ error: language.server_error || "Server error" });
+  }
+});
+
+exports.verify_email_otp = onRequest(async (request, response) => {
+    const db = getDatabase()
+    let settingdata = await db.ref('settings').once("value");
+    let settings = settingdata.val();
+    const allowedOrigins = ['https://' + config.firebaseProjectId + '.web.app', settings.CompanyWebsite];
+    const origin = request.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        response.set("Access-Control-Allow-Origin", origin);
+    }
+    response.set("Access-Control-Allow-Headers", "Content-Type");
+    const email = request.body.email;
+    const otp = request.body.otp;
+
+    const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
+    const langData = langSnap.val();
+    const language = langData && Object.values(langData)[0] ? Object.values(langData)[0].keyValuePairs : {};
+
+    if (!settings.AllowCriticalEditsAdmin) {
+        if (otp === "123456") {
+            return response.send({ success: true });
+        } else {
+            return response.send({ error: language.otp_mismatch || "OTP mismatch" });
+        }
+    }
+
+    const emailList = await db.ref("/otp_email_requests").orderByChild("email").equalTo(email).once('value');
+    const listData = emailList.val();
+    if(listData){
+        let check = await rgf.checkEmailOtp(config, email, listData, language);
+        if(check.errorStr){
+            await db.ref(`/otp_email_requests/${check.key}`).remove();
+            return response.send({ error:check.errorStr });
+        } else{
+            if(check.data.email){
+                if(parseInt(check.data.otp) === parseInt(otp)){
+                    await db.ref(`/otp_email_requests/${check.key}`).remove();
+                    const emailKey = email.replace(/\./g, '_dot_').replace(/@/g, '_at_');
+                    const verifiedData = {
+                        email: email,
+                        verifiedAt: new Date().getTime()
+                    };
+                    await db.ref(`/otp_email_verified/${emailKey}`).set(verifiedData);
+                    return response.send({ success: true });  
+                } else {
+                    check.data['count'] = check.data.count? check.data.count + 1: 1;
+                    await db.ref(`/otp_email_requests/${check.key}`).update(check.data);
+                    return response.send({ error: language.otp_mismatch || "OTP mismatch" });
+                }
+            }else{
+                return response.send({ error: language.request_email_not_found || "Request email not found" });
+            }
+        }
+    }else{ 
+        return response.send({ error: language.request_email_not_found || "Request email not found" });
     }
 });
 

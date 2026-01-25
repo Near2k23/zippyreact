@@ -14,6 +14,7 @@ import CarTypes from './views/CarTypes';
 import AddBookings from './views/AddBookings';
 import Promos from './views/Promos';
 import DynamicHours from './views/DynamicHours';
+import Zones from './views/Zones';
 import Users from './views/Users';
 import CustomerDetails from "views/CustomerDetails.js";
 import Notifications from './views/Notifications';
@@ -35,6 +36,7 @@ import { ThemeProvider } from '@mui/styles';
 import { createTheme } from '@mui/material';
 import { useJsApiLoader } from '@react-google-maps/api';
 import TermCondition from "views/TermCondition.js";
+import DriverAgreement from "views/DriverAgreement.js";
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { webClientId } from "config/ClientIds.js";
 import { HelmetProvider } from "react-helmet-async";
@@ -90,6 +92,7 @@ function App() {
                 <Route path="/bookings/bookingdetails/:id" element={<ProtectedRoute permit={"customer,admin,driver,fleetadmin"}><BookingDetails /></ProtectedRoute>}/>
                 <Route path="/profile" element={<ProtectedRoute permit={"customer,admin,driver,fleetadmin"}><MyProfile /></ProtectedRoute>}/>
                 <Route path="/cartypes" element={<ProtectedRoute permit={"admin"}><CarTypes /></ProtectedRoute>}/>
+                <Route path="/zones" element={<ProtectedRoute permit={"admin"}><Zones /></ProtectedRoute>}/>
                 <Route path="/cars" element={<ProtectedRoute permit={"admin,fleetadmin,driver"}><CarsList /></ProtectedRoute>}/>
                 <Route path="/addbookings" element={<ProtectedRoute permit={"admin,fleetadmin,customer"}><AddBookings /></ProtectedRoute>}/>
                 <Route path="/promos" element={<ProtectedRoute permit={"admin"}><Promos /></ProtectedRoute>}/>
@@ -111,6 +114,7 @@ function App() {
                 <Route path="/about-us" element={<AboutUs />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/term-condition" element={<TermCondition />} />
+                <Route path="/driver-agreement" element={<DriverAgreement />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/users/edituser/:usertype" element={<ProtectedRoute permit={"admin,fleetadmin"}><EditUser/></ProtectedRoute>}/>
                 <Route path="/users/edituser/:usertype/:id" element={<ProtectedRoute permit={"admin,fleetadmin"}><EditUser/></ProtectedRoute>}/>

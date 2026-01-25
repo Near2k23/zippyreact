@@ -7,6 +7,7 @@ import {
 import Polyline from '@mapbox/polyline';
 import { firebase } from '../config/configureFirebase';
 import { FareCalculator } from '../other/FareCalculator';
+import { getCarTypeWithZonePrices } from '../other/ZonePriceHelper';
 import { onValue } from "firebase/database";
 
 export const getEstimate = (bookingData) => async (dispatch) => {
@@ -90,10 +91,16 @@ export const getEstimate = (bookingData) => async (dispatch) => {
           }
         }
 
+        let carDetailsWithZonePrices = bookingData.carDetails;
+        
+        if (bookingData.currentZoneId && bookingData.carDetails) {
+          carDetailsWithZonePrices = getCarTypeWithZonePrices(bookingData.carDetails, bookingData.currentZoneId);
+        }
+
         let {totalCost, grandTotal, convenience_fees, dynamic_fee} = FareCalculator(
           distance,
           res.time_in_secs,
-          bookingData.carDetails,
+          carDetailsWithZonePrices,
           bookingData.instructionData,
           settings.decimal,
           activeRule
@@ -104,7 +111,7 @@ export const getEstimate = (bookingData) => async (dispatch) => {
           payload: {
             pickup:bookingData.pickup,
             drop:bookingData.drop,
-            carDetails:bookingData.carDetails,
+            carDetails:carDetailsWithZonePrices,
             instructionData: bookingData.instructionData,
             estimateDistance: parseFloat(parseFloat(distance).toFixed(settings.decimal)),
             fareCost: totalCost ? parseFloat(parseFloat(totalCost).toFixed(settings.decimal)) : 0,
