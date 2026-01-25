@@ -11,7 +11,7 @@ export default {
     ios: {
         associatedDomains: ['applinks:' + AppConfig.expo_slug + '.page.link'],
     },
-    runtimeVersion: "1.0.17",
+    runtimeVersion: "1.0.18",
     userInterfaceStyle: "automatic",
     platforms: [
         "ios",
@@ -96,7 +96,7 @@ export default {
             googleMapsApiKey: GoogleMapApiConfig.ios
         },
         googleServicesFile: "./GoogleService-Info.plist",
-        buildNumber: "1.0.17"
+        buildNumber: "1.0.18"
     },
     android: {
         package: AppConfig.app_identifier,

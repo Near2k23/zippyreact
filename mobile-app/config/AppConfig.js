@@ -2,7 +2,7 @@ module.exports.AppConfig = {
   app_name: 'WayGO',
   app_description: 'Viajes',
   app_identifier: 'com.tecnosoluciones.waygorides',
-  ios_app_version: '1.0.17',
+  ios_app_version: '1.0.18',
   android_app_version: 100,
   expo_owner: 'tecnosoluciones',
   expo_slug: 'waygo',

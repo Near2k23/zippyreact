@@ -84,6 +84,12 @@ export default function RegistrationBackgroundCheckStep({
         }
     };
 
+    const handleOpenDriverAgreement = () => {
+        Linking.openURL('https://waygodriver.com/driver-agreement').catch(err => 
+            console.error("Couldn't load page", err)
+        );
+    };
+
     const handleFinalSubmit = () => {
         if (backgroundCheckAccepted && termsAccepted && onFinalSubmit) {
             onFinalSubmit();
@@ -181,6 +187,13 @@ export default function RegistrationBackgroundCheckStep({
                                     onPress={handleOpenTerms}
                                 >
                                     {t('term_condition')}
+                                </Text>
+                                {' ' + t('and_the') + ' '}
+                                <Text 
+                                    style={[styles.termsLinkText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                    onPress={handleOpenDriverAgreement}
+                                >
+                                    {t('driver_agreement')}
                                 </Text>
                             </Text>
                         </View>
