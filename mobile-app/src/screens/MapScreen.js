@@ -88,13 +88,15 @@ export default function MapScreen(props) {
     const bookings = useSelector(state => state.bookinglistdata.bookings);
     const addressdata = useSelector(state => state.addressdata);
     const [datePickerOpen, setDatePickerOpen] = useState(false)
-    const latitudeDelta = 0.0122;
-    const longitudeDelta = 0.0061;
+    const latitudeDelta = 0.12;
+    const longitudeDelta = latitudeDelta * (width / height);
 
     const [allCarTypes, setAllCarTypes] = useState([]);
     const [freeCars, setFreeCars] = useState([]);
     const [selectFromMap, setSelectFromMap] = useState(false);
     const [mapSelectionType, setMapSelectionType] = useState(null);
+    const [isResolvingTapAddress, setIsResolvingTapAddress] = useState(false);
+    const mapSelectRequestId = useRef(0);
 
     useEffect(() => {
         if (props.route.params?.selectFromMap && props.route.params?.locationType) {
@@ -203,6 +205,24 @@ export default function MapScreen(props) {
     const fitMapToRoute = async (pickup, drop, forceAutoFit = false) => {
         if (pickup && drop && mapRef.current) {
             try {
+                const pickupLat = parseFloat(pickup.lat);
+                const pickupLng = parseFloat(pickup.lng);
+                const dropLat = parseFloat(drop.lat);
+                const dropLng = parseFloat(drop.lng);
+
+                if (!isNaN(pickupLat) && !isNaN(pickupLng) && !isNaN(dropLat) && !isNaN(dropLng)) {
+                    const deltaLat = Math.abs(pickupLat - dropLat);
+                    const deltaLng = Math.abs(pickupLng - dropLng);
+                    if (deltaLat < 0.0005 && deltaLng < 0.0005) {
+                        mapRef.current.animateToRegion({
+                            latitude: pickupLat,
+                            longitude: pickupLng,
+                            latitudeDelta: latitudeDelta,
+                            longitudeDelta: longitudeDelta
+                        });
+                        return;
+                    }
+                }
                 if (settings && settings.showLiveRoute) {
                     const startLoc = pickup.lat + ',' + pickup.lng;
                     const destLoc = drop.lat + ',' + drop.lng;
@@ -465,10 +485,8 @@ export default function MapScreen(props) {
         }
     }, [tripdata]);
 
-    // Cambiar showInitialScreen a false cuando se regrese del SearchScreen con datos completos
     useEffect(() => {
         if (tripdata.pickup && tripdata.pickup.add && tripdata.drop && tripdata.drop.add && showInitialScreen) {
-            // Solo cambiar si el drop fue configurado desde SearchScreen (source: 'search')
             if (tripdata.drop.source === 'search') {
                 setShowInitialScreen(false);
             }
@@ -569,7 +587,7 @@ export default function MapScreen(props) {
             }
         }
         
-        if (tripdata.pickup && tripdata.drop && !showInitialScreen) {
+        if (tripdata.pickup && tripdata.drop && !showInitialScreen && !selectFromMap) {
             const requestEstimate = async () => {
                 if (tripdata.carType && drivers && drivers.length > 0) {
                     let tripdataWithZonePrices = { ...tripdata, currentZoneId: currentZone?.id || null };
@@ -589,7 +607,7 @@ export default function MapScreen(props) {
                 fitMapToRoute(tripdata.pickup, tripdata.drop);
             }, 500);
         }
-    }, [tripdata.selected, tripdata.pickup, tripdata.drop, mapRef.current, showInitialScreen, tripdata.carType, drivers, instructionData]);
+    }, [tripdata.selected, tripdata.pickup, tripdata.drop, mapRef.current, showInitialScreen, tripdata.carType, drivers, instructionData, selectFromMap]);
 
     useEffect(() => {
         if (bookingdata.booking) {
@@ -817,7 +835,72 @@ export default function MapScreen(props) {
     }
   };
 
+  const handleMapPress = (e) => {
+    if (!selectFromMap || !mapSelectionType) return;
+    const coordinate = e?.nativeEvent?.coordinate;
+    if (!coordinate || typeof coordinate.latitude !== 'number' || typeof coordinate.longitude !== 'number') return;
+
+    mapSelectRequestId.current += 1;
+    const reqId = mapSelectRequestId.current;
+    setIsResolvingTapAddress(true);
+
+    const pos = { latitude: coordinate.latitude, longitude: coordinate.longitude };
+
+    if (mapSelectionType === 'pickup') {
+      dispatch(updateTripPickup({ lat: pos.latitude, lng: pos.longitude, add: null, source: 'mapSelect' }));
+    } else if (mapSelectionType === 'drop') {
+      dispatch(updateTripDrop({ lat: pos.latitude, lng: pos.longitude, add: null, source: 'mapSelect' }));
+    }
+
+    let res = '';
+    let found = false;
+    let savedAddresses = [];
+
+    try {
+      const value = addresses;
+      if (value !== null) {
+        savedAddresses = JSON.parse(value);
+        for (let i = 0; i < savedAddresses.length; i++) {
+          let distance = GetDistance(pos.latitude, pos.longitude, savedAddresses[i].lat, savedAddresses[i].lng);
+          if (distance < 0.25) {
+            res = savedAddresses[i].description;
+            found = true;
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      found = false;
+    }
+
+    if (reqId !== mapSelectRequestId.current) return;
+
+    if (found) {
+      setAddresses(pos, res, 'mapSelect');
+      if (reqId === mapSelectRequestId.current) setIsResolvingTapAddress(false);
+      return;
+    }
+
+    const latlng = pos.latitude + "," + pos.longitude;
+    fetchAddressfromCoords(latlng).then((add) => {
+      if (reqId !== mapSelectRequestId.current) return;
+      if (add) {
+        try {
+          savedAddresses.push({ lat: pos.latitude, lng: pos.longitude, description: add });
+          storeAddresses(savedAddresses);
+        } catch (error) { }
+        setAddresses(pos, add, 'mapSelect');
+      }
+      if (reqId === mapSelectRequestId.current) setIsResolvingTapAddress(false);
+    }).catch(() => {
+      if (reqId === mapSelectRequestId.current) setIsResolvingTapAddress(false);
+    });
+  };
+
     const onRegionChangeComplete = (newregion, gesture) => {
+        if (selectFromMap && mapSelectionType) {
+            return;
+        }
         if((tripdata.pickup && tripdata.pickup.source =='mapSelect') || (tripdata.drop && tripdata.drop.source =='mapSelect')){
             if (gesture && gesture.isGesture) {
                 updateAddresses({
@@ -825,13 +908,6 @@ export default function MapScreen(props) {
                     longitude: newregion.longitude
                 }, 'mapSelect');
             }
-        }
-        
-        if (selectFromMap && mapSelectionType && gesture && gesture.isGesture) {
-            updateAddresses({
-                latitude: newregion.latitude,
-                longitude: newregion.longitude
-            }, 'mapSelect');
         }
     }
 
@@ -1084,10 +1160,8 @@ export default function MapScreen(props) {
     };
 
     const handleSelectRecentTrip = (trip) => {
-        // Limpiar datos anteriores
         dispatch(clearTripPoints());
         
-        // Configurar pickup
         if (trip.pickup && trip.pickup.lat && trip.pickup.lng) {
             dispatch(updateTripPickup({
                 lat: trip.pickup.lat,
@@ -1097,7 +1171,6 @@ export default function MapScreen(props) {
             }));
         }
         
-        // Configurar drop
         if (trip.drop && trip.drop.lat && trip.drop.lng) {
             dispatch(updateTripDrop({
                 lat: trip.drop.lat,
@@ -1107,7 +1180,6 @@ export default function MapScreen(props) {
             }));
         }
         
-        // Cerrar modal y salir del modo inicial
         setShowRecentTripsModal(false);
         setShowInitialScreen(false);
     };
@@ -1123,7 +1195,6 @@ export default function MapScreen(props) {
                 onPress={() => handleSelectRecentTrip(trip)}
                 activeOpacity={0.7}
             >
-                {/* Ruta simplificada */}
                 <View style={styles.tripRouteContainer}>
                     <View style={styles.routePointContainer}>
                         <View style={[styles.routeIconContainer, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
@@ -1170,7 +1241,6 @@ export default function MapScreen(props) {
     );
 
     const handleWallet = () => {
-        // Navegar a la pantalla de billetera
         props.navigation.navigate('WalletDetails');
     };
 
@@ -1201,13 +1271,11 @@ export default function MapScreen(props) {
     };
 
     const handleAddressSelect = (address) => {
-        // Validar que la dirección tenga coordenadas válidas
         if (!address || !address.lat || !address.lng) {
             console.warn('Address missing coordinates:', address);
             return;
         }
         
-        // Validar que la dirección esté dentro de una zona válida
         if (zonesdata.zones && zonesdata.zones.length > 0) {
             const addressZone = detectZoneByLocation(address.lat, address.lng, zonesdata.zones);
             
@@ -1220,7 +1288,6 @@ export default function MapScreen(props) {
                 return;
             }
             
-            // Verificar si la zona tiene geometría válida
             const hasValidGeometry = addressZone.geometry && 
                 ((addressZone.geometry.type === 'polygon' && addressZone.geometry.coordinates && addressZone.geometry.coordinates.length > 0) ||
                  (addressZone.geometry.type === 'circle' && addressZone.geometry.center && addressZone.geometry.radius));
@@ -1235,10 +1302,8 @@ export default function MapScreen(props) {
             }
         }
         
-        // Limpiar datos anteriores
         dispatch(clearTripPoints());
         
-        // Configurar pickup con ubicación actual
         if (gps && gps.location && gps.location.lat && gps.location.lng) {
             dispatch(updateTripPickup({
                 lat: gps.location.lat,
@@ -1248,7 +1313,6 @@ export default function MapScreen(props) {
             }));
         }
         
-        // Configurar destino seleccionado
         dispatch(updateTripDrop({
             lat: address.lat,
             lng: address.lng,
@@ -1256,7 +1320,6 @@ export default function MapScreen(props) {
             source: 'predefined'
         }));
         
-        // Ir al MapScreen con el drop seleccionado
         dispatch(updatSelPointType('drop'));
         setShowInitialScreen(false);
     };
@@ -1889,7 +1952,6 @@ const onMapSelectComplete = () => {
 
     return (
         <View style={styles.container}>
-            {/* <StatusBar hidden={true} /> */}
             {!showInitialScreen ? (
                 <View style={styles.mapcontainer}>
                 {region && region.latitude && pageActive.current ?
@@ -1902,6 +1964,7 @@ const onMapSelectComplete = () => {
                         style={styles.mapViewStyle}
                         initialRegion={region}
                         onRegionChangeComplete={onRegionChangeComplete}
+                        onPress={selectFromMap && mapSelectionType ? handleMapPress : undefined}
                         onPanDrag={() => setDragging(30)}
                         minZoomLevel={11}
                         maxZoomLevel={20}
@@ -1950,9 +2013,25 @@ const onMapSelectComplete = () => {
                                 <Image source={require('../../assets/images/rsz_2red_pin.png')} style={{ height: 35, width: 35 }} />
                             </Marker>
                         )}
+                        {selectFromMap && mapSelectionType === 'pickup' && tripdata.pickup && tripdata.pickup.lat && (
+                            <Marker
+                                coordinate={{ latitude: tripdata.pickup.lat, longitude: tripdata.pickup.lng }}
+                                title={tripdata.pickup.add}
+                            >
+                                <Image source={require('../../assets/images/green_pin.png')} style={{ height: 35, width: 35 }} />
+                            </Marker>
+                        )}
+                        {selectFromMap && mapSelectionType === 'drop' && tripdata.drop && tripdata.drop.lat && (
+                            <Marker
+                                coordinate={{ latitude: tripdata.drop.lat, longitude: tripdata.drop.lng }}
+                                title={tripdata.drop.add}
+                            >
+                                <Image source={require('../../assets/images/rsz_2red_pin.png')} style={{ height: 35, width: 35 }} />
+                            </Marker>
+                        )}
                     </MapView>
                     : null}
-                {region && (!routeCoords || routeCoords.length === 0) ?
+                {region && !selectFromMap && (!routeCoords || routeCoords.length === 0) ?
                     tripdata.selected == 'pickup' ?
                         <View pointerEvents="none" style={styles.mapFloatingPinView}>
                             <Image pointerEvents="none" style={[styles.mapFloatingPin, { marginBottom: Platform.OS == 'ios' ? (hasNotch ? (-10 + dragging) : 33) : 40 }]} resizeMode="contain" source={require('../../assets/images/green_pin.png')} />
@@ -1962,6 +2041,12 @@ const onMapSelectComplete = () => {
                             <Image pointerEvents="none" style={[styles.mapFloatingPin, { marginBottom: Platform.OS == 'ios' ? (hasNotch ? (-10 + dragging) : 33) : 40 }]} resizeMode="contain" source={require('../../assets/images/rsz_2red_pin.png')} />
                         </View>
                     : null}
+                {!showInitialScreen && selectFromMap && isResolvingTapAddress ? (
+                    <View style={styles.mapResolvingAddress}>
+                        <ActivityIndicator color={colors.WHITE} size="small" />
+                        <Text style={styles.mapResolvingAddressText}>{t('loading')}</Text>
+                    </View>
+                ) : null}
                 {(!(tripdata.pickup && tripdata.pickup.source =='mapSelect')) ? tripdata.selected == 'pickup' ?
                     <View style={[styles.locationButtonView, {
                         bottom: settings && settings.horizontal_view ? 180 : isEditing ?
@@ -2881,6 +2966,23 @@ const styles = StyleSheet.create({
     mapFloatingPin: {
         height: 40
     },
+    mapResolvingAddress: {
+        position: 'absolute',
+        top: Platform.OS == 'android' ? 90 : (hasNotch ? 110 : 95),
+        alignSelf: 'center',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 14,
+        backgroundColor: 'rgba(0,0,0,0.35)'
+    },
+    mapResolvingAddressText: {
+        marginLeft: 8,
+        fontFamily: fonts.Bold,
+        fontSize: 14,
+        color: colors.WHITE
+    },
     buttonBar: {
         height: 65,
         width: '100%',
@@ -3057,19 +3159,9 @@ const styles = StyleSheet.create({
         marginBottom: 5,
         marginLeft: 15,
         marginRight: 15,
-        //backgroundColor: colors.WHITE,
         borderRadius: 6,
         borderWidth: 1,
-        //borderColor: colors.SHADOW,
         alignItems: 'center',
-        //shadowColor:  colors.BLACK,
-        // shadowOffset: {
-        //     width: 0,
-        //     height: 3,
-        // },
-        // shadowOpacity: 0.2,
-        // shadowRadius: 2,
-        // elevation: 2,
     },
     bodyContent: {
         flex: 1

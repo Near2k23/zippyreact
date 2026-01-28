@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Text, View, StyleSheet, Dimensions, FlatList, Modal, TouchableHighlight, Switch, Image, Platform, Linking, TouchableOpacity, KeyboardAvoidingView, useColorScheme } from 'react-native';
+import { Text, View, StyleSheet, Dimensions, FlatList, Modal, TouchableHighlight, Switch, Image, Platform, Linking, TouchableOpacity, KeyboardAvoidingView, useColorScheme, AppState } from 'react-native';
 import { Button, Icon } from 'react-native-elements';
 import MapView, { Polyline, PROVIDER_GOOGLE, Marker } from 'react-native-maps';
 import { colors } from '../common/theme';
@@ -20,6 +20,7 @@ import { fonts } from '../common/font';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import customMapStyle from "../common/mapTheme.json";
+import * as LocalAuthentication from 'expo-local-authentication';
 
 export default function DriverTrips(props) {
     const {
@@ -103,7 +104,6 @@ export default function DriverTrips(props) {
 
     useEffect(() => {
         if (gps.location && zonesdata.zones && zonesdata.zones.length > 0) {
-            try{ console.log('ZONES_GPS_DRIVER', { lat: gps.location.lat, lng: gps.location.lng }); }catch(e){}
             const detectedZone = detectZoneByLocation(gps.location.lat, gps.location.lng, zonesdata.zones);
 
             const hasGeometryMatch = !!(detectedZone && detectedZone.geometry);
@@ -280,7 +280,54 @@ export default function DriverTrips(props) {
         props.navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'BookedCab', params: { bookingId: id } }] }));
     };
 
-    const onChangeFunction = () => {
+    const authenticateBiometric = async () => {
+        try {
+            const compatible = await LocalAuthentication.hasHardwareAsync();
+            if (!compatible) {
+                Alert.alert(
+                    t('alert'),
+                    t('biometric_not_available') || 'La autenticación biométrica no está disponible en este dispositivo.'
+                );
+                return false;
+            }
+
+            const enrolled = await LocalAuthentication.isEnrolledAsync();
+            if (!enrolled) {
+                Alert.alert(
+                    t('alert'),
+                    t('biometric_not_available_description') || 'Tu dispositivo no tiene autenticación biométrica configurada. Por favor, habilítala en los ajustes de tu dispositivo.'
+                );
+                return false;
+            }
+
+            const result = await LocalAuthentication.authenticateAsync({
+                promptMessage: t('biometric_auth_message') || 'Autenticación biométrica requerida para ponerse online',
+                cancelLabel: t('cancel') || 'Cancelar',
+                disableDeviceFallback: false,
+            });
+
+            if (result.success) {
+                return true;
+            } else {
+                if (result.error !== 'user_cancel') {
+                    Alert.alert(
+                        t('alert'),
+                        t('biometric_auth_failed') || 'La autenticación biométrica falló. Por favor, inténtalo de nuevo.'
+                    );
+                }
+                return false;
+            }
+        } catch (error) {
+            console.log('Error during biometric authentication:', error);
+            Alert.alert(
+                t('alert'),
+                t('biometric_auth_error') || 'Ocurrió un error durante la autenticación biométrica.'
+            );
+            return false;
+        }
+    };
+
+    const onChangeFunction = async () => {
         if (auth.profile.queue) {
             Alert.alert(t('alert'), t('active_booking_right_now'));
         } else {
@@ -328,6 +375,11 @@ export default function DriverTrips(props) {
                             return;
                         }
                     }
+                    
+                    const biometricResult = await authenticateBiometric();
+                    if (!biometricResult) {
+                        return;
+                    }
                 }
                 dispatch(updateProfile({ driverActiveStatus: !isDriverActive }));
             }
@@ -370,8 +422,30 @@ export default function DriverTrips(props) {
     }
 
     useEffect(() => {
-        const unsubscribe = props.navigation.addListener('focus', () => {
+        const unsubscribe = props.navigation.addListener('focus', async () => {
             pageActive.current = true;
+            const foregroundStatus = await Location.getForegroundPermissionsAsync();
+            const backgroundStatus = await Location.getBackgroundPermissionsAsync();
+            
+            if (foregroundStatus.granted && backgroundStatus.granted) {
+                try {
+                    const currentLocation = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.High
+                    });
+                    
+                    if (currentLocation && currentLocation.coords) {
+                        dispatch({
+                            type: 'UPDATE_GPS_LOCATION',
+                            payload: {
+                                lat: currentLocation.coords.latitude,
+                                lng: currentLocation.coords.longitude
+                            }
+                        });
+                    }
+                } catch (locationError) {
+                    console.log('Error obteniendo ubicación al volver al focus:', locationError);
+                }
+            }
         });
         return unsubscribe;
     }, [props.navigation, pageActive.current]);
@@ -385,26 +459,142 @@ export default function DriverTrips(props) {
 
     useEffect(() => {
         pageActive.current = true;
+        
+        const handleAppStateChange = async (nextAppState) => {
+            if (nextAppState === 'active' && pageActive.current) {
+                const foregroundStatus = await Location.getForegroundPermissionsAsync();
+                const backgroundStatus = await Location.getBackgroundPermissionsAsync();
+                
+                if (foregroundStatus.granted && backgroundStatus.granted) {
+                    try {
+                        const currentLocation = await Location.getCurrentPositionAsync({
+                            accuracy: Location.Accuracy.High
+                        });
+                        
+                        if (currentLocation && currentLocation.coords) {
+                            dispatch({
+                                type: 'UPDATE_GPS_LOCATION',
+                                payload: {
+                                    lat: currentLocation.coords.latitude,
+                                    lng: currentLocation.coords.longitude
+                                }
+                            });
+                            dispatch(updateProfile({ driverActiveStatus: true }));
+                            setChecks({ ...checks, driverActiveStatus: true });
+                        }
+                    } catch (locationError) {
+                        console.log('Error obteniendo ubicación al volver al foreground:', locationError);
+                    }
+                }
+            }
+        };
+        
+        const subscription = AppState.addEventListener('change', handleAppStateChange);
+        
         return () => {
             pageActive.current = false;
+            subscription.remove();
         };
     }, []);
 
     const changePermission = async () => {
-        let permResp = await Location.requestForegroundPermissionsAsync();
-        if (permResp.status == 'granted') {
-            let { status } = await Location.requestBackgroundPermissionsAsync();
-            if (status === 'granted') {
-                dispatch(updateProfile({ driverActiveStatus: true }));
-                setChecks({ ...checks, driverActiveStatus: true });
-            }
-        }
-        else {
-            if (Platform.OS == 'ios') {
-                Linking.openSettings()
+        try {
+            const foregroundPerm = await Location.requestForegroundPermissionsAsync();
+            
+            if (foregroundPerm.status === 'granted') {
+                const backgroundPerm = await Location.requestBackgroundPermissionsAsync();
+                
+                if (backgroundPerm.status === 'granted') {
+                    try {
+                        const currentLocation = await Location.getCurrentPositionAsync({
+                            accuracy: Location.Accuracy.High
+                        });
+                        
+                        if (currentLocation && currentLocation.coords) {
+                            dispatch({
+                                type: 'UPDATE_GPS_LOCATION',
+                                payload: {
+                                    lat: currentLocation.coords.latitude,
+                                    lng: currentLocation.coords.longitude
+                                }
+                            });
+                        }
+                    } catch (locationError) {
+                        console.log('Error obteniendo ubicación:', locationError);
+                    }
+                    
+                    dispatch(updateProfile({ driverActiveStatus: true }));
+                    setChecks({ ...checks, driverActiveStatus: true });
+                    Alert.alert(t('alert'), t('location_permission_granted') || 'Permisos de ubicación otorgados correctamente');
+                } else {
+                    if (Platform.OS === 'ios') {
+                        Alert.alert(
+                            t('alert'),
+                            t('background_location_permission_required') || 'Se requiere permiso de ubicación en segundo plano. Por favor, habilítalo en Configuración.',
+                            [
+                                { text: t('cancel') || 'Cancelar', style: 'cancel' },
+                                { 
+                                    text: t('settings') || 'Configuración', 
+                                    onPress: () => Linking.openSettings() 
+                                }
+                            ]
+                        );
+                    } else {
+                        Alert.alert(
+                            t('alert'),
+                            t('background_location_permission_required') || 'Se requiere permiso de ubicación en segundo plano. Por favor, habilítalo en Configuración.',
+                            [
+                                { text: t('cancel') || 'Cancelar', style: 'cancel' },
+                                { 
+                                    text: t('settings') || 'Configuración', 
+                                    onPress: async () => {
+                                        try {
+                                            await startActivityAsync(ActivityAction.LOCATION_SOURCE_SETTINGS);
+                                        } catch (error) {
+                                            console.log('Error abriendo configuración:', error);
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                }
             } else {
-                startActivityAsync(ActivityAction.LOCATION_SOURCE_SETTINGS);
+                if (Platform.OS === 'ios') {
+                    Alert.alert(
+                        t('alert'),
+                        t('location_permission_required') || 'Se requiere permiso de ubicación. Por favor, habilítalo en Configuración.',
+                        [
+                            { text: t('cancel') || 'Cancelar', style: 'cancel' },
+                            { 
+                                text: t('settings') || 'Configuración', 
+                                onPress: () => Linking.openSettings() 
+                            }
+                        ]
+                    );
+                } else {
+                    Alert.alert(
+                        t('alert'),
+                        t('location_permission_required') || 'Se requiere permiso de ubicación. Por favor, habilítalo en Configuración.',
+                        [
+                            { text: t('cancel') || 'Cancelar', style: 'cancel' },
+                            { 
+                                text: t('settings') || 'Configuración', 
+                                onPress: async () => {
+                                    try {
+                                        await startActivityAsync(ActivityAction.LOCATION_SOURCE_SETTINGS);
+                                    } catch (error) {
+                                        console.log('Error abriendo configuración:', error);
+                                    }
+                                }
+                            }
+                        ]
+                    );
+                }
             }
+        } catch (error) {
+            console.log('Error en changePermission:', error);
+            Alert.alert(t('alert'), t('error_requesting_permissions') || 'Error al solicitar permisos. Por favor, inténtalo de nuevo.');
         }
     }
     const windoWidth = Dimensions.get("window").width

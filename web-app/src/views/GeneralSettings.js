@@ -588,11 +588,12 @@ const GeneralSettings = (props) => {
                   margin="normal"
                   fullWidth
                   id="tipMoneyField"
-                  label={t('tip_money_field')}
+                  label={`${t('tip_money_field')} (%)`}
                   name="tipMoneyField"
                   autoComplete="tipMoneyField"
                   onChange={handleWalletMoney}
                   value={data.tipMoneyField}
+                  helperText={"Ej: 10,15,25,40"}
                 />
                 <DeliveryFlow
                   data={data.bookingFlow}

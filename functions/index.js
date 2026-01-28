@@ -945,10 +945,10 @@ exports.withdrawUpdate = onValueUpdated(
         return;
     }
     let arr = [];
-    console.log('🔐 AUTH DEBUG - Headers authorization:', request.headers.authorization);
-    console.log('🔐 AUTH DEBUG - Config projectId:', config.firebaseProjectId);
-    const user = await rgf.validateBasicAuth(request.headers.authorization, config);
-    console.log('🔐 AUTH DEBUG - validateBasicAuth result:', user);
+        console.log('AUTH DEBUG - Headers authorization:', request.headers.authorization);
+        console.log('AUTH DEBUG - Config projectId:', config.firebaseProjectId);
+        const user = await rgf.validateBasicAuth(request.headers.authorization, config);
+        console.log('AUTH DEBUG - validateBasicAuth result:', user);
     if(user){
         if (request.body.email || request.body.mobile) {
             if (request.body.email) {
@@ -1013,17 +1013,29 @@ exports.user_signup = onRequest(async (request, response) => {
     let settings = settingData.val();
 
     try {
-        console.log('🔐 SIGNUP DEBUG - User details:', JSON.stringify(userDetails, null, 2));
-        console.log('🔐 SIGNUP DEBUG - Settings:', JSON.stringify(settings, null, 2));
+        console.log('REGISTRO SERVIDOR - User details recibidos:', {
+            userDetailsKeys: Object.keys(userDetails),
+            hasVerifyIdImage: 'verifyIdImage' in userDetails,
+            hasProfileImage: 'profileImage' in userDetails,
+            verifyIdImageType: userDetails.verifyIdImage && userDetails.verifyIdImage.constructor ? userDetails.verifyIdImage.constructor.name : null,
+            profileImageType: userDetails.profileImage && userDetails.profileImage.constructor ? userDetails.profileImage.constructor.name : null,
+            userDetailsPreview: JSON.stringify(userDetails, null, 2).substring(0, 1000)
+        });
+        console.log('SIGNUP DEBUG - Settings:', JSON.stringify(settings, null, 2));
         
         const regData = await rgf.validateSignupData(config, userDetails, settings);
-        console.log('🔐 SIGNUP DEBUG - RegData result:', JSON.stringify(regData, null, 2));
+        console.log('REGISTRO SERVIDOR - RegData después de validateSignupData:', {
+            regDataKeys: Object.keys(regData),
+            hasVerifyIdImage: 'verifyIdImage' in regData,
+            hasProfileImage: 'profileImage' in regData,
+            regDataPreview: JSON.stringify(regData, null, 2).substring(0, 1000)
+        });
 
         if (regData.error) {
-            console.log('🔐 SIGNUP DEBUG - Validation error:', regData.error);
+            console.log('SIGNUP DEBUG - Validation error:', regData.error);
             return response.send(regData);
         } else {
-            console.log('🔐 SIGNUP DEBUG - Creating user with auth...');
+            console.log('SIGNUP DEBUG - Creating user with auth...');
             try {
                 let emailVerified = settings.emailVerificationRequired ? false : true;
                 
@@ -1032,7 +1044,7 @@ exports.user_signup = onRequest(async (request, response) => {
                     const verifiedSnapshot = await db.ref(`/otp_email_verified/${emailKey}`).once('value');
                     const verifiedData = verifiedSnapshot.val();
                     
-                    console.log('🔐 SIGNUP DEBUG - Checking email verification:', {
+                    console.log('SIGNUP DEBUG - Checking email verification:', {
                         email: userDetails.email,
                         emailKey: emailKey,
                         verifiedDataExists: !!verifiedData,
@@ -1044,7 +1056,7 @@ exports.user_signup = onRequest(async (request, response) => {
                         const verifiedAt = verifiedData.verifiedAt;
                         const timeDiffMinutes = (currentTime - verifiedAt) / 60000;
                         
-                        console.log('🔐 SIGNUP DEBUG - Email verification timing:', {
+                        console.log('SIGNUP DEBUG - Email verification timing:', {
                             currentTime: currentTime,
                             verifiedAt: verifiedAt,
                             timeDiffMinutes: timeDiffMinutes,
@@ -1054,17 +1066,17 @@ exports.user_signup = onRequest(async (request, response) => {
                         if (timeDiffMinutes <= 30) {
                             emailVerified = true;
                             await db.ref(`/otp_email_verified/${emailKey}`).remove();
-                            console.log('✅ SIGNUP DEBUG - Email was verified with OTP, marking as verified');
+                            console.log('SIGNUP DEBUG - Email was verified with OTP, marking as verified');
                         } else {
                             await db.ref(`/otp_email_verified/${emailKey}`).remove();
-                            console.log('⏰ SIGNUP DEBUG - Email verification expired');
+                            console.log('SIGNUP DEBUG - Email verification expired');
                         }
                     } else {
-                        console.log('❌ SIGNUP DEBUG - No email verification record found or email mismatch');
+                        console.log('SIGNUP DEBUG - No email verification record found or email mismatch');
                     }
                 }
                 
-                console.log('🔐 SIGNUP DEBUG - Final emailVerified status:', emailVerified);
+                console.log('SIGNUP DEBUG - Final emailVerified status:', emailVerified);
                 
                 const userRecord = await auth.createUser({
                     email: userDetails.email,
@@ -1072,14 +1084,14 @@ exports.user_signup = onRequest(async (request, response) => {
                     password: userDetails.password,
                     emailVerified: emailVerified
                 });
-                console.log('🔐 SIGNUP DEBUG - User created:', {
+                console.log('SIGNUP DEBUG - User created:', {
                     uid: userRecord.uid,
                     email: userRecord.email,
                     emailVerified: userRecord.emailVerified
                 });
 
                 if (userRecord && userRecord.uid) {
-                    console.log('🔐 SIGNUP DEBUG - Saving user data to database...');
+                    console.log('SIGNUP DEBUG - Saving user data to database...');
                     await db.ref('users/' + userRecord.uid).set(regData);
                     
                     if (settings.emailVerificationRequired && userDetails.email && !emailVerified) {
@@ -1114,26 +1126,26 @@ exports.user_signup = onRequest(async (request, response) => {
                                     subject: language.email_verification_subject || 'Verifica tu Email',
                                     html: emailHtml
                                 });
-                                console.log('🔐 SIGNUP DEBUG - Verification email sent');
+                                console.log('SIGNUP DEBUG - Verification email sent');
                             }
                         } catch (emailError) {
-                            console.log('🔐 SIGNUP DEBUG - Error sending verification email:', emailError);
+                            console.log('SIGNUP DEBUG - Error sending verification email:', emailError);
                         }
                     }
                     
                     if (userDetails.signupViaReferral && settings.bonus > 0) {
-                        console.log('🔐 SIGNUP DEBUG - Adding referral bonus...');
+                        console.log('SIGNUP DEBUG - Adding referral bonus...');
                         await addToWallet(userDetails.signupViaReferral, settings.bonus, "Admin Credit", null);
                         await addToWallet(userRecord.uid, settings.bonus, "Admin Credit", null);
                     }
-                    console.log('🔐 SIGNUP DEBUG - Registration completed successfully');
+                    console.log('SIGNUP DEBUG - Registration completed successfully');
                     return response.send({ uid: userRecord.uid });
                 } else {
-                    console.log('🔐 SIGNUP DEBUG - User record is null or missing uid');
+                    console.log('SIGNUP DEBUG - User record is null or missing uid');
                     return response.send({ error: "User Not Created" });
                 }
             } catch (authError) {
-                console.log('🔐 SIGNUP DEBUG - Auth error:', authError);
+                console.log('SIGNUP DEBUG - Auth error:', authError);
                 if (authError.code === 'auth/email-already-exists') {
                     return response.send({ error: "Email already exists" });
                 } else if (authError.code === 'auth/phone-number-already-exists') {
@@ -1153,7 +1165,7 @@ exports.user_signup = onRequest(async (request, response) => {
             }
         }
     } catch (error) {
-        console.log('🔐 SIGNUP DEBUG - Catch error:', error);
+        console.log('SIGNUP DEBUG - Catch error:', error);
         return response.send({ error: "User Not Created: " + (error.message || error.code || "Unknown error") });
     }
 });

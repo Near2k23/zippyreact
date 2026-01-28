@@ -200,12 +200,15 @@ export const mainSignUp = async (regData) => {
     config
   } = firebase;
   let url = `https://${config.projectId}.web.app/user_signup`;
+  
+  const bodyToSend = JSON.stringify({ regData: regData });
+  
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ regData: regData })
+    body: bodyToSend
   })
   const res = await response.json();
   return res;
@@ -681,14 +684,7 @@ export const verifyEmailPassword = (email, pass) => async (dispatch) => {
       const user = userCredential.user;
       const settings = store.getState().settingsdata?.settings;
       
-      console.log('🔐 LOGIN DEBUG - Email password login:', {
-        email: user.email,
-        emailVerified: user.emailVerified,
-        emailVerificationRequired: settings?.emailVerificationRequired
-      });
-      
       if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
-        console.log('⚠️ LOGIN DEBUG - Email not verified, sending verification email');
         try {
           await sendEmailVerification(user);
           await signOut(authRef());

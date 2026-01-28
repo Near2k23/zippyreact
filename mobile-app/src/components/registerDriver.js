@@ -439,6 +439,18 @@ export default function RegistrationDriver(props) {
             delete userData.referralId;
         }
         
+        console.log('📸 REGISTRO - handleFinalSubmit - Datos a enviar:', {
+            hasVerifyIdImage: !!userData.verifyIdImage,
+            verifyIdImageType: userData.verifyIdImage?.constructor?.name,
+            verifyIdImageSize: userData.verifyIdImage?.size,
+            hasProfileImage: !!userData.profileImage,
+            profileImageType: userData.profileImage?.constructor?.name,
+            profileImageSize: userData.profileImage?.size,
+            documentImageUri: documentImage,
+            selfieImageUri: selfieImage,
+            userDataKeys: Object.keys(userData)
+        });
+        
         onPressRegister(userData);
     }
 

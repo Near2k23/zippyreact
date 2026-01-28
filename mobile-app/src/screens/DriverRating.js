@@ -41,7 +41,8 @@ export default function DriverRating(props) {
     const [amount, setAmount] = useState(0);
     const auth = useSelector(state=> state.auth);
     const providers = useSelector(state => state.paymentmethods.providers);
-    const [tipAmount, setTipAmount] = useState(['5', '10', '20']);
+    const [tipAmount, setTipAmount] = useState(['10', '15', '25', '40']);
+    const [selectedTipPercent, setSelectedTipPercent] = useState(null);
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
 
@@ -82,11 +83,15 @@ export default function DriverRating(props) {
     }, [activeBookings]);
 
     useEffect(() => {
+        const fallback = ['10', '15', '25', '40'];
         if (settings && settings.tipMoneyField) {
-          const moneyField = settings.tipMoneyField.split(",");
-          if (moneyField.length > 0) {
-            setTipAmount(moneyField);
-          }
+          const parsed = settings.tipMoneyField
+            .split(',')
+            .map(v => String(v).trim())
+            .filter(v => v.length > 0 && Number.isFinite(Number(v)) && Number(v) > 0);
+          setTipAmount(parsed.length > 0 ? parsed : fallback);
+        } else {
+          setTipAmount(fallback);
         }
     }, [settings]);
 
@@ -139,13 +144,21 @@ export default function DriverRating(props) {
     }
 
     const newData = ({ item, index }) => {
+        const percent = Number(item);
+        const fare = booking?.trip_cost ? parseFloat(booking.trip_cost) : 0;
+        const tipValue = parseFloat((fare * (percent / 100)).toFixed(settings?.decimal || 2));
+        const isSelected = selectedTipPercent === percent;
         return (
-          <TouchableOpacity key={"key" + index} style={[styles.boxView, {borderColor: amount== item? mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR : SECONDORY_COLOR,borderWidth:1,borderRadius: 6,}]} onPress={() => { setAmount(parseFloat(item)) }}>
-            {settings.swipe_symbol===false?
-              <Text style={[styles.quckMoneyText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{settings.symbol}{formatAmount(item, settings.decimal, settings.country)}</Text>
-              :
-              <Text style={[styles.quckMoneyText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >{formatAmount(item, settings.decimal, settings.country)}{settings.symbol}</Text>
-            }
+          <TouchableOpacity
+            key={"key" + index}
+            style={[styles.boxView, {borderColor: isSelected ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : SECONDORY_COLOR,borderWidth:1,borderRadius: 6,}]}
+            onPress={() => { setSelectedTipPercent(percent); setAmount(tipValue); }}
+          >
+            <Text style={[styles.quckMoneyText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} >
+              {settings?.swipe_symbol === false
+                ? `${percent}% (${settings.symbol}${formatAmount(tipValue, settings.decimal, settings.country)})`
+                : `${percent}% (${formatAmount(tipValue, settings.decimal, settings.country)}${settings.symbol})`}
+            </Text>
           </TouchableOpacity>
         )
     }
@@ -171,7 +184,7 @@ export default function DriverRating(props) {
                                 emptyColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
                                 rating={booking && booking.driverRating ? (Math.round(parseFloat(booking.driverRating) * 2) / 2) : 0}
                                 onChange={() => {
-                                    //console.log('hello')
+                                    
                                 }}
                                 style={[isRTL ? { transform: [{ scaleX: -1 }] } : null]}
                             />

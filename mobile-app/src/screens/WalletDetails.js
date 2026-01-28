@@ -18,18 +18,14 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { Icon } from 'react-native-elements';
 import i18n from 'i18n-js';
 
-// Local imports
 import { WTransactionHistory, WaygoDialog } from '../components';
 import { colors } from '../common/theme';
 import { fonts } from '../common/font';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import { api } from 'common';
 
-// Constants
 const { height, width } = Dimensions.get('window');
-const RECHARGE_AMOUNTS = [10000, 25000, 50000, 100000];
 
-// AutoResizeText Component
 const AutoResizeText = ({ children, style, maxFontSize = 24, minFontSize = 16, ...props }) => {
   const [fontSize, setFontSize] = useState(maxFontSize);
   const [textWidth, setTextWidth] = useState(0);
@@ -72,7 +68,6 @@ const AutoResizeText = ({ children, style, maxFontSize = 24, minFontSize = 16, .
 };
 
 export default function WalletDetails(props) {
-  // Redux hooks
   const { withdrawBalance } = api;
   const dispatch = useDispatch();
   const auth = useSelector(state => state.auth);
@@ -80,35 +75,29 @@ export default function WalletDetails(props) {
   const settings = useSelector(state => state.settingsdata.settings);
   const providers = useSelector(state => state.paymentmethods.providers);
 
-  // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
-  // State management
   const [profile, setProfile] = useState();
   const [mode, setMode] = useState();
   
-  // Recharge states
   const [rechargeModalVisible, setRechargeModalVisible] = useState(false);
-  const [selectedAmount, setSelectedAmount] = useState(null);
+  const [rechargeAmount, setRechargeAmount] = useState(null);
+  const [rechargeAmountFocus, setRechargeAmountFocus] = useState(false);
   
-  // Withdraw states
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState(null);
   const [withdrawAmountFocus, setWithdrawAmountFocus] = useState(false);
   
-  // Dialog states
   const [errorDialogVisible, setErrorDialogVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successDialogVisible, setSuccessDialogVisible] = useState(false);
 
-  // Localization and theme
   const { t } = i18n;
   const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
   const colorScheme = useColorScheme();
 
-  // Utility functions
   const formatAmount = (value, decimal, country) => {
     const number = parseFloat(value || 0);
     if (country === "Vietnam") {
@@ -124,7 +113,6 @@ export default function WalletDetails(props) {
     }
   };
 
-  // Effects
   useEffect(() => {
     if (auth?.profile?.mode) {
       if (auth.profile.mode === 'system') {
@@ -164,6 +152,15 @@ export default function WalletDetails(props) {
       }),
     ]).start();
   }, [fadeAnim, slideAnim, scaleAnim]);
+
+  const getRechargeQuickAmounts = () => {
+    const raw = settings?.walletMoneyField;
+    if (!raw || typeof raw !== 'string' || raw.trim() === '') return [];
+    return raw
+      .split(',')
+      .map(v => parseFloat(String(v).trim()))
+      .filter(v => Number.isFinite(v) && v > 0);
+  };
 
 
 
@@ -219,7 +216,6 @@ export default function WalletDetails(props) {
     }
   };
 
-  // Recharge functions
   const doRecharge = () => {
     if (!(profile.mobile && profile.mobile.length > 6 && profile.email && profile.firstName)) {
       Alert.alert(t('alert'), t('profile_incomplete'));
@@ -237,8 +233,9 @@ export default function WalletDetails(props) {
   };
 
   const handleRechargeConfirm = () => {
-    if (!selectedAmount) {
-      Alert.alert(t('alert'), t('select_amount'));
+    if (!rechargeAmount || rechargeAmount <= 0) {
+      setErrorMessage(t('enter_valid_amount'));
+      setErrorDialogVisible(true);
       return;
     }
     setRechargeModalVisible(false);
@@ -250,7 +247,7 @@ export default function WalletDetails(props) {
     
     const payData = {
       email: profile.email,
-      amount: selectedAmount,
+      amount: rechargeAmount,
       order_id: "wallet-" + profile.uid + "-" + reference,
       name: t('add_money') || 'Add Money',
       description: t('wallet_ballance') || 'Wallet Balance',
@@ -266,10 +263,9 @@ export default function WalletDetails(props) {
       providers: providers
     });
     
-    setSelectedAmount(null);
+    setRechargeAmount(null);
   };
 
-  // Withdraw functions
   const doWithdraw = () => {
     if (!(profile.mobile && profile.mobile.length > 6) && profile.email && profile.firstName) {
       Alert.alert(t('alert'), t('profile_incomplete'));
@@ -310,45 +306,73 @@ export default function WalletDetails(props) {
     }, 300);
   };
 
-  // Render functions
   const renderRechargeContent = () => (
     <View style={styles.rechargeContent}>
-      <Text style={[styles.amountSelectionTitle, { 
+      <Text style={[styles.rechargeInputLabel, { 
         color: mode === 'dark' ? colors.WHITE : colors.BLACK 
       }]}>
-        {t('select_recharge_amount')}
+        {t('recharge_amount')}
       </Text>
-      <View style={styles.amountGrid}>
-        {RECHARGE_AMOUNTS.map((amount) => (
-          <TouchableOpacity
-            key={amount}
-            style={[
-              styles.amountButton,
-              selectedAmount === amount && styles.selectedAmountButton,
-              { 
-                backgroundColor: selectedAmount === amount 
-                  ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
-                  : (mode === 'dark' ? '#3A3A3A' : '#F5F5F5'),
-                borderColor: selectedAmount === amount 
-                  ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
-                  : 'transparent'
-              }
-            ]}
-            onPress={() => setSelectedAmount(amount)}
-          >
-            <Text style={[
-              styles.amountText,
-              { 
-                color: selectedAmount === amount 
-                  ? colors.WHITE 
-                  : (mode === 'dark' ? colors.WHITE : colors.BLACK)
-              }
-            ]}>
-              {settings?.symbol || '$'}{formatAmount(amount, settings?.decimal || 2, settings?.country)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <TextInput
+        placeholder={`${settings?.symbol || '$'}0.00`}
+        onFocus={() => setRechargeAmountFocus(true)}
+        onBlur={() => setRechargeAmountFocus(false)}
+        value={rechargeAmount ? rechargeAmount.toString() : ''}
+        placeholderTextColor={colors.SHADOW}
+        style={[
+          styles.rechargeTextInput,
+          { 
+            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+            backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
+          },
+          (rechargeAmountFocus || (rechargeAmount && rechargeAmount.toString().length > 0)) ? [
+            styles.rechargeInputFocused, 
+            { borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }
+          ] : null
+        ]}
+        onChangeText={(text) => {
+          const numericValue = text.replace(/[^0-9.]/g, '');
+          if (numericValue === '' || /^\d*\.?\d*$/.test(numericValue)) {
+            setRechargeAmount(numericValue === '' ? null : parseFloat(numericValue) || null);
+          }
+        }}
+        keyboardType="numeric"
+        maxLength={10}
+      />
+      {getRechargeQuickAmounts().length > 0 ? (
+        <View style={styles.quickAmountGrid}>
+          {getRechargeQuickAmounts().map((amount) => (
+            <TouchableOpacity
+              key={amount}
+              style={[
+                styles.quickAmountButton,
+                {
+                  backgroundColor: rechargeAmount === amount
+                    ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                    : (mode === 'dark' ? '#3A3A3A' : '#F5F5F5'),
+                  borderColor: rechargeAmount === amount
+                    ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                    : 'transparent'
+                }
+              ]}
+              onPress={() => setRechargeAmount(amount)}
+            >
+              <Text
+                style={[
+                  styles.quickAmountText,
+                  {
+                    color: rechargeAmount === amount
+                      ? colors.WHITE
+                      : (mode === 'dark' ? colors.WHITE : colors.BLACK)
+                  }
+                ]}
+              >
+                {settings?.symbol || '$'}{formatAmount(amount, settings?.decimal || 2, settings?.country)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 
@@ -521,10 +545,10 @@ export default function WalletDetails(props) {
         visible={rechargeModalVisible}
         onClose={() => {
           setRechargeModalVisible(false);
-          setSelectedAmount(null);
+          setRechargeAmount(null);
         }}
         title={t('recharge_wallet')}
-        icon="wallet-plus-outline"
+        icon="add-circle-outline"
         iconColor={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
         type="confirm"
         showButtons={true}
@@ -579,7 +603,6 @@ export default function WalletDetails(props) {
     </>
   );
 
-  // Main render
   return (
     <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -702,45 +725,54 @@ const styles = StyleSheet.create({
   rechargeContent: {
     paddingVertical: 16,
   },
-  amountSelectionTitle: {
-    fontSize: 16,
+  rechargeInputLabel: {
+    fontSize: 15,
     fontFamily: fonts.Medium,
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 12,
+    marginLeft: 6,
     letterSpacing: 0.3,
   },
-  amountGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  amountButton: {
-    width: '48%',
+  rechargeTextInput: {
     height: 56,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    fontSize: 17,
+    fontFamily: fonts.Regular,
+    backgroundColor: '#F9FAFB',
     borderWidth: 2,
     borderColor: '#E5E7EB',
-    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  selectedAmountButton: {
+  rechargeInputFocused: {
     borderWidth: 2,
-    shadowOpacity: 0.15,
+    backgroundColor: '#FFFFFF',
+    shadowOpacity: 0.12,
     shadowRadius: 12,
-    elevation: 6,
+    elevation: 4,
   },
-  amountText: {
+  quickAmountGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 14,
+  },
+  quickAmountButton: {
+    width: '48%',
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  quickAmountText: {
     fontSize: 15,
     fontFamily: fonts.Medium,
     letterSpacing: 0.3,

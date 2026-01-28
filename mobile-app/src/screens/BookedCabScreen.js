@@ -90,8 +90,8 @@ export default function BookedCabScreen(props) {
     const [ratingVisible, setRatingVisible] = useState(false);
     const [driverRatingValue, setDriverRatingValue] = useState(0);
     const [driverFeedback, setDriverFeedback] = useState('');
-    const [tipOptions, setTipOptions] = useState([5,10,15]);
-    const [selectedTip, setSelectedTip] = useState(null);
+    const [tipOptions, setTipOptions] = useState([10, 15, 25, 40]);
+    const [selectedTipPercent, setSelectedTipPercent] = useState(null);
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -128,7 +128,6 @@ export default function BookedCabScreen(props) {
         }
     }, [auth.profile]);
 
-    // Expandir por defecto para drivers; colapsar por defecto para riders
     useEffect(() => {
         if (role === 'driver') {
             setShowBottomExpanded(true);
@@ -136,6 +135,19 @@ export default function BookedCabScreen(props) {
             setShowBottomExpanded(false);
         }
     }, [role]);
+
+    useEffect(() => {
+        const fallback = [10, 15, 25, 40];
+        if (settings && settings.tipMoneyField) {
+            const parsed = settings.tipMoneyField
+                .split(',')
+                .map(v => Number(String(v).trim()))
+                .filter(v => Number.isFinite(v) && v > 0);
+            setTipOptions(parsed.length > 0 ? parsed : fallback);
+        } else {
+            setTipOptions(fallback);
+        }
+    }, [settings]);
 
     useEffect(() => {
         setInterval(() => {
@@ -282,7 +294,6 @@ export default function BookedCabScreen(props) {
                 }
                 if (booking.status == 'PAID' & pageActive.current) {
                     if (role == 'customer') {
-                        // Mostrar diálogo de calificación en lugar de navegar
                         setTimeout(() => {
                             setRatingVisible(true);
                         }, 800);
@@ -543,7 +554,6 @@ export default function BookedCabScreen(props) {
         }
     },[cancelReasons])
 
-    // Contenido personalizado para el modal de cancelación
     const renderCancelContent = () => {
         return (
             <View style={styles.cancelContentContainer}>
@@ -570,7 +580,6 @@ export default function BookedCabScreen(props) {
         );
     };
 
-    // Función para manejar la confirmación de cancelación
     const handleCancelConfirm = () => {
         if (cancelReasonSelected >= 0) {
             dispatch(cancelBooking({ booking: curBooking, reason: cancelReasons[cancelReasonSelected].label, cancelledBy: role }));
@@ -582,7 +591,6 @@ export default function BookedCabScreen(props) {
     };
 
     const confirmModalClose = () => {
-        //setSearchModalVisible(true);
         setConfirmModalVisible(false);
         let booking = { ...curBooking };
         booking.confirmModal = true;
@@ -660,7 +668,7 @@ export default function BookedCabScreen(props) {
                                                         emptyColor={colors.STAR}
                                                         rating={rating}
                                                         onChange={() => {
-                                                            //console.log('hello')
+                                                            
                                                         }}
                                                         style={[isRTL ? { transform: [{ scaleX: -1 }] } : null]}
                                                     />
@@ -930,7 +938,6 @@ export default function BookedCabScreen(props) {
         )
     }
 
-    // Componente para el diseño cuando el estado es ACCEPTED
     const AcceptedBookingView = () => {
         return (
             <View style={[styles.mainContainer, {flexDirection: 'column', backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
@@ -1269,7 +1276,6 @@ export default function BookedCabScreen(props) {
             {curBooking && curBooking.status === 'ACCEPTED' && role === 'customer' ? (
                 <AcceptedBookingView />
             ) : (
-                /* Diseño original para otros estados */
                 <>
                     <View style={styles.mapcontainer}>
                         {curBooking ?
@@ -1637,14 +1643,15 @@ export default function BookedCabScreen(props) {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             {tipOptions.map((percent, idx) => {
                                 const fare = curBooking?.trip_cost ? parseFloat(curBooking.trip_cost) : 0;
-                                const tipAmount = parseFloat((fare * (percent/100)).toFixed(settings?.decimal || 2));
-                                const isSelected = selectedTip === tipAmount;
+                                const tipAmount = parseFloat((fare * (percent / 100)).toFixed(settings?.decimal || 2));
+                                const isSelected = selectedTipPercent === percent;
                                 return (
-                                    <TouchableOpacity key={idx} onPress={() => setSelectedTip(tipAmount)} style={{ width: '30%', height: 42, borderRadius: 10, borderWidth: 1, borderColor: isSelected ? 'transparent' : '#CBD5DC', backgroundColor: isSelected ? '#F3BE12' : colors.WHITE, alignItems: 'center', justifyContent: 'center' }}>
+                                    <TouchableOpacity key={idx} onPress={() => setSelectedTipPercent(percent)} style={{ width: '30%', height: 42, borderRadius: 10, borderWidth: 1, borderColor: isSelected ? 'transparent' : '#CBD5DC', backgroundColor: isSelected ? '#F3BE12' : colors.WHITE, alignItems: 'center', justifyContent: 'center' }}>
                                         <Text style={{ fontFamily: fonts.Bold, fontSize: 14, color: colors.BLACK }}>
-                                            {settings?.swipe_symbol === false 
-                                                ? `${settings?.symbol}${formatAmount(tipAmount, settings?.decimal, settings?.country)}`
-                                                : `${formatAmount(tipAmount, settings?.decimal, settings?.country)} ${settings?.symbol}`}
+                                            {`${percent}% `}
+                                            {settings?.swipe_symbol === false
+                                                ? `(${settings?.symbol}${formatAmount(tipAmount, settings?.decimal, settings?.country)})`
+                                                : `(${formatAmount(tipAmount, settings?.decimal, settings?.country)} ${settings?.symbol})`}
                                         </Text>
                                     </TouchableOpacity>
                                 )
@@ -1659,8 +1666,9 @@ export default function BookedCabScreen(props) {
                                         let updated = { ...curBooking };
                                         updated.rating = driverRatingValue;
                                         updated.feedback = driverFeedback;
-                                        if (selectedTip) {
-                                            updated.tipamount = parseFloat(selectedTip);
+                                        if (selectedTipPercent !== null && selectedTipPercent !== undefined) {
+                                            const fare = updated?.trip_cost ? parseFloat(updated.trip_cost) : 0;
+                                            updated.tipamount = parseFloat((fare * (selectedTipPercent / 100)).toFixed(settings?.decimal || 2));
                                         }
                                         updated.status = 'COMPLETE';
                                         dispatch(updateBooking(updated));
@@ -1840,7 +1848,6 @@ const styles = StyleSheet.create({
     okButtonStyle: { flexDirection: 'row', backgroundColor: colors.SHADOW, alignItems: 'center', justifyContent: 'center' },
     okButtonContainerStyle: { flex: 1, width: (width * 0.85), backgroundColor: colors.SHADOW, },
 
-    // Estilos para el contenido personalizado del modal de cancelación
     cancelContentContainer: {
         width: '100%',
         maxHeight: 300,
@@ -1850,7 +1857,6 @@ const styles = StyleSheet.create({
         maxHeight: 250,
         paddingHorizontal: 10,
     },
-    // Estilos mantenidos para el contenido del modal de cancelación
     radioContainer: { flex: 8, alignItems: 'center' },
     radioText: { fontSize: 16, fontFamily: fonts.Medium },
     radioContainerStyle: { paddingTop: 30, marginHorizontal: 10 },
@@ -1934,7 +1940,6 @@ const styles = StyleSheet.create({
         fontSize: 18
     },
     topTitle: {
-        //width: 188,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.5,
         shadowRadius: 3,
@@ -1947,7 +1952,6 @@ const styles = StyleSheet.create({
         top: hasNotch ? 45 : 55,
     },
     topTitle1: {
-        //width: 188,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.5,
         shadowRadius: 3,
@@ -2052,7 +2056,6 @@ const styles = StyleSheet.create({
         width: '100%',
         marginVertical: 5,
     },
-    // Estilos para el diseño ACCEPTED
     acceptedStatusContainer: {
         position: 'absolute',
         top: Platform.OS === 'ios' ? 100 : 80,

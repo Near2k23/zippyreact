@@ -57,8 +57,8 @@ export default function AppCommon({ children }) {
   const [bounceAnim] = useState(new Animated.Value(1));
   const languagedata = useSelector(state => state.languagedata);
   const initialFunctionsNotCalled = useRef(true);
-  const authStillNotResponded = useRef(true);
-  const authState = useRef('loading');
+  const [authStillNotResponded, setAuthStillNotResponded] = useState(true);
+  const [authState, setAuthState] = useState('loading');
   const locationLoading = useRef(true);
 
   useEffect(() => {
@@ -506,9 +506,9 @@ export default function AppCommon({ children }) {
 
   useEffect(() => {
     if (auth.profile && languagedata && languagedata.langlist && settings && initialFunctionsNotCalled.current) {
-      authStillNotResponded.current = false;
+      setAuthStillNotResponded(false);
       if (auth.profile.usertype) {
-        authState.current= auth.profile.usertype;
+        setAuthState(auth.profile.usertype);
         if (auth.profile.lang) {
           const lang = auth.profile.lang;
           i18n.locale = lang['langLocale'];
@@ -555,8 +555,8 @@ export default function AppCommon({ children }) {
   useEffect(() => {
     if (api && languagedata && languagedata.langlist && auth.error && auth.error.msg && !auth.profile && settings) {
       locationLoading.current = false;
-      authState.current= 'failed';
-      authStillNotResponded.current = false;
+      setAuthState('failed');
+      setAuthStillNotResponded(false);
       initialFunctionsNotCalled.current = true;
       fetchingToken.current = false;
       StopBackgroundLocation();
@@ -592,7 +592,7 @@ export default function AppCommon({ children }) {
     }
   }, [animationComplete]);
 
-  if (authStillNotResponded.current || !(languagedata && languagedata.langlist) || !settings || authState.current == 'loading') {
+  if (authStillNotResponded || !(languagedata && languagedata.langlist) || !settings || authState == 'loading') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.TAXIPRIMARY }}>
         <Animated.Image
