@@ -9,6 +9,9 @@ import {
   REQUEST_OTP,
   REQUEST_OTP_SUCCESS,
   REQUEST_OTP_FAILED,
+  REQUEST_EMAIL_TOKEN,
+  REQUEST_EMAIL_TOKEN_SUCCESS,
+  REQUEST_EMAIL_TOKEN_FAILED,
   UPDATE_USER_WALLET_HISTORY,
   SEND_RESET_EMAIL,
   SEND_RESET_EMAIL_FAILED
@@ -834,7 +837,7 @@ export const requestEmailOtp = (email) => async (dispatch) => {
     config
   } = firebase;
   dispatch({
-    type: REQUEST_OTP,
+    type: REQUEST_EMAIL_TOKEN,
     payload: true
   }); 
 
@@ -857,13 +860,13 @@ export const requestEmailOtp = (email) => async (dispatch) => {
     const result = await response.json();
     if(result.success){
       dispatch({
-        type: REQUEST_OTP_SUCCESS,
+        type: REQUEST_EMAIL_TOKEN_SUCCESS,
         payload: true
       });
       return { success: true };
     }else{
       dispatch({
-        type: REQUEST_OTP_FAILED,
+        type: REQUEST_EMAIL_TOKEN_FAILED,
         payload: result.error
       });
       return { success: false, error: result.error };
@@ -871,7 +874,7 @@ export const requestEmailOtp = (email) => async (dispatch) => {
   }catch(error){
     console.log('Error in requestEmailOtp:', error);
     dispatch({
-      type: REQUEST_OTP_FAILED,
+      type: REQUEST_EMAIL_TOKEN_FAILED,
       payload: error.message || 'Network error'
     });
     return { success: false, error: error.message || 'Network error' };

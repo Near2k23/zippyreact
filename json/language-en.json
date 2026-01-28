@@ -769,6 +769,8 @@
   "no_cancelled_booking" : "No cancelled booking ",
   "booking_successful":"Booking Successful",
   "booking_confirm":"Your booking has been confirmed",
+  "booking_requested_success_title":"Reserva solicitada exitosamente",
+  "booking_requested_success_body":"Tu reserva fue solicitada con éxito. En breve un conductor la aceptará.",
   "done":"DONE",
   "smssettings": "SMS Settings",
   "customMobileOTP": "Enable Custom Mobile OTP",

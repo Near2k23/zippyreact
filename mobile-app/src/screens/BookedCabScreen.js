@@ -599,35 +599,30 @@ export default function BookedCabScreen(props) {
 
     const confirmModal = () => {
         return (
-            <Modal
-                animationType="none"
-                transparent={true}
+            <WaygoDialog
                 visible={confirmModalVisible}
-                onRequestClose={() => {
-                    setConfirmModalVisible(false);
-                }}>
-                <View style={{ flex: 1, backgroundColor: colors.BACKGROUND, justifyContent: 'center', alignItems: 'center' }}>
-                    <View style={{ width: width - 70, borderRadius: 10, flex: 1, maxHeight: 280, marginTop: 15, backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE, alignItems: 'center' }}>
-                        <Ionicons name="checkmark-circle" size={130} color={colors.GREEN} style={{ marginTop: 10, }} />
-                        <Text style={{ fontSize: 25, fontFamily:fonts.Bold, marginTop: -10, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{t('booking_successful')}</Text>
-                        <Text style={{ fontSize: 16, marginTop: 10,fontFamily:fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>{t('booking_confirm')}</Text>
-                        <View style={{ position: 'absolute', bottom: 20, alignSelf: 'center' }}>
+                onClose={confirmModalClose}
+                title={t('booking_requested_success_title')}
+                icon="checkmark-circle"
+                iconColor={colors.GREEN}
+                type="info"
+                showButtons={false}
+                customContent={(
+                    <View>
+                        <Text style={{ fontSize: 14, fontFamily: fonts.Regular, color: mode === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)', textAlign: 'center', marginTop: 6 }}>
+                            {t('booking_requested_success_body')}
+                        </Text>
+                        <View style={{ marginTop: 18 }}>
                             <Button
                                 title={t('done')}
-                                loading={false}
-                                loadingProps={{ size: "large", }}
-                                titleStyle={{ fontFamily:fonts.Bold }}
-                                onPress={() => confirmModalClose()}
-                                buttonStyle={{ width: 100, backgroundColor: colors.GREEN }}
-                                containerStyle={{ marginTop: 15 }}
+                                titleStyle={{ fontFamily: fonts.Bold }}
+                                onPress={confirmModalClose}
+                                buttonStyle={{ height: 44, borderRadius: 10, backgroundColor: colors.GREEN }}
                             />
                         </View>
-
                     </View>
-
-                    
-                </View>
-            </Modal>
+                )}
+            />
         )
     }
 
@@ -1640,13 +1635,13 @@ export default function BookedCabScreen(props) {
                             />
                         </View>
                         <Text style={{ fontSize: 18, fontFamily: fonts.Bold, textAlign: 'center', color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginBottom: 8 }}>{t('addtip')}</Text>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             {tipOptions.map((percent, idx) => {
                                 const fare = curBooking?.trip_cost ? parseFloat(curBooking.trip_cost) : 0;
                                 const tipAmount = parseFloat((fare * (percent / 100)).toFixed(settings?.decimal || 2));
                                 const isSelected = selectedTipPercent === percent;
                                 return (
-                                    <TouchableOpacity key={idx} onPress={() => setSelectedTipPercent(percent)} style={{ width: '30%', height: 42, borderRadius: 10, borderWidth: 1, borderColor: isSelected ? 'transparent' : '#CBD5DC', backgroundColor: isSelected ? '#F3BE12' : colors.WHITE, alignItems: 'center', justifyContent: 'center' }}>
+                                    <TouchableOpacity key={idx} onPress={() => setSelectedTipPercent(percent)} style={{ width: '48%', height: 42, borderRadius: 10, borderWidth: 1, borderColor: isSelected ? 'transparent' : '#CBD5DC', backgroundColor: isSelected ? '#F3BE12' : colors.WHITE, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
                                         <Text style={{ fontFamily: fonts.Bold, fontSize: 14, color: colors.BLACK }}>
                                             {`${percent}% `}
                                             {settings?.swipe_symbol === false

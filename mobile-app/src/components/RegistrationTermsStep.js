@@ -98,7 +98,7 @@ export default function RegistrationTermsStep({ onTermsAccepted, mode: propMode,
                             ios_backgroundColor="#CCCCCC"
                         />
                         <Text style={[styles.toggleText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                            {t('accept_terms_confirmation') || 'Al seleccionar acepto a continuación, confirmo que revisé y acepto los términos y condiciones'}
+                            {t('accept_terms_confirmation') + t('term_condition')}
                         </Text>
                     </View>
                 </View>

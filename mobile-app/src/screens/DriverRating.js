@@ -11,7 +11,6 @@ import {
     TextInput,
     KeyboardAvoidingView,
     Platform,
-    FlatList,
     Alert,
     useColorScheme,
     Keyboard
@@ -265,13 +264,9 @@ export default function DriverRating(props) {
                                     {t('addtip')}
                                 </Text>
                                 <View style={styles.quickMoneyContainer}>
-                                    <FlatList
-                                        keyExtractor={(item, index) => index.toString()}
-                                        data={tipAmount}
-                                        renderItem={newData}
-                                        horizontal={true}
-                                        showsHorizontalScrollIndicator={false}
-                                    />
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                                        {tipAmount.map((item, index) => newData({ item, index }))}
+                                    </View>
                                 </View>
                                 <View style={{alignItems: 'center',flexDirection:isRTL?'row-reverse':'row',justifyContent:'center'}}>
                                     <Text style={[styles.walletbalText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('wallet_balance')} </Text>
@@ -407,10 +402,10 @@ const styles = StyleSheet.create({
       },
       boxView: {
         height: 35,
-        width: 70,
+        width: '48%',
         justifyContent: 'center',
         alignItems: 'center',
-        marginHorizontal:5
+        marginBottom: 10
       },
       quckMoneyText: {
         fontSize: 16,

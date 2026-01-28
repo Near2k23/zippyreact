@@ -6,6 +6,9 @@ import i18n from 'i18n-js';
 import { api } from 'common';
 import { updateLicenseImage, updateProfileImage } from 'common/src/actions/usersactions';
 import { updateProfile } from 'common/src/actions/authactions';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { firebase } from 'common/src/config/configureFirebase';
+import { get } from 'firebase/database';
 
 export default function RegistrationPage(props) {
   const {
@@ -19,6 +22,40 @@ export default function RegistrationPage(props) {
   const { t } = i18n;
 
     const dispatch = useDispatch()
+    
+    const waitForUserProfile = async (uid, maxAttempts = 10, delayMs = 500) => {
+        const { singleUserRef } = firebase;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+                const snapshot = await get(singleUserRef(uid));
+                if (snapshot.exists() && snapshot.val()) {
+                    return true;
+                }
+            } catch (error) {
+            }
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+        return false;
+    };
+    
+    const authenticateUserSafely = async (email, password, uid) => {
+        try {
+            const currentUser = firebase.auth.currentUser;
+            
+            if (currentUser && currentUser.uid === uid) {
+                return true;
+            }
+            
+            const profileReady = await waitForUserProfile(uid);
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            
+            await signInWithEmailAndPassword(firebase.auth, email, password);
+            return true;
+        } catch (authError) {
+            return false;
+        }
+    };
     
     const uploadImagesAndUpdateProfile = async (uid, regData) => {
         try {
@@ -53,13 +90,18 @@ export default function RegistrationPage(props) {
                 await update(singleUserRef(uid), updateData);
             }
         } catch (error) {
-            console.error('Error uploading images:', error);
         }
     };
     
     const clickRegister = async (regData) => {
     setLoading(true);
-    checkUserExists(regData).then((res)=>{
+    const verifyIdImageBlob = regData.verifyIdImage;
+    const profileImageBlob = regData.profileImage;
+    const userPassword = regData.password;
+    const regDataWithoutBlobs = { ...regData };
+    delete regDataWithoutBlobs.verifyIdImage;
+    delete regDataWithoutBlobs.profileImage;
+    checkUserExists(regDataWithoutBlobs).then((res)=>{
       if(res.users && res.users.length>0){
         setLoading(false);
         Alert.alert(t('alert'),t('user_exists'));
@@ -70,7 +112,6 @@ export default function RegistrationPage(props) {
       }
       else{
         if (regData.referralId && regData.referralId.length > 0) {
-          
           validateReferer(regData.referralId).then((referralInfo)=>{
             const referrals = useduserReferral ?? [];
             for (let i = 0; i < referrals.length; i++) {
@@ -83,26 +124,28 @@ export default function RegistrationPage(props) {
                     setLoading(false)
                     return
                 }
-               
-               
             }
             if (referralInfo.uid) {
-                            mainSignUp({...regData, signupViaReferral: referralInfo.uid}).then(async (res)=>{
-                             
-                            dispatch(editreferral({email:regData.email,phone:regData.mobile},"Add"))
+                            mainSignUp({...regDataWithoutBlobs, signupViaReferral: referralInfo.uid}).then(async (res)=>{
+                            dispatch(editreferral({email:regDataWithoutBlobs.email,phone:regDataWithoutBlobs.mobile},"Add"))
                 setLoading(false);
                 if(res.uid){
-                  await uploadImagesAndUpdateProfile(res.uid, regData);
+                  await authenticateUserSafely(regDataWithoutBlobs.email, userPassword, res.uid);
+                  await uploadImagesAndUpdateProfile(res.uid, { verifyIdImage: verifyIdImageBlob, profileImage: profileImageBlob, term: regData.term, biometricEnabled: regData.biometricEnabled });
                   Alert.alert(
                     t('alert'),
                     t('account_create_successfully'),
                     [
-                        {
-                            text: t('ok'), 
-                            onPress: () => {
-                             props. navigation.goBack();
-                            }
-                        },
+                    {
+                        text: t('ok'), 
+                        onPress: () => {
+                          if (props.navigation.canGoBack()) {
+                            props.navigation.goBack();
+                          } else {
+                            props.navigation.navigate('TabRoot');
+                          }
+                        }
+                    },
                     ],
                     { cancelable: false },
                   );
@@ -134,7 +177,6 @@ export default function RegistrationPage(props) {
                     }
                   }
                   Alert.alert(t('alert'), errorMessage);
-                  console.log('🔐 AUTH DEBUG - Error en mainSignUp:', res.error);
                 }
               })
             }else{
@@ -146,20 +188,25 @@ export default function RegistrationPage(props) {
             Alert.alert(t('alert'),t('referer_not_found'))
           });
         } else {
-          mainSignUp(regData).then(async (res)=>{
+          mainSignUp(regDataWithoutBlobs).then(async (res)=>{
                         setLoading(false);
             if(res.uid){
-                            await uploadImagesAndUpdateProfile(res.uid, regData);
+                            await authenticateUserSafely(regDataWithoutBlobs.email, userPassword, res.uid);
+                            await uploadImagesAndUpdateProfile(res.uid, { verifyIdImage: verifyIdImageBlob, profileImage: profileImageBlob, term: regData.term, biometricEnabled: regData.biometricEnabled });
                             Alert.alert(
                   t('alert'),
                   t('account_create_successfully'),
                   [
-                      {
-                          text: t('ok'), 
-                          onPress: () => {
-                            props.navigation.goBack();
-                          }
-                      },
+                  {
+                      text: t('ok'), 
+                      onPress: () => {
+                        if (props.navigation.canGoBack()) {
+                          props.navigation.goBack();
+                        } else {
+                          props.navigation.navigate('TabRoot');
+                        }
+                      }
+                  },
                   ],
                   { cancelable: false },
               );
@@ -191,7 +238,6 @@ export default function RegistrationPage(props) {
                 }
               }
               Alert.alert(t('alert'), errorMessage);
-              console.log('🔐 AUTH DEBUG - Error en mainSignUp:', res.error);
             }
           })
         }
@@ -202,7 +248,10 @@ export default function RegistrationPage(props) {
   return (
     <View style={styles.containerView}>
       <Registration
-        onPressRegister={(regData) => clickRegister(regData)}
+        onPressRegister={(regData) => {
+          if (loading) return;
+          clickRegister(regData);
+        }}
         onPressBack={() => { props.navigation.goBack() }}
         loading={loading}
         >

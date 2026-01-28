@@ -369,6 +369,7 @@ async function validateSignupData(config, userData, appSettings) {
   if (userData.currency_code) userProfile.currency_code = userData.currency_code;
   if (userData.swipe_symbol) userProfile.swipe_symbol = userData.swipe_symbol;
   if (userData.symbol) userProfile.symbol = userData.symbol;
+  if (userData.term === true) userProfile.term = true;
   if (userData.socialSecurity !== undefined && userData.socialSecurity !== null && userData.socialSecurity !== '') {
     userProfile.socialSecurity = userData.socialSecurity;
   }

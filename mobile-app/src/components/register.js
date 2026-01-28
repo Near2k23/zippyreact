@@ -343,10 +343,14 @@ export default function Registration(props) {
             if (state.usertype === 'driver') {
                 setCurrentStep(4);
             } else {
-                setCurrentStep(6);
+                setCurrentStep(4);
             }
         } else if (currentStep === 4) {
-            setCurrentStep(5);
+            if (state.usertype === 'driver') {
+                setCurrentStep(5);
+            } else {
+                handleFinalSubmit();
+            }
         } else if (currentStep === 5) {
             setCurrentStep(6);
         } else if (currentStep === 6) {
@@ -418,7 +422,7 @@ export default function Registration(props) {
             case 3:
                 return t('security');
             case 4:
-                return t('upload_documents');
+                return state.usertype === 'driver' ? t('upload_documents') : t('term_condition');
             case 5:
                 return t('enable_biometric');
             case 6:
@@ -449,9 +453,6 @@ export default function Registration(props) {
         const match = value.match(/\(\+(\d+)\)/);
         return match && match[1] ? `+${match[1]}` : '';
     }
-
-    // const lCom = { icon: 'ios-arrow-back', type: 'ionicon', color: colors.WHITE, size: 35, component: TouchableWithoutFeedback, onPress: props.onPressBack };
-    // const rCom = { icon: 'ios-arrow-forward', type: 'ionicon', color: colors.WHITE, size: 35, component: TouchableWithoutFeedback, onPress: props.onPressBack };
 
     return (
         <View style={{ flex: 1, }}>
@@ -851,38 +852,71 @@ export default function Registration(props) {
                             </Animated.View>
                         </KeyboardAvoidingView>
                     ) : currentStep === 4 ? (
-                        <View style={{ flex: 1 }}>
-                            <RegistrationDocumentStep
-                                documentImage={documentImage}
-                                selfieImage={selfieImage}
-                                onDocumentImageChange={handleDocumentImageChange}
-                                onSelfieImageChange={handleSelfieImageChange}
-                                mode={mode}
-                            />
-                            <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 }}>
-                                <TouchableOpacity 
-                                    style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
-                                    onPress={handleBack}
-                                >
-                                    <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
-                                        {t('back') || 'Volver'}
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity 
-                                    style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
-                                    onPress={handleNext}
-                                    activeOpacity={0.8}
-                                >
-                                    {loading ? (
-                                        <ActivityIndicator color={colors.WHITE} />
-                                    ) : (
-                                        <Text style={styles.loginButtonText}>
-                                            {t('next') || 'Siguiente'}
+                        state.usertype === 'driver' ? (
+                            <View style={{ flex: 1 }}>
+                                <RegistrationDocumentStep
+                                    documentImage={documentImage}
+                                    selfieImage={selfieImage}
+                                    onDocumentImageChange={handleDocumentImageChange}
+                                    onSelfieImageChange={handleSelfieImageChange}
+                                    mode={mode}
+                                />
+                                <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 }}>
+                                    <TouchableOpacity 
+                                        style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                        onPress={handleBack}
+                                    >
+                                        <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                            {t('back') || 'Volver'}
                                         </Text>
-                                    )}
-                                </TouchableOpacity>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                        onPress={handleNext}
+                                        activeOpacity={0.8}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator color={colors.WHITE} />
+                                        ) : (
+                                            <Text style={styles.loginButtonText}>
+                                                {t('next') || 'Siguiente'}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
                             </View>
-                        </View>
+                        ) : (
+                            <View style={{ flex: 1 }}>
+                                <RegistrationTermsStep
+                                    onContinue={handleNext}
+                                    onTermsAccepted={setTermsAccepted}
+                                    mode={mode}
+                                />
+                                <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 20, paddingBottom: 20, paddingTop: 10 }}>
+                                    <TouchableOpacity 
+                                        style={[styles.loginRegisterButton, { width: 'auto', paddingHorizontal: 20, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE, borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                        onPress={handleBack}
+                                    >
+                                        <Text style={[styles.loginRegisterButtonText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}>
+                                            {t('back') || 'Volver'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.loginButton, { flex: 1, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
+                                        onPress={handleNext}
+                                        activeOpacity={0.8}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator color={colors.WHITE} />
+                                        ) : (
+                                            <Text style={styles.loginButtonText}>
+                                                {t('register_button') || 'Registrarse'}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        )
                     ) : currentStep === 5 ? (
                         <View style={{ flex: 1 }}>
                             <RegistrationBiometricStep
