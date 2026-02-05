@@ -41,6 +41,17 @@ const useStyles = makeStyles((theme) => ({
     background: `linear-gradient(135deg, ${colors.WHITE} 0%, ${SECONDORY_COLOR} 100%)`,
     minHeight: "100vh",
     padding: theme.spacing(2),
+    width: "100%",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
+    overflowX: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    [theme.breakpoints.down("sm")]: {
+      padding: 0,
+      alignItems: "stretch",
+    },
   },
   documentCard: {
     borderRadius: "24px",
@@ -49,9 +60,17 @@ const useStyles = makeStyles((theme) => ({
     border: `1px solid ${colors.TABLE_BORDER}`,
     overflow: "hidden",
     transition: "all 0.3s ease",
+    width: "100%",
+    maxWidth: "100%",
+    boxSizing: "border-box",
     "&:hover": {
       boxShadow: "0 25px 50px rgba(0, 141, 153, 0.15)",
       transform: "translateY(-2px)",
+    },
+    [theme.breakpoints.down("sm")]: {
+      borderRadius: 0,
+      borderLeft: "none",
+      borderRight: "none",
     },
   },
   imageCard: {
@@ -75,6 +94,12 @@ const useStyles = makeStyles((theme) => ({
     },
     "&:hover .zoom-overlay": {
       opacity: 1,
+    },
+    [theme.breakpoints.down("sm")]: {
+      margin: 0,
+      padding: theme.spacing(1),
+      height: 300,
+      borderRadius: "16px",
     },
   },
   imageContainer: {
@@ -130,12 +155,20 @@ const useStyles = makeStyles((theme) => ({
       transform: "scale(1.1) rotate(5deg)",
       color: MAIN_COLOR,
     },
+    [theme.breakpoints.down("sm")]: {
+      height: 200,
+      borderRadius: "16px",
+    },
   },
   uploadIcon: {
     fontSize: 80,
     color: colors.TABLE_BORDER,
     marginBottom: theme.spacing(2),
     transition: "all 0.3s ease",
+    [theme.breakpoints.down("sm")]: {
+      fontSize: 50,
+      marginBottom: theme.spacing(1),
+    },
   },
   buttonStyle: {
     borderRadius: "25px",
@@ -215,6 +248,11 @@ const useStyles = makeStyles((theme) => ({
       boxShadow: "0 8px 30px rgba(0, 141, 153, 0.15)",
       transform: "translateY(-2px)",
     },
+    [theme.breakpoints.down("sm")]: {
+      padding: theme.spacing(1.5),
+      margin: 0,
+      marginBottom: theme.spacing(2),
+    },
   },
 }));
 
@@ -247,6 +285,7 @@ function UserDocuments() {
   // Estado para gestión de documentos - usando useRef para evitar re-renders
   const documentStatusesRef = useRef({
     verifyIdImage: { status: 'pending', note: '' },
+    selfieImg: { status: 'pending', note: '' },
     licenseImageFront: { status: 'pending', note: '' },
     licenseImageBack: { status: 'pending', note: '' },
     vehicleRegistrationCard: { status: 'pending', note: '' }
@@ -255,7 +294,6 @@ function UserDocuments() {
   const adminNotesRef = useRef('');
   const [forceUpdate, setForceUpdate] = useState(0);
   
-  // Estado local para los campos de notas generales
   const [localDriverNotes, setLocalDriverNotes] = useState('');
   const [localAdminNotes, setLocalAdminNotes] = useState('');
 
@@ -270,17 +308,14 @@ function UserDocuments() {
         navigate("/404");
       } else {
         setData(user);
-        // Cargar estados de documentos existentes
         if (user.documentStatus) {
           documentStatusesRef.current = user.documentStatus;
         }
         driverNotesRef.current = user.driver_notes || '';
         adminNotesRef.current = user.admin_notes || '';
-        
-        // Sincronizar estado local con las refs
         setLocalDriverNotes(user.driver_notes || '');
         setLocalAdminNotes(user.admin_notes || '');
-        setForceUpdate(prev => prev + 1); // Forzar re-render para mostrar datos cargados
+        setForceUpdate(prev => prev + 1);
       }
     }
   }, [staticusers, id, navigate]);
@@ -289,7 +324,6 @@ function UserDocuments() {
     setImages(prev => ({ ...prev, [field]: e.target.files[0] }));
   }, []);
 
-  // Funciones para manejar cambios de estado sin causar re-renders
   const handleStatusChange = useCallback((docType, field, value) => {
     documentStatusesRef.current = {
       ...documentStatusesRef.current,
@@ -312,7 +346,6 @@ function UserDocuments() {
     adminNotesRef.current = value;
   }, []);
 
-  // Funciones helper para colores y textos
   const getStatusColor = useCallback((status) => {
     switch(status) {
       case 'approved': return 'success';
@@ -363,20 +396,15 @@ function UserDocuments() {
 
   const handleSaveDocumentStatuses = useCallback(async () => {
     setLoading(true);
-    
     const updateData = {
       documentStatus: documentStatusesRef.current,
       driver_notes: driverNotesRef.current,
       admin_notes: adminNotesRef.current
     };
-    
-    // Verificar si algún documento fue rechazado para enviar notificación
     const rejectedDocs = Object.entries(documentStatusesRef.current).filter(
-      ([key, val]) => val.status === 'rejected'
+      ([, val]) => val.status === 'rejected'
     );
-    
     await dispatch(updateUserDocumentStatus(data.id, updateData, rejectedDocs.length > 0));
-    
     setLoading(false);
     setCommonAlert({ open: true, msg: t('document_status_updated') });
   }, [data.id, dispatch, t]);
@@ -441,6 +469,7 @@ function UserDocuments() {
 
   const commonFields = [
     { title: t("verifyid_image"), imageUrl: data?.verifyIdImage, placeholder: t("verifyid_image"), field: "verifyIdImage" },
+    { title: t("selfie_image") || "Selfie", imageUrl: data?.selfieImg, placeholder: t("selfie_image") || "Selfie", field: "selfieImg" },
   ];
 
   const driverFields = [
@@ -451,12 +480,10 @@ function UserDocuments() {
 
   const imageFields = data.usertype === "driver" ? [...commonFields, ...driverFields] : commonFields;
 
-  // Componente simple para gestión de estado de documento
   const DocumentStatusCard = ({ docType, title, imageUrl }) => {
     const [localStatus, setLocalStatus] = useState(documentStatusesRef.current[docType]?.status || 'pending');
     const [localNote, setLocalNote] = useState(documentStatusesRef.current[docType]?.note || '');
     
-    // Sincronizar con la ref cuando cambie
     useEffect(() => {
       const currentStatus = documentStatusesRef.current[docType] || { status: 'pending', note: '' };
       setLocalStatus(currentStatus.status);
@@ -479,10 +506,7 @@ function UserDocuments() {
           {title}
         </Typography>
         
-        {/* Imagen del documento */}
-        <ImageCard imageUrl={imageUrl} title={title} />
-        
-        {/* Selector de estado */}
+        <ImageCard imageUrl={imageUrl} title={title} showTitle={false} />
         <FormControl fullWidth sx={{ mt: 2 }}>
           <InputLabel id={`${docType}-status-label`}>{t('status')}</InputLabel>
           <Select
@@ -498,7 +522,6 @@ function UserDocuments() {
           </Select>
         </FormControl>
         
-        {/* Campo de nota */}
         <TextField
           fullWidth
           multiline
@@ -538,6 +561,7 @@ function UserDocuments() {
             alt={altText} 
             style={{ 
               width: "100%", 
+              maxWidth: "100%",
               height: "100%", 
               borderRadius: "16px",
               objectFit: "cover"
@@ -566,25 +590,27 @@ function UserDocuments() {
     </Card>
   );
 
-  const ImageCard = ({ title, imageUrl, placeholder, onClick }) => (
+  const ImageCard = ({ title, imageUrl, placeholder, onClick, showTitle = true }) => (
     <Card className={classes.imageCard} onClick={imageUrl ? () => handleImagePreview(imageUrl, title) : onClick}>
-      <Typography 
-        variant="h6" 
-        sx={{ 
-          textAlign: "center", 
-          fontSize: 18, 
-          fontWeight: 600, 
-          fontFamily: FONT_FAMILY,
-          marginBottom: 2,
-          color: MAIN_COLOR,
-          minHeight: 40,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center"
-        }}
-      >
-        {title}
-      </Typography>
+      {showTitle && (
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            textAlign: "center", 
+            fontSize: 18, 
+            fontWeight: 600, 
+            fontFamily: FONT_FAMILY,
+            marginBottom: 2,
+            color: MAIN_COLOR,
+            minHeight: 40,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}
+        >
+          {title}
+        </Typography>
+      )}
       {imageUrl ? (
         <div className={classes.imageContainer} style={{ flex: 1 }}>
           <img 
@@ -592,6 +618,7 @@ function UserDocuments() {
             alt={title} 
             style={{ 
               width: "100%", 
+              maxWidth: "100%",
               height: "100%", 
               borderRadius: "16px",
               objectFit: "cover"
@@ -710,21 +737,21 @@ function UserDocuments() {
     <CircularLoading />
   ) : (
     <Box className={classes.mainContainer}>
-      <Card className={classes.documentCard} sx={{ margin: 2, padding: 3 }}>
-        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: isRTL === "rtl" ? "flex-end" : "flex-start", marginBottom: 3 }}>
+      <Card className={classes.documentCard} sx={{ margin: { xs: 0, sm: 2 }, padding: { xs: 1.5, sm: 3 }, maxWidth: "100%", borderRadius: { xs: 0, sm: "24px" } }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: isRTL === "rtl" ? "flex-end" : "flex-start", gap: 2, marginBottom: data.usertype === "driver" ? 3 : 0 }}>
           <GoBackButton isRTL={isRTL} onClick={() => navigate(`/users/${rId}`, { state: { pageNo: state?.pageNo } })} />
-        </Box>
-        
-        {/* Gestión de Estados de Documentos - Solo para conductores */}
-        {data.usertype === "driver" ? (
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 600, color: MAIN_COLOR, textAlign: 'center' }}>
+          {data.usertype === "driver" && (
+            <Typography variant="h5" sx={{ fontWeight: 600, color: MAIN_COLOR }}>
               {t('status')}
             </Typography>
+          )}
+        </Box>
+        
+        {data.usertype === "driver" ? (
+          <Box sx={{ mt: 2 }}>
             
-            <Grid container spacing={3}>
-              {/* ID/Passport */}
-              <Grid item xs={12} md={4}>
+            <Grid container spacing={{ xs: 1, sm: 2, md: 3 }}>
+              <Grid item xs={12} sm={6} md={4}>
                 <DocumentStatusCard
                   docType="verifyIdImage"
                   title={t("verifyid_image")}
@@ -732,8 +759,15 @@ function UserDocuments() {
                 />
               </Grid>
               
-              {/* Licencia Frente */}
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} sm={6} md={4}>
+                <DocumentStatusCard
+                  docType="selfieImg"
+                  title={t("selfie_image") || "Selfie"}
+                  imageUrl={data?.selfieImg}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={4}>
                 <DocumentStatusCard
                   docType="licenseImageFront"
                   title={t("license_image_front")}
@@ -741,8 +775,7 @@ function UserDocuments() {
                 />
               </Grid>
               
-              {/* Licencia Reverso */}
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} sm={6} md={4}>
                 <DocumentStatusCard
                   docType="licenseImageBack"
                   title={t("license_image_back")}
@@ -750,8 +783,7 @@ function UserDocuments() {
                 />
               </Grid>
               
-              {/* Tarjeta de Propiedad */}
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} sm={6} md={4}>
                 <DocumentStatusCard
                   docType="vehicleRegistrationCard"
                   title={t("vehicle_registration_card_image")}
@@ -759,8 +791,6 @@ function UserDocuments() {
                 />
               </Grid>
             </Grid>
-
-            {/* Campos de notas generales */}
             <Box sx={{ mt: 4 }}>
               <TextField
                 fullWidth
@@ -784,8 +814,7 @@ function UserDocuments() {
 
           </Box>
         ) : (
-          /* Para usuarios no conductores, mostrar solo documentos básicos */
-          <Grid container spacing={3} justifyContent="center" alignItems="stretch" sx={{ marginY: 2 }}>
+          <Grid container spacing={{ xs: 1, sm: 2, md: 3 }} justifyContent="center" alignItems="stretch" sx={{ marginY: { xs: 1, sm: 2 } }}>
             {editable ? (
               imageFields?.map((field, index) => (
                 <Grid item xs={12} sm={6} md={4} key={index}>

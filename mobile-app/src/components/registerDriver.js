@@ -428,7 +428,7 @@ export default function RegistrationDriver(props) {
         const userData = { 
             ...state,
             verifyIdImage: documentImageBlob,
-            profileImage: selfieImageBlob,
+            selfieImg: selfieImageBlob,
             biometricEnabled: biometricEnabled,
             term: termsAccepted,
             backgroundCheckAccepted: backgroundCheckAccepted
@@ -443,9 +443,9 @@ export default function RegistrationDriver(props) {
             hasVerifyIdImage: !!userData.verifyIdImage,
             verifyIdImageType: userData.verifyIdImage?.constructor?.name,
             verifyIdImageSize: userData.verifyIdImage?.size,
-            hasProfileImage: !!userData.profileImage,
-            profileImageType: userData.profileImage?.constructor?.name,
-            profileImageSize: userData.profileImage?.size,
+            hasSelfieImg: !!userData.selfieImg,
+            selfieImgType: userData.selfieImg?.constructor?.name,
+            selfieImgSize: userData.selfieImg?.size,
             documentImageUri: documentImage,
             selfieImageUri: selfieImage,
             userDataKeys: Object.keys(userData)

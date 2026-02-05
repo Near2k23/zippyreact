@@ -70,10 +70,10 @@ export default function RegistrationDriverPage(props) {
                 updateData.verifyIdImage = verifyIdImageUrl;
             }
             
-            if (regData.profileImage) {
-                await uploadBytesResumable(profileImageRef(uid), regData.profileImage);
-                const profileImageUrl = await getDownloadURL(profileImageRef(uid));
-                updateData.profile_image = profileImageUrl;
+            if (regData.selfieImg) {
+                await uploadBytesResumable(profileImageRef(uid), regData.selfieImg);
+                const selfieUrl = await getDownloadURL(profileImageRef(uid));
+                updateData.selfieImg = selfieUrl;
             }
             
             if (regData.term !== undefined) {
@@ -95,11 +95,11 @@ export default function RegistrationDriverPage(props) {
     setLoading(true);
     
     const verifyIdImageBlob = regData.verifyIdImage;
-    const profileImageBlob = regData.profileImage;
+    const selfieBlob = regData.selfieImg;
     const userPassword = regData.password;
     const regDataWithoutBlobs = { ...regData };
     delete regDataWithoutBlobs.verifyIdImage;
-    delete regDataWithoutBlobs.profileImage;
+    delete regDataWithoutBlobs.selfieImg;
     
     checkUserExists(regDataWithoutBlobs).then((res)=>{
       if(res.users && res.users.length>0){
@@ -138,7 +138,7 @@ export default function RegistrationDriverPage(props) {
                 if(res.uid){
                   await authenticateUserSafely(regDataWithoutBlobs.email, userPassword, res.uid);
                   
-                  await uploadImagesAndUpdateProfile(res.uid, { verifyIdImage: verifyIdImageBlob, profileImage: profileImageBlob, term: regData.term, biometricEnabled: regData.biometricEnabled });
+                  await uploadImagesAndUpdateProfile(res.uid, { verifyIdImage: verifyIdImageBlob, selfieImg: selfieBlob, term: regData.term, biometricEnabled: regData.biometricEnabled });
                   Alert.alert(
                     t('alert'),
                     t('account_create_successfully'),
@@ -200,7 +200,7 @@ export default function RegistrationDriverPage(props) {
             if(res.uid){
                             await authenticateUserSafely(regDataWithoutBlobs.email, userPassword, res.uid);
                             
-                            await uploadImagesAndUpdateProfile(res.uid, { verifyIdImage: verifyIdImageBlob, profileImage: profileImageBlob, term: regData.term, biometricEnabled: regData.biometricEnabled });
+                            await uploadImagesAndUpdateProfile(res.uid, { verifyIdImage: verifyIdImageBlob, selfieImg: selfieBlob, term: regData.term, biometricEnabled: regData.biometricEnabled });
                             Alert.alert(
                   t('alert'),
                   t('account_create_successfully'),

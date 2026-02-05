@@ -1016,9 +1016,9 @@ exports.user_signup = onRequest(async (request, response) => {
         console.log('REGISTRO SERVIDOR - User details recibidos:', {
             userDetailsKeys: Object.keys(userDetails),
             hasVerifyIdImage: 'verifyIdImage' in userDetails,
-            hasProfileImage: 'profileImage' in userDetails,
+            hasProfileImageOrSelfie: ('profileImage' in userDetails) || ('selfieImg' in userDetails),
             verifyIdImageType: userDetails.verifyIdImage && userDetails.verifyIdImage.constructor ? userDetails.verifyIdImage.constructor.name : null,
-            profileImageType: userDetails.profileImage && userDetails.profileImage.constructor ? userDetails.profileImage.constructor.name : null,
+            selfieImgType: userDetails.selfieImg && userDetails.selfieImg.constructor ? userDetails.selfieImg.constructor.name : null,
             userDetailsPreview: JSON.stringify(userDetails, null, 2).substring(0, 1000)
         });
         console.log('SIGNUP DEBUG - Settings:', JSON.stringify(settings, null, 2));
@@ -1027,7 +1027,7 @@ exports.user_signup = onRequest(async (request, response) => {
         console.log('REGISTRO SERVIDOR - RegData después de validateSignupData:', {
             regDataKeys: Object.keys(regData),
             hasVerifyIdImage: 'verifyIdImage' in regData,
-            hasProfileImage: 'profileImage' in regData,
+            hasSelfieImg: 'selfieImg' in regData,
             regDataPreview: JSON.stringify(regData, null, 2).substring(0, 1000)
         });
 
