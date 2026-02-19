@@ -25,6 +25,7 @@ import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
 import { fonts } from '../common/font';
 import DownloadReceipt from '../components/DownloadReceipt';
 import { getLangKey } from 'common/src/other/getLangKey';
+import { getVehicleColorByKey } from 'common/src/other/VehicleColors';
 import customMapStyle from "../common/mapTheme.json";
 
 const { width } = Dimensions.get('window');
@@ -65,6 +66,7 @@ export default function RideDetails(props) {
 
     useEffect(() => {
         setRole(auth.profile?.usertype || null);
+        console.log('paramData', paramData);
     }, [auth.profile]);
 
     useEffect(() => {
@@ -139,7 +141,7 @@ export default function RideDetails(props) {
                 >
                     <Image source={require("../../assets/images/green_pin.png")} style={styles.markerImage} />
                 </Marker>
-                
+
                 {paramData.waypoints?.map((point, index) => (
                     <Marker
                         key={index}
@@ -150,7 +152,7 @@ export default function RideDetails(props) {
                         <Image source={require("../../assets/images/rsz_2red_pin.png")} style={styles.markerImage} />
                     </Marker>
                 ))}
-                
+
                 <Marker
                     coordinate={{ latitude: paramData.drop.lat, longitude: paramData.drop.lng }}
                     title={t('marker_title_2')}
@@ -158,7 +160,7 @@ export default function RideDetails(props) {
                 >
                     <Image source={require("../../assets/images/rsz_2red_pin.png")} style={styles.markerImage} />
                 </Marker>
-                
+
                 {paramData.coords && (
                     <Polyline
                         coordinates={paramData.coords}
@@ -180,7 +182,7 @@ export default function RideDetails(props) {
                         borderColor: mainColor,
                         backgroundColor: cardBackgroundColor
                     }]}>
-                        <View style={[styles.locationDot, { 
+                        <View style={[styles.locationDot, {
                             backgroundColor: mainColor
                         }]} />
                     </View>
@@ -194,7 +196,7 @@ export default function RideDetails(props) {
                     ))}
                     <View style={[styles.dashedLine, { borderColor: isDark ? colors.WHITE : colors.SHADOW }]} />
                     <View style={[styles.locationIcon, { backgroundColor: cardBackgroundColor }]}>
-                        <Ionicons 
+                        <Ionicons
                             name="location"
                             size={10}
                             color={colors.RED}
@@ -225,7 +227,7 @@ export default function RideDetails(props) {
     const TripInfoCard = () => (
         <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
             <Text style={[styles.sectionTitle, { color: textColor }]}>{t('trip_information')}</Text>
-            
+
             <View style={[styles.vehicleDetails, { flexDirection: isRTL ? 'row-reverse' : 'row', marginBottom: 20 }]}>
                 <View style={styles.vehicleDetailItem}>
                     <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('trip_cost')}</Text>
@@ -239,14 +241,14 @@ export default function RideDetails(props) {
                             )}
                     </Text>
                 </View>
-                
+
                 <View style={styles.vehicleDetailItem}>
                     <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('distance')}</Text>
                     <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
                         {parseFloat(paramData?.distance || 0).toFixed(settings.decimal)} {settings?.convert_to_mile ? t("mile") : t("km")}
                     </Text>
                 </View>
-                
+
                 <View style={styles.vehicleDetailItem}>
                     <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('duration')}</Text>
                     <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
@@ -254,16 +256,16 @@ export default function RideDetails(props) {
                     </Text>
                 </View>
             </View>
-            
+
             <View style={[styles.statusContainer, { backgroundColor: mainColor, padding: 12, borderRadius: 8, marginBottom: 16 }]}>
-                 <Text style={[styles.statusText, { color: colors.WHITE, fontSize: 16, fontFamily: fonts.Bold }]}>
-                     {paramData?.reason ? t(getLangKey(paramData.reason)) : t(paramData.status).toUpperCase()}
-                 </Text>
-             </View>
-             
-             <Text style={[styles.bookingDate, { color: textColor, marginTop: 0, fontSize: 12, opacity: 0.7 }]}>
-                 {t('booking_date')} - {moment(paramData.bookingDate).format('lll')}
-             </Text>
+                <Text style={[styles.statusText, { color: colors.WHITE, fontSize: 16, fontFamily: fonts.Bold }]}>
+                    {paramData?.reason ? t(getLangKey(paramData.reason)) : t(paramData.status).toUpperCase()}
+                </Text>
+            </View>
+
+            <Text style={[styles.bookingDate, { color: textColor, marginTop: 0, fontSize: 12, opacity: 0.7 }]}>
+                {t('booking_date')} - {moment(paramData.bookingDate).format('lll')}
+            </Text>
         </View>
     );
 
@@ -272,7 +274,7 @@ export default function RideDetails(props) {
         const userName = isCustomer ? paramData.driver_name : paramData.customer_name;
         const userImage = isCustomer ? paramData.driver_image : paramData.customer_image;
         const userContact = isCustomer ? paramData.driver_contact : paramData.customer_contact;
-        
+
         if (!userName) return null;
 
         return (
@@ -286,7 +288,7 @@ export default function RideDetails(props) {
                         rounded
                         source={userImage ? { uri: userImage } : require('../../assets/images/profilePic.png')}
                     />
-                    
+
                     <View style={styles.userInfo}>
                         <Text style={[styles.userName, { color: textColor }]}>{userName}</Text>
                         {paramData.rating > 0 && isCustomer && (
@@ -298,11 +300,11 @@ export default function RideDetails(props) {
                                 emptyColor={mainColor}
                                 rating={Math.round(parseFloat(paramData.rating) * 2) / 2}
                                 style={isRTL ? { transform: [{ scaleX: -1 }] } : {}}
-                                onChange={() => {}}
+                                onChange={() => { }}
                             />
                         )}
                     </View>
-                    
+
                     {userContact && (
                         <View style={[styles.contactButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                             <TouchableOpacity
@@ -312,7 +314,7 @@ export default function RideDetails(props) {
                             >
                                 <Ionicons name="call" size={20} color={colors.WHITE} />
                             </TouchableOpacity>
-                            
+
                             <TouchableOpacity
                                 onPress={() => ['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'COMPLETE'].includes(paramData.status)
                                     ? onChatAction() : onChatAlert()}
@@ -333,7 +335,7 @@ export default function RideDetails(props) {
         return (
             <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
                 <Text style={[styles.sectionTitle, { color: textColor }]}>{t('car_details_title')}</Text>
-                
+
                 <View style={[styles.vehicleHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <View style={[styles.carImageContainer, { backgroundColor: `${mainColor}20` }]}>
                         <Image
@@ -343,7 +345,7 @@ export default function RideDetails(props) {
                     </View>
                     <Text style={[styles.carType, { color: textColor }]}>{t(getLangKey(paramData.carType))}</Text>
                 </View>
-                
+
                 <View style={[styles.vehicleDetails, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     {paramData.vehicleModel && (
                         <View style={styles.vehicleDetailItem}>
@@ -351,18 +353,28 @@ export default function RideDetails(props) {
                             <Text style={[styles.vehicleDetailValue, { color: textColor }]}>{paramData.vehicleModel}</Text>
                         </View>
                     )}
-                    
+
                     {paramData.vehicleMake && (
                         <View style={styles.vehicleDetailItem}>
                             <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('vehicle_make')}</Text>
                             <Text style={[styles.vehicleDetailValue, { color: textColor }]}>{paramData.vehicleMake}</Text>
                         </View>
                     )}
-                    
+
                     <View style={styles.vehicleDetailItem}>
-                        <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('vehicle_number')}</Text>
+                        <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('plate')}</Text>
                         <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
                             {paramData.vehicle_number || t('car_no_not_found')}
+                        </Text>
+                    </View>
+                    <View style={styles.vehicleDetailItem}>
+                        <Text style={[styles.vehicleDetailLabel, { color: textColor }]}>{t('color')}</Text>
+                        <Text style={[styles.vehicleDetailValue, { color: textColor }]}>
+                            {(() => {
+                                const colorKey = paramData.vehicleColor || paramData.car_color;
+                                const colorObj = colorKey ? getVehicleColorByKey(colorKey) : null;
+                                return colorObj ? t(colorObj.labelKey) : (colorKey || t('color_not_found'));
+                            })()}
                         </Text>
                     </View>
                 </View>
@@ -376,7 +388,7 @@ export default function RideDetails(props) {
         return (
             <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: isDark ? '#2C2C2E' : '#E2E9EC' }]}>
                 <Text style={[styles.sectionTitle, { color: textColor }]}>{t('bill_details_title')}</Text>
-                
+
                 {paramData.payment_mode && (
                     <View style={[styles.paymentMethodContainer, { marginBottom: 20 }]}>
                         <View style={[styles.paymentMethodItem, { backgroundColor: `${mainColor}10`, borderColor: mainColor }]}>
@@ -396,7 +408,7 @@ export default function RideDetails(props) {
                         </View>
                     </View>
                 )}
-                
+
                 <View style={[styles.billSummary, { marginBottom: 20 }]}>
                     <View style={styles.billSummaryItem}>
                         <Text style={[styles.billSummaryLabel, { color: textColor }]}>{t("your_trip")}</Text>
@@ -406,7 +418,7 @@ export default function RideDetails(props) {
                                 : `${settings.symbol} ${formatAmount(paramData.trip_cost, settings.decimal, settings.country)}`}
                         </Text>
                     </View>
-                    
+
                     {paramData?.discount > 0 && (
                         <View style={styles.billSummaryItem}>
                             <Text style={[styles.billSummaryLabel, { color: textColor }]}>{t('discount')}</Text>
@@ -416,7 +428,7 @@ export default function RideDetails(props) {
                         </View>
                     )}
                 </View>
-                
+
                 <View style={[styles.totalContainer, { backgroundColor: `${mainColor}08`, borderColor: mainColor }]}>
                     <Text style={[styles.totalLabel, { color: textColor }]}>{t("Customer_paid")}</Text>
                     <Text style={[styles.totalValue, { color: mainColor }]}>
@@ -425,7 +437,7 @@ export default function RideDetails(props) {
                             : `${settings.symbol} ${formatAmount(paramData?.customer_paid || 0, settings.decimal, settings.country)}`}
                     </Text>
                 </View>
-                
+
                 <View style={[styles.receiptContainer, { marginTop: 16 }]}>
                     <Text style={[styles.receiptLabel, { color: textColor }]}>{t("receipt")}</Text>
                     <DownloadReceipt booking={paramData} settings={settings} />
@@ -448,9 +460,9 @@ export default function RideDetails(props) {
     const shouldShowButton = () => {
         const customerStatuses = ['PAYMENT_PENDING', 'NEW', 'ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED', 'PENDING', 'PAID'];
         const driverStatuses = ['ACCEPTED', 'ARRIVED', 'STARTED', 'REACHED'];
-        
+
         return (auth.profile.usertype === 'customer' && customerStatuses.includes(paramData.status)) ||
-               (auth.profile.usertype === 'driver' && driverStatuses.includes(paramData.status));
+            (auth.profile.usertype === 'driver' && driverStatuses.includes(paramData.status));
     };
 
     const getButtonTitle = () => {
@@ -469,7 +481,7 @@ export default function RideDetails(props) {
                 <VehicleCard />
                 <BillCard />
                 <FeedbackCard />
-                
+
             </ScrollView>
             {shouldShowButton() && (
                 <Button

@@ -11,7 +11,7 @@ export default {
     ios: {
         associatedDomains: ['applinks:' + AppConfig.expo_slug + '.page.link'],
     },
-    runtimeVersion: "1.0.20",
+    runtimeVersion: AppConfig.ios_app_version,
     userInterfaceStyle: "automatic",
     platforms: [
         "ios",
@@ -96,10 +96,10 @@ export default {
             googleMapsApiKey: GoogleMapApiConfig.ios
         },
         googleServicesFile: "./GoogleService-Info.plist",
-        buildNumber: "1.0.20"
+        buildNumber: AppConfig.ios_app_version
     },
     android: {
-        package: AppConfig.app_identifier,
+        package: "com.tecnosoluciones.waygorides",
         versionCode: AppConfig.android_app_version,
         newArchEnabled: false,
         edgeToEdgeEnabled: false,

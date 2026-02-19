@@ -14,16 +14,17 @@ import Tooltip from "@mui/material/Tooltip";
 import { colors } from "../components/Theme/WebTheme";
 import moment from "moment/min/moment-with-locales";
 import Switch from "@mui/material/Switch";
-import { useNavigate,useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
-import {FONT_FAMILY, SECONDORY_COLOR } from "../common/sharedFunctions";
+import { FONT_FAMILY, SECONDORY_COLOR } from "../common/sharedFunctions";
 import { ThemeProvider } from '@mui/material/styles';
 import theme from "styles/tableStyle";
 // import BlankTable from '../components/Table/BlankTable';
 // import TableStyle from '../components/Table/Style';
 // import localization from '../components/Table/Localization';
 import { getLangKey } from "common/src/other/getLangKey";
+import { VEHICLE_COLORS, getVehicleColorByKey } from 'common/src/other/VehicleColors';
 import TableShadcn from '../components/ui/TableShadcn';
 import IconButton from '../components/ui/icon-button';
 import {
@@ -74,7 +75,7 @@ export default function CarsList() {
   const userdata = useSelector((state) => state.usersdata);
   const auth = useSelector((state) => state.auth);
   const cartypes = useSelector((state) => state.cartypes);
-  const { updateUserCar, editCar} = api;
+  const { updateUserCar, editCar } = api;
   const [driversObj, setDriversObj] = useState();
   const [data, setData] = useState([]);
   const carlistdata = useSelector((state) => state.carlistdata);
@@ -83,12 +84,12 @@ export default function CarsList() {
   const rootRef = useRef(null);
   const classes = useStyles();
   const [role, setRole] = useState(null);
-  const {state} = useLocation()
-  const [currentPage,setCurrentPage] = useState(null)
+  const { state } = useLocation()
+  const [currentPage, setCurrentPage] = useState(null)
 
-  useEffect(()=>{
+  useEffect(() => {
     setCurrentPage(state?.pageNo)
-  },[state])
+  }, [state])
 
   useEffect(() => {
     if (role !== "driver" && userdata.users) {
@@ -100,7 +101,7 @@ export default function CarsList() {
             user.fleetadmin === auth.profile.uid) ||
             role === "admin")
       );
-      let obj = {}; 
+      let obj = {};
       for (let i = 0; i < arr.length; i++) {
         let user = arr[i];
         obj[user.id] = `${user.firstName} ${user.lastName} (${settings.AllowCriticalEditsAdmin ? user.mobile : t("hidden_demo")}) ${settings.AllowCriticalEditsAdmin ? user.email : t("hidden_demo")}`;
@@ -122,10 +123,10 @@ export default function CarsList() {
   }, [auth.profile]);
 
   useEffect(() => {
-    if (carlistdata?.cars && driversObj) { 
+    if (carlistdata?.cars && driversObj) {
       const updatedData = carlistdata.cars.map((car) => ({
         ...car,
-        driverName: driversObj[car?.driver] || " ",  
+        driverName: driversObj[car?.driver] || " ",
       }));
       setData(updatedData);
     } else {
@@ -152,25 +153,25 @@ export default function CarsList() {
 
   const handleSetProfileModal = (e) => {
     e.preventDefault();
-    if(settings.AllowCriticalEditsAdmin){
-    if (selectedImage) {
-      setLoading(true);
-      let finalData = userData;
-      finalData.car_image = selectedImage;
-      dispatch(editCar(finalData, "UpdateImage"));
-      setProfileModal(false);
-      setTimeout(() => {
-        setSelectedImage(null);
-        setLoading(false);
-      }, 10000);
+    if (settings.AllowCriticalEditsAdmin) {
+      if (selectedImage) {
+        setLoading(true);
+        let finalData = userData;
+        finalData.car_image = selectedImage;
+        dispatch(editCar(finalData, "UpdateImage"));
+        setProfileModal(false);
+        setTimeout(() => {
+          setSelectedImage(null);
+          setLoading(false);
+        }, 10000);
+      } else {
+        setCommonAlert({ open: true, msg: t("choose_image_first") });
+      }
+
     } else {
-      setCommonAlert({ open: true, msg: t("choose_image_first") });
+      setCommonAlert({ open: true, msg: t('demo_mode') })
     }
-    
-  }else{
-    setCommonAlert({ open: true, msg: t('demo_mode')})
   }
-}
 
   const onClick = (rowData) => {
     setImageData(rowData.car_image);
@@ -179,27 +180,44 @@ export default function CarsList() {
   };
 
   // TableShadcn columns
-  const columns = React.useMemo(()=> ([
-    { accessorKey: 'createdAt', header: t('createdAt'), cell: ({row}) => row.original.createdAt ? moment(row.original.createdAt).format('lll') : null },
-    { accessorKey: 'driverName', header: t('driver'), cell: ({row}) => row.original.driverName || null },
-    { accessorKey: 'carType', header: t('car_type'), cell: ({row}) => row.original.carType ? t(getLangKey(row.original.carType)) : null },
+  const columns = React.useMemo(() => ([
+    { accessorKey: 'createdAt', header: t('createdAt'), cell: ({ row }) => row.original.createdAt ? moment(row.original.createdAt).format('lll') : null },
+    { accessorKey: 'driverName', header: t('driver'), cell: ({ row }) => row.original.driverName || null },
+    { accessorKey: 'carType', header: t('car_type'), cell: ({ row }) => row.original.carType ? t(getLangKey(row.original.carType)) : null },
     { accessorKey: 'vehicleNumber', header: t('vehicle_reg_no') },
     { accessorKey: 'vehicleMake', header: t('vehicle_model_name') },
     { accessorKey: 'vehicleModel', header: t('vehicle_model_no') },
     { accessorKey: 'other_info', header: t('other_info') },
-    { accessorKey: 'car_image', header: t('image'), cell: ({row}) => row.original.car_image ? (
-      <button onClick={() => onClick(row.original)}><img alt='CarImage' src={row.original.car_image} style={{ width: 50 }} /></button>
-    ) : null },
-    { accessorKey: 'active', header: t('active_status'), cell: ({row}) => (
-      <Switch disabled checked={!!row.original.active} />
-    )},
-    { accessorKey: 'approved', header: t('approved'), cell: ({row}) => (
-      <Switch
-        checked={!!row.original.approved}
-        onChange={() => handelApproved(row.original)}
-        disabled={!(settings.AllowCriticalEditsAdmin && settings.carApproval && role === 'admin')}
-      />
-    )},
+    {
+      accessorKey: 'vehicleColor', header: t('vehicle_color'), cell: ({ row }) => {
+        const colorObj = getVehicleColorByKey(row.original.vehicleColor);
+        return colorObj ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: '50%', backgroundColor: colorObj.hex, border: '1px solid #E2E9EC' }} />
+            <span>{t(colorObj.labelKey)}</span>
+          </div>
+        ) : null;
+      }
+    },
+    {
+      accessorKey: 'car_image', header: t('image'), cell: ({ row }) => row.original.car_image ? (
+        <button onClick={() => onClick(row.original)}><img alt='CarImage' src={row.original.car_image} style={{ width: 50 }} /></button>
+      ) : null
+    },
+    {
+      accessorKey: 'active', header: t('active_status'), cell: ({ row }) => (
+        <Switch disabled checked={!!row.original.active} />
+      )
+    },
+    {
+      accessorKey: 'approved', header: t('approved'), cell: ({ row }) => (
+        <Switch
+          checked={!!row.original.approved}
+          onChange={() => handelApproved(row.original)}
+          disabled={!(settings.AllowCriticalEditsAdmin && settings.carApproval && role === 'admin')}
+        />
+      )
+    },
   ]), [t, settings, role]);
 
   const handelApproved = (rowData) => {
@@ -220,16 +238,17 @@ export default function CarsList() {
   // Shadcn add/edit modal state
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [itemToEdit, setItemToEdit] = useState(null);
-  const initialEditForm = React.useMemo(()=>({
+  const initialEditForm = React.useMemo(() => ({
     driver: '',
     carType: '',
     vehicleNumber: '',
     vehicleMake: '',
     vehicleModel: '',
+    vehicleColor: '',
     other_info: '',
     active: true,
     approved: false,
-  }),[]);
+  }), []);
   const [editForm, setEditForm] = useState(initialEditForm);
 
   const handleAddClick = () => {
@@ -245,6 +264,7 @@ export default function CarsList() {
       vehicleNumber: row.vehicleNumber || '',
       vehicleMake: row.vehicleMake || '',
       vehicleModel: row.vehicleModel || '',
+      vehicleColor: row.vehicleColor || '',
       other_info: row.other_info || '',
       active: !!row.active,
       approved: !!row.approved,
@@ -314,12 +334,13 @@ export default function CarsList() {
               vehicleMake: t('vehicle_model_name'),
               vehicleModel: t('vehicle_model_no'),
               other_info: t('other_info'),
+              vehicleColor: t('vehicle_color'),
               car_image: t('image'),
               active: t('active_status'),
               approved: t('approved')
             }}
             renderActions={(row) => (
-              <div style={{ display:'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
                 <IconButton aria-label="edit" onClick={() => handleEditClick(row)}>
                   <EditIcon fontSize='small' />
                 </IconButton>
@@ -335,18 +356,18 @@ export default function CarsList() {
       </ThemeProvider>
 
       {/* Modal edición/alta */}
-      <Dialog open={editDialogOpen} onOpenChange={(open)=> { if(!open) setEditDialogOpen(false); else setEditDialogOpen(true); }}>
-        <DialogOverlay onClick={()=>setEditDialogOpen(false)} />
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { if (!open) setEditDialogOpen(false); else setEditDialogOpen(true); }}>
+        <DialogOverlay onClick={() => setEditDialogOpen(false)} />
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{ itemToEdit ? t('edit') : t('add_car') }</DialogTitle>
+            <DialogTitle>{itemToEdit ? t('edit') : t('add_car')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('driver')}</label>
-              <select value={editForm.driver} onChange={(e)=>setEditForm(prev=>({...prev, driver: e.target.value}))} disabled={role === 'driver'} className="w-full px-3 py-2 border border-gray-300 rounded-md">
+              <select value={editForm.driver} onChange={(e) => setEditForm(prev => ({ ...prev, driver: e.target.value }))} disabled={role === 'driver'} className="w-full px-3 py-2 border border-gray-300 rounded-md">
                 <option value="">{t('select_driver')}</option>
-                {driversObj && Object.keys(driversObj).map((id)=> (
+                {driversObj && Object.keys(driversObj).map((id) => (
                   <option key={id} value={id}>{driversObj[id]}</option>
                 ))}
               </select>
@@ -354,9 +375,9 @@ export default function CarsList() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('car_type')}</label>
-                <select 
-                  value={editForm.carType} 
-                  onChange={(e)=>setEditForm(prev=>({...prev, carType: e.target.value}))} 
+                <select
+                  value={editForm.carType}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, carType: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">{t('select_vehicle_type')}</option>
@@ -371,34 +392,55 @@ export default function CarsList() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('vehicle_reg_no')}</label>
-                <input type="text" value={editForm.vehicleNumber} onChange={(e)=>setEditForm(prev=>({...prev, vehicleNumber: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <input type="text" value={editForm.vehicleNumber} onChange={(e) => setEditForm(prev => ({ ...prev, vehicleNumber: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('vehicle_model_name')}</label>
-                <input type="text" value={editForm.vehicleMake} onChange={(e)=>setEditForm(prev=>({...prev, vehicleMake: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <input type="text" value={editForm.vehicleMake} onChange={(e) => setEditForm(prev => ({ ...prev, vehicleMake: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">{t('vehicle_model_no')}</label>
-                <input type="text" value={editForm.vehicleModel} onChange={(e)=>setEditForm(prev=>({...prev, vehicleModel: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <input type="text" value={editForm.vehicleModel} onChange={(e) => setEditForm(prev => ({ ...prev, vehicleModel: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">{t('other_info')}</label>
-              <textarea value={editForm.other_info} onChange={(e)=>setEditForm(prev=>({...prev, other_info: e.target.value}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" rows={3} />
+              <textarea value={editForm.other_info} onChange={(e) => setEditForm(prev => ({ ...prev, other_info: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md" rows={3} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('vehicle_color')}</label>
+              <select
+                value={editForm.vehicleColor}
+                onChange={(e) => setEditForm(prev => ({ ...prev, vehicleColor: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">{t('select_vehicle_color')}</option>
+                {VEHICLE_COLORS.map((colorItem) => (
+                  <option key={colorItem.key} value={colorItem.key}>
+                    {t(colorItem.labelKey)}
+                  </option>
+                ))}
+              </select>
+              {editForm.vehicleColor && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                  <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: '50%', backgroundColor: getVehicleColorByKey(editForm.vehicleColor)?.hex || '#CCC', border: '1px solid #E2E9EC' }} />
+                  <span className="text-sm">{t(getVehicleColorByKey(editForm.vehicleColor)?.labelKey || '')}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={editForm.active} onChange={(e)=>setEditForm(prev=>({...prev, active: e.target.checked}))} className="h-4 w-4" />
+                <input type="checkbox" checked={editForm.active} onChange={(e) => setEditForm(prev => ({ ...prev, active: e.target.checked }))} className="h-4 w-4" />
                 {t('active_status')}
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={editForm.approved} onChange={(e)=>setEditForm(prev=>({...prev, approved: e.target.checked}))} className="h-4 w-4" />
+                <input type="checkbox" checked={editForm.approved} onChange={(e) => setEditForm(prev => ({ ...prev, approved: e.target.checked }))} className="h-4 w-4" />
                 {t('approved')}
               </label>
             </div>
           </div>
           <div className="flex justify-end space-x-2 mt-6">
-            <button onClick={()=>setEditDialogOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+            <button onClick={() => setEditDialogOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
               {t('cancel')}
             </button>
             <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
@@ -418,7 +460,7 @@ export default function CarsList() {
             </ShadAlertDialogDescription>
           </ShadAlertDialogHeader>
           <ShadAlertDialogFooter>
-            <ShadAlertDialogCancel onClick={()=>setConfirmOpen(false)}>{t('cancel')}</ShadAlertDialogCancel>
+            <ShadAlertDialogCancel onClick={() => setConfirmOpen(false)}>{t('cancel')}</ShadAlertDialogCancel>
             <ShadAlertDialogAction onClick={handleDeleteConfirm}>{t('delete')}</ShadAlertDialogAction>
           </ShadAlertDialogFooter>
         </ShadAlertDialogContent>
@@ -442,7 +484,7 @@ export default function CarsList() {
         >
           <Grid item xs={12} sm={12} md={12} lg={12}>
             <Typography component="h1" variant="h6" style={{ fontFamily: FONT_FAMILY }} >
-            {t("upload_car_image")}
+              {t("upload_car_image")}
               <input
                 type="file"
                 style={{ marginLeft: 10, fontFamily: FONT_FAMILY }}
@@ -519,7 +561,7 @@ export default function CarsList() {
                 <Button
                   onClick={handleProfileModal}
                   variant="contained"
-                  style={{ backgroundColor:colors.RED, fontFamily: FONT_FAMILY  }}
+                  style={{ backgroundColor: colors.RED, fontFamily: FONT_FAMILY }}
                 >
                   {t("cancel")}
                 </Button>
@@ -527,7 +569,7 @@ export default function CarsList() {
                   onClick={handleSetProfileModal}
                   variant="contained"
                   color="secondaryButton"
-                  style={{ marginLeft: 10 , backgroundColor:colors.GREEN, fontFamily: FONT_FAMILY  }}
+                  style={{ marginLeft: 10, backgroundColor: colors.GREEN, fontFamily: FONT_FAMILY }}
                 >
                   {t("save")}
                 </Button>

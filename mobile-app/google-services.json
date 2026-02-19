@@ -8,6 +8,42 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:210137526589:android:6912a237b6edbadb575554",
+        "android_client_info": {
+          "package_name": "com.sofytecapps.waygo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCRIDFTkzqcXl1V3BpjN_ITvvqTtAECSjQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "210137526589-3pu92m8r32ib8qsmrnsqdntc34107tfi.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zippy.rides"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:210137526589:android:07b89a9c6a28c589575554",
         "android_client_info": {
           "package_name": "com.tecnosoluciones.waygorides"

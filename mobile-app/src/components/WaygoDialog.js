@@ -37,14 +37,14 @@ export default function WaygoDialog({
             return 'light';
         }
     };
-    
+
     const mode = getMode();
 
     const getIconProps = () => {
         if (icon && iconColor) {
             return { name: icon, color: iconColor };
         }
-        
+
         switch (type) {
             case 'warning':
                 return { name: 'warning-outline', color: colors.ORANGE };
@@ -64,34 +64,34 @@ export default function WaygoDialog({
             visible={visible}
             onRequestClose={onClose}
         >
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
                 onPress={onClose}
             >
-                <TouchableOpacity 
-                    style={[styles.modalContent, { 
-                        backgroundColor: mode === 'dark' ? '#272A2C' : colors.WHITE 
+                <TouchableOpacity
+                    style={[styles.modalContent, {
+                        backgroundColor: mode === 'dark' ? '#272A2C' : colors.WHITE
                     }]}
                     activeOpacity={1}
-                    onPress={() => {}}
+                    onPress={() => { }}
                 >
                     <View style={styles.handleBar} />
-                    
+
                     <View style={styles.modalBody}>
-                        <View style={[styles.modalHeader, { 
-                            flexDirection: isRTL ? 'row-reverse' : 'row' 
+                        <View style={[styles.modalHeader, {
+                            flexDirection: isRTL ? 'row-reverse' : 'row'
                         }]}>
                             {showIcon && (
                                 <View style={styles.iconContainer}>
-                                    <Ionicons 
-                                        name={iconProps.name} 
-                                        size={24} 
-                                        color={iconProps.color} 
+                                    <Ionicons
+                                        name={iconProps.name}
+                                        size={24}
+                                        color={iconProps.color}
                                     />
                                 </View>
                             )}
-                            <Text style={[styles.modalTitle, { 
+                            <Text style={[styles.modalTitle, {
                                 color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                                 textAlign: showIcon ? (isRTL ? 'right' : 'left') : 'center',
                                 marginLeft: showIcon ? (isRTL ? 0 : 16) : 0,
@@ -101,44 +101,44 @@ export default function WaygoDialog({
                                 {title}
                             </Text>
                         </View>
-                        
+
                         {customContent ? (
                             customContent
                         ) : (
-                            <Text style={[styles.modalMessage, { 
+                            <Text style={[styles.modalMessage, {
                                 color: mode === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)',
                                 textAlign: isRTL ? 'right' : 'left'
                             }]}>
                                 {message}
                             </Text>
                         )}
-                        
+
                         {showButtons && (
-                            <View style={[styles.buttonContainer, { 
-                                flexDirection: isRTL ? 'row-reverse' : 'row' 
+                            <View style={[styles.buttonContainer, {
+                                flexDirection: isRTL ? 'row-reverse' : 'row'
                             }]}>
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     style={[styles.button, styles.cancelButton, {
                                         backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#E2E9EC'
                                     }]}
                                     onPress={onClose}
                                 >
-                                    <Text style={[styles.buttonText, { 
-                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK 
+                                    <Text style={[styles.buttonText, {
+                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK
                                     }]}>
                                         {cancelText}
                                     </Text>
                                 </TouchableOpacity>
-                                
-                                <TouchableOpacity 
+
+                                <TouchableOpacity
                                     style={[styles.button, styles.confirmButton, {
-                                        backgroundColor: type === 'warning' ? colors.RED : 
-                                                       (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
+                                        backgroundColor: type === 'warning' ? colors.RED :
+                                            (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
                                     }]}
                                     onPress={onConfirm}
                                 >
-                                    <Text style={[styles.buttonText, { 
-                                        color: colors.WHITE 
+                                    <Text style={[styles.buttonText, {
+                                        color: colors.WHITE
                                     }]}>
                                         {confirmText}
                                     </Text>

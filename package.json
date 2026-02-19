@@ -5,7 +5,7 @@
   "scripts": {
     "app": "yarn workspace mobile-app start",
     "app:publish": "cd mobile-app && eas update",
-    "mainContainer": "cd mobile-app && eas build --platform ios --profile production",
+    "app:build-ios": "cd mobile-app && eas build --platform ios --profile production",
     "app:build-android": "cd mobile-app && eas build --platform android --profile production",
     "app:build-android-apk": "cd mobile-app && eas build --platform android --profile preview",
     "app:build-ios-sim": "cd mobile-app && eas build -p ios --profile simulator",

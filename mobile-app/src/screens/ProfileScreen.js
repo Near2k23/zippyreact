@@ -33,6 +33,7 @@ import { FontAwesome5 } from '@expo/vector-icons';
 import auth from '@react-native-firebase/auth';
 import { fonts } from '../common/font';
 import { getLangKey } from 'common/src/other/getLangKey';
+import WaygoDialog from '../components/WaygoDialog';
 
 export default function ProfileScreen(props) {
     const { authRef, mobileAuthCredential, updatePhoneNumber } = useContext(FirebaseContext);
@@ -62,6 +63,18 @@ export default function ProfileScreen(props) {
     const [countryCode, setCountryCode] = useState();
     const [userMobile, setUserMobile] = useState('');
 
+    const [alertConfig, setAlertConfig] = useState({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info',
+        showButtons: false,
+        onConfirm: null,
+        onClose: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+        confirmText: '',
+        cancelText: ''
+    });
+
     const fromPage = props.route.params && props.route.params.fromPage ? props.route.params.fromPage : null;
 
     let colorScheme = useColorScheme();
@@ -69,9 +82,9 @@ export default function ProfileScreen(props) {
 
     useEffect(() => {
         if (auth?.profile?.mode) {
-            if (auth.profile.mode === 'system'){
+            if (auth.profile.mode === 'system') {
                 setMode(colorScheme);
-            }else{
+            } else {
                 setMode(auth.profile.mode);
             }
         } else {
@@ -82,22 +95,35 @@ export default function ProfileScreen(props) {
     const formatCountries = useMemo(() => {
         let arr = [];
         for (let i = 0; i < countries.length; i++) {
-            let txt = "(+" + countries[i].phone + ") " + countries[i].label ;
-            arr.push({ label: txt, value: txt, key: txt, inputLabel: " +" + countries[i].phone});
+            let txt = "(+" + countries[i].phone + ") " + countries[i].label;
+            arr.push({ label: txt, value: txt, key: txt, inputLabel: " +" + countries[i].phone });
         }
         return arr;
-    }, [countries]); 
+    }, [countries]);
 
+    const showAlert = (message) => {
+        setAlertConfig({
+            visible: true,
+            title: t('alert'),
+            message: message,
+            type: 'warning',
+            showButtons: true,
+            confirmText: t('ok'),
+            cancelText: null,
+            onConfirm: () => setAlertConfig(prev => ({ ...prev, visible: false })),
+            onClose: () => setAlertConfig(prev => ({ ...prev, visible: false }))
+        });
+    }
     useEffect(() => {
         if (settings) {
             for (let i = 0; i < countries.length; i++) {
                 if (countries[i].label == settings.country) {
-                    setCountryCode("(+" + countries[i].phone + ") " + countries[i].label );
+                    setCountryCode("(+" + countries[i].phone + ") " + countries[i].label);
                     setUserMobile("")
                 }
             }
         }
-        
+
     }, [settings]);
 
 
@@ -174,7 +200,7 @@ export default function ProfileScreen(props) {
                         resolve(xhr.response);
                     };
                     xhr.onerror = function () {
-                        Alert.alert(t('alert'), t('image_upload_error'));
+                        showAlert(t('image_upload_error'));
                         setLoader(false);
                     };
                     xhr.responseType = 'blob';
@@ -187,7 +213,7 @@ export default function ProfileScreen(props) {
                         Alert.alert(t('alert'), t('profile_updated'));
                     } catch (error) {
                         console.error('Error updating profile image:', error);
-                        Alert.alert(t('alert'), t('image_upload_error'));
+                        showAlert(t('image_upload_error'));
                     }
                 }
                 setLoader(false);
@@ -196,31 +222,29 @@ export default function ProfileScreen(props) {
                 setLoader(false);
             }
         } else {
-            Alert.alert(t('alert'), t('camera_permission_error'))
+            showAlert(t('camera_permission_error'))
         }
     };
 
     const deleteAccount = () => {
-        setDLoading(true)
-        Alert.alert(
-            t('delete_account_modal_title'),
-            t('delete_account_modal_subtitle'),
-            [
-                {
-                    text: t('cancel'),
-                    onPress: () => { setDLoading(false) },
-                    style: 'cancel',
-
-                },
-                {
-                    text: t('yes'), onPress: () => {
-                        dispatch(deleteUser(auth.profile.uid));
-
-                    }
-                },
-            ],
-            { cancelable: false },
-        );
+        setDLoading(true);
+        setAlertConfig({
+            visible: true,
+            title: t('delete_account_modal_title'),
+            message: t('delete_account_modal_subtitle'),
+            type: 'warning',
+            showButtons: true,
+            confirmText: t('yes'),
+            cancelText: t('cancel'),
+            onConfirm: () => {
+                setAlertConfig(prev => ({ ...prev, visible: false }));
+                dispatch(deleteUser(auth.profile.uid));
+            },
+            onClose: () => {
+                setDLoading(false);
+                setAlertConfig(prev => ({ ...prev, visible: false }));
+            }
+        });
     }
 
     const [otp, setOtp] = useState("");
@@ -234,27 +258,33 @@ export default function ProfileScreen(props) {
     const [loading, setLoading] = useState(false);
     const [dloading, setDLoading] = useState(false);
 
-    const [emailLoading,setEmailLoading] = useState(false)
-    const [mobileLoading,setmobileLoading] = useState(false)
+    const [emailLoading, setEmailLoading] = useState(false)
+    const [mobileLoading, setmobileLoading] = useState(false)
     useEffect(() => {
         if (auth.profile && auth.profile.uid) {
             setProfileData({ ...auth.profile });
             if (updateCalled) {
-            
-                Alert.alert(
-                    t('alert'),
-                    t('profile_updated'),
-                    [
-                        {
-                            text: t('ok'), onPress: () => {
-                                setUpdateCalled(false);
-                                setEmailLoading(false);
-                                setmobileLoading(false);
-                            }
-                        }
-                    ],
-                    { cancelable: true }
-                );
+
+                setAlertConfig({
+                    visible: true,
+                    title: t('alert'),
+                    message: t('profile_updated'),
+                    type: 'success',
+                    showButtons: true,
+                    confirmText: t('ok'),
+                    onConfirm: () => {
+                        setAlertConfig(prev => ({ ...prev, visible: false }));
+                        setUpdateCalled(false);
+                        setEmailLoading(false);
+                        setmobileLoading(false);
+                    },
+                    onClose: () => {
+                        setAlertConfig(prev => ({ ...prev, visible: false }));
+                        setUpdateCalled(false);
+                        setEmailLoading(false);
+                        setmobileLoading(false);
+                    }
+                });
                 setUpdateCalled(false);
             }
         }
@@ -272,20 +302,7 @@ export default function ProfileScreen(props) {
             setEditName(false);
         } else {
             setEditName(true)
-            Alert.alert(
-                t('alert'),
-                t('proper_input_name'),
-                [
-                    {
-                        text: t('cancel'),
-                        onPress: () => { setEditName(false) },
-                        style: 'cancel',
-
-                    },
-                    { text: t('ok'), onPress: () => { } }
-                ],
-                { cancelable: true }
-            );
+            showAlert(t('proper_input_name'));
         }
     }
 
@@ -307,7 +324,7 @@ export default function ProfileScreen(props) {
         setEditMobile(false);
     }
 
-    
+
 
     const saveProfile = async (set) => {
         if (profileData.email === auth.profile.email && set === 1) {
@@ -324,12 +341,12 @@ export default function ProfileScreen(props) {
                 setEmailLoading(true)
                 checkUserExists({ email: profileData.email }).then((res) => {
                     if (res.users && res.users.length > 0) {
-                        Alert.alert(t('alert'), t('user_exists'));
+                        showAlert(t('user_exists'));
                         setLoading(false)
                         setEmailLoading(false)
                     }
                     else if (res.error) {
-                        Alert.alert(t('alert'), t('email_or_mobile_issue'));
+                        showAlert(t('email_or_mobile_issue'));
                         setLoading(false)
                         setEmailLoading(false)
                     } else {
@@ -341,7 +358,7 @@ export default function ProfileScreen(props) {
                     }
                 });
             } else {
-                Alert.alert(t('alert'), t('proper_email'));
+                showAlert(t('proper_email'));
                 setLoading(false);
             }
         } else {
@@ -349,13 +366,13 @@ export default function ProfileScreen(props) {
                 checkUserExists({ mobile: profileData.mobile }).then(async (res) => {
                     setmobileLoading(true)
                     if (res.users && res.users.length > 0) {
-                        Alert.alert(t('alert'), t('user_exists'));
+                        showAlert(t('user_exists'));
                         setLoading(false);
                         setmobileLoading(false)
                         setEditMobile(false);
                     }
                     else if (res.error) {
-                        Alert.alert(t('alert'), t('email_or_mobile_issue'));
+                        showAlert(t('email_or_mobile_issue'));
                         setLoading(false);
                         setEditMobile(false);
                         setEmailLoading(false)
@@ -363,21 +380,21 @@ export default function ProfileScreen(props) {
                         if (settings.customMobileOTP) {
                             setOtpCalled(true);
                             dispatch(requestMobileOtp(profileData.mobile));
-                            if(!settings.AllowCriticalEditsAdmin){
-                                Alert.alert(t('alert'), t('in_demo_mobile_login'));
+                            if (!settings.AllowCriticalEditsAdmin) {
+                                showAlert(t('in_demo_mobile_login'));
                             }
                             setmobileLoading(false)
                         } else {
                             const snapshot = await auth()
                                 .verifyPhoneNumber(profileData.mobile)
                                 .on('state_changed', (phoneAuthSnapshot) => {
-                                        if(phoneAuthSnapshot && phoneAuthSnapshot.state === "error"){
-                                            setLoading(false);
-                                            setEditMobile(false);
-                                            setEmailLoading(false);
-                                            setmobileLoading(false);
-                                            Alert.alert(t('alert'), t('email_or_mobile_issue'));
-                                        }
+                                    if (phoneAuthSnapshot && phoneAuthSnapshot.state === "error") {
+                                        setLoading(false);
+                                        setEditMobile(false);
+                                        setEmailLoading(false);
+                                        setmobileLoading(false);
+                                        showAlert(t('email_or_mobile_issue'));
+                                    }
                                 });
                             if (snapshot) {
                                 setConfirmCode(snapshot);
@@ -388,7 +405,7 @@ export default function ProfileScreen(props) {
                     }
                 });
             } else {
-                Alert.alert(t('alert'), t('mobile_no_blank_error'))
+                showAlert(t('mobile_no_blank_error'))
                 setLoading(false)
                 setEditMobile(false);
             }
@@ -408,9 +425,9 @@ export default function ProfileScreen(props) {
                     setLoading(false);
                     setEmailLoading(false)
                     if (res.error === 'Error updating user') {
-                        Alert.alert(t('alert'), t('user_exists'));
+                        showAlert(t('user_exists'));
                     } else {
-                        Alert.alert(t('alert'), t('otp_validate_error'));
+                        showAlert(t('otp_validate_error'));
                     }
                 }
             } else {
@@ -423,13 +440,13 @@ export default function ProfileScreen(props) {
                 }).catch((error) => {
                     setOtp('');
                     setOtpCalled(true);
-                    Alert.alert(t('alert'), t('otp_validate_error'));
+                    showAlert(t('otp_validate_error'));
                 });
             }
         } else {
             setOtp('');
             setOtpCalled(true);
-            Alert.alert(t('alert'), t('otp_validate_error'));
+            showAlert(t('otp_validate_error'));
         }
     }
 
@@ -443,13 +460,13 @@ export default function ProfileScreen(props) {
     const cancle = (set) => {
         if (set === 0) {
             setEditName(false);
-            setProfileData({ ...profileData, firstName: auth.profile.firstName, lastName: auth.profile.lastName})
+            setProfileData({ ...profileData, firstName: auth.profile.firstName, lastName: auth.profile.lastName })
         } else if (set === 1) {
             setEditEmail(false);
-            setProfileData({ ...profileData, email: auth.profile.email})
+            setProfileData({ ...profileData, email: auth.profile.email })
         } else if (set === 2) {
             setEditMobile(false);
-            setProfileData({ ...profileData, mobile: auth.profile.mobile})
+            setProfileData({ ...profileData, mobile: auth.profile.mobile })
             setUserMobile('')
         }
     }
@@ -477,13 +494,13 @@ export default function ProfileScreen(props) {
             elevation: 0,
             shadowOpacity: 0,
         }}>
-            <TouchableOpacity 
+            <TouchableOpacity
                 onPress={onPressBack}
-                style={{ 
-                    width: 40, 
-                    height: 40, 
-                    justifyContent: 'center', 
-                    alignItems: isRTL ? 'flex-end' : 'flex-start' 
+                style={{
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: isRTL ? 'flex-end' : 'flex-start'
                 }}
             >
                 <Icon
@@ -492,7 +509,7 @@ export default function ProfileScreen(props) {
                     color={mode === 'dark' ? colors.WHITE : colors.BLACK}
                     size={24}
                 />
-                            </TouchableOpacity>
+            </TouchableOpacity>
             <Text style={{
                 fontFamily: fonts.Bold,
                 color: mode === 'dark' ? colors.WHITE : colors.BLACK,
@@ -503,41 +520,41 @@ export default function ProfileScreen(props) {
             }}>
                 {title}
             </Text>
-                    </View>
+        </View>
     );
 
 
     return (
         <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
             <CustomHeader title={t('profile_setting_menu')} navigation={props.navigation} />
-            
+
             <View style={styles.profileImageSection}>
                 <TouchableOpacity style={styles.profileImageContainer} onPress={showActionSheet}>
                     {loader ? (
                         <View style={styles.profileImageLoader}>
                             <ActivityIndicator size="large" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
-                                            </View>
-                                        ) : (
+                        </View>
+                    ) : (
                         <View style={styles.profileImageWrapper}>
-                            <Image 
-                                source={profileData && profileData.profile_image ? 
-                                    { uri: profileData.profile_image } : 
+                            <Image
+                                source={profileData && profileData.profile_image ?
+                                    { uri: profileData.profile_image } :
                                     require('../../assets/images/profilePic.png')
-                                } 
-                                style={styles.profileImage} 
-                                        />
-                                    </View>
+                                }
+                                style={styles.profileImage}
+                            />
+                        </View>
                     )}
-                                    </TouchableOpacity>
-                    </View>
+                </TouchableOpacity>
+            </View>
 
             <View style={styles.userNameSection}>
                 <Text style={[styles.userName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                    {auth.profile && (auth.profile.firstName && auth.profile.lastName) 
+                    {auth.profile && (auth.profile.firstName && auth.profile.lastName)
                         ? `${auth.profile.firstName} ${auth.profile.lastName}`
                         : ''}
                 </Text>
-                        </View>
+            </View>
 
             <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
                 <View style={styles.fieldContainer}>
@@ -545,14 +562,14 @@ export default function ProfileScreen(props) {
                         {t('first_name')}
                     </Text>
                     <TextInput
-                        style={[styles.fieldInput, { 
+                        style={[styles.fieldInput, {
                             color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                             backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                         }]}
                         value={profileData?.firstName || ''}
                         onChangeText={(text) => {
-                            setProfileData({ 
-                                ...profileData, 
+                            setProfileData({
+                                ...profileData,
                                 firstName: text
                             });
                         }}
@@ -569,14 +586,14 @@ export default function ProfileScreen(props) {
                         {t('last_name')}
                     </Text>
                     <TextInput
-                        style={[styles.fieldInput, { 
+                        style={[styles.fieldInput, {
                             color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                             backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                         }]}
                         value={profileData?.lastName || ''}
                         onChangeText={(text) => {
-                            setProfileData({ 
-                                ...profileData, 
+                            setProfileData({
+                                ...profileData,
                                 lastName: text
                             });
                         }}
@@ -593,8 +610,8 @@ export default function ProfileScreen(props) {
                     <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
                         {t('email')}
                     </Text>
-                                            <TextInput
-                        style={[styles.fieldInput, { 
+                    <TextInput
+                        style={[styles.fieldInput, {
                             color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                             backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                         }]}
@@ -605,33 +622,33 @@ export default function ProfileScreen(props) {
                         keyboardType="email-address"
                         autoCapitalize="none"
                     />
-                                        </View>
+                </View>
 
                 <View style={styles.fieldContainer}>
                     <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
                         {t('mobile')}
                     </Text>
-                                            <TextInput
-                        style={[styles.fieldInput, { 
+                    <TextInput
+                        style={[styles.fieldInput, {
                             color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                             backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                         }]}
                         value={profileData?.mobile || ''}
                         onChangeText={(text) => setProfileData({ ...profileData, mobile: text })}
-                                                placeholder={t('mobile')}
+                        placeholder={t('mobile')}
                         placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
                         keyboardType="phone-pad"
                     />
-                    </View>
+                </View>
 
-                {((auth.profile.usertype === 'driver' && settings && settings.showSocialSecurityDrivers) || 
-                  (auth.profile.usertype === 'customer' && settings && settings.showSocialSecurityRiders)) ?
+                {((auth.profile && auth.profile.usertype === 'driver' && settings && settings.showSocialSecurityDrivers) ||
+                    (auth.profile && auth.profile.usertype === 'customer' && settings && settings.showSocialSecurityRiders)) ?
                     <View style={styles.fieldContainer}>
                         <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
                             {t('social_security')}
                         </Text>
                         <TextInput
-                            style={[styles.fieldInput, { 
+                            style={[styles.fieldInput, {
                                 color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                                 backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                             }]}
@@ -645,24 +662,24 @@ export default function ProfileScreen(props) {
                             keyboardType="numeric"
                         />
                     </View>
-                : null}
+                    : null}
 
                 {langSelection && languagedata && languagedata.langlist && languagedata.langlist.length > 1 && (
                     <View style={styles.fieldContainer}>
                         <Text style={[styles.fieldLabel, { color: mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)' }]}>
                             {t('language')}
                         </Text>
-                        <View style={[styles.fieldInput, { 
+                        <View style={[styles.fieldInput, {
                             backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5',
                             paddingVertical: 0,
                             paddingHorizontal: 0,
                         }]}>
-                                    <RNPickerSelect
-                                        pickerRef={pickerRef1}
-                                        placeholder={{}}
-                                        value={langSelection}
-                                        useNativeAndroidPickerStyle={false}
-                                        style={{
+                            <RNPickerSelect
+                                pickerRef={pickerRef1}
+                                placeholder={{}}
+                                value={langSelection}
+                                useNativeAndroidPickerStyle={false}
+                                style={{
                                     inputIOS: {
                                         fontSize: 14,
                                         fontFamily: fonts.Regular,
@@ -677,41 +694,41 @@ export default function ProfileScreen(props) {
                                         paddingVertical: 12,
                                         paddingHorizontal: 12,
                                     },
-                                            placeholder: {
+                                    placeholder: {
                                         color: mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'
-                                            }
-                                        }}
-                                onValueChange={(text) => {
-                                                let defl = null;
-                                                for (const value of Object.values(languagedata.langlist)) {
-                                                    if (value.langLocale == text) {
-                                                        defl = value;
-                                                    }
-                                                }
-                                                setLangSelection(text);
-                                                i18n.locale = text;
-                                                moment.locale(defl.dateLocale);
-                                                setIsRTL(text == 'he' || text == 'ar')
-                                                AsyncStorage.setItem('lang', JSON.stringify({ langLocale: text, dateLocale: defl.dateLocale }));
-                                                dispatch(updateProfile({ lang: { langLocale: text, dateLocale: defl.dateLocale } }));
+                                    }
                                 }}
-                                items={Object.values(languagedata.langlist).map(function (value) { 
-                                    return { label: value.langName, value: value.langLocale }; 
+                                onValueChange={(text) => {
+                                    let defl = null;
+                                    for (const value of Object.values(languagedata.langlist)) {
+                                        if (value.langLocale == text) {
+                                            defl = value;
+                                        }
+                                    }
+                                    setLangSelection(text);
+                                    i18n.locale = text;
+                                    moment.locale(defl.dateLocale);
+                                    setIsRTL(text == 'he' || text == 'ar')
+                                    AsyncStorage.setItem('lang', JSON.stringify({ langLocale: text, dateLocale: defl.dateLocale }));
+                                    dispatch(updateProfile({ lang: { langLocale: text, dateLocale: defl.dateLocale } }));
+                                }}
+                                items={Object.values(languagedata.langlist).map(function (value) {
+                                    return { label: value.langName, value: value.langLocale };
                                 })}
-                                Icon={() => { 
+                                Icon={() => {
                                     return (
-                                        <MaterialIcons 
-                                            name="keyboard-arrow-down" 
-                                            size={20} 
-                                            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'} 
+                                        <MaterialIcons
+                                            name="keyboard-arrow-down"
+                                            size={20}
+                                            color={mode === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'}
                                             style={{ marginRight: 12, marginTop: 12 }}
                                         />
-                                    ); 
+                                    );
                                 }}
-                                        mode={mode}
-                                    />
-                            </View>
+                                mode={mode}
+                            />
                         </View>
+                    </View>
                 )}
 
                 {profileData && profileData.referralId && (
@@ -720,7 +737,7 @@ export default function ProfileScreen(props) {
                             {t('referralId')}
                         </Text>
                         <TextInput
-                            style={[styles.fieldInput, { 
+                            style={[styles.fieldInput, {
                                 color: mode === 'dark' ? colors.WHITE : colors.BLACK,
                                 backgroundColor: mode === 'dark' ? '#3A3A3A' : '#F5F5F5'
                             }]}
@@ -728,19 +745,19 @@ export default function ProfileScreen(props) {
                             editable={false}
                             placeholder={t('referralId')}
                             placeholderTextColor={mode === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)'}
-                                />
-                            </View>
+                        />
+                    </View>
                 )}
 
-                            <TouchableOpacity
+                <TouchableOpacity
                     style={[styles.updateButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]}
-                                onPress={() => {
+                    onPress={() => {
                         if (profileData.firstName && profileData.lastName) {
                             if (settings && settings.socialSecurityRequired) {
-                                const shouldShowField = (auth.profile.usertype === 'driver' && settings.showSocialSecurityDrivers) || 
-                                                        (auth.profile.usertype === 'customer' && settings.showSocialSecurityRiders);
+                                const shouldShowField = (auth.profile && auth.profile.usertype === 'driver' && settings.showSocialSecurityDrivers) ||
+                                    (auth.profile && auth.profile.usertype === 'customer' && settings.showSocialSecurityRiders);
                                 if (shouldShowField && (!profileData.socialSecurity || profileData.socialSecurity.trim() === '')) {
-                                    Alert.alert(t('alert'), t('social_security_required') || 'Social Security es requerido');
+                                    showAlert(t('social_security_required') || 'Social Security es requerido');
                                     return;
                                 }
                             }
@@ -761,10 +778,32 @@ export default function ProfileScreen(props) {
                     ) : (
                         <Text style={styles.updateButtonText}>{t('save')}</Text>
                     )}
-                            </TouchableOpacity>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.updateButton, { backgroundColor: colors.RED, marginTop: 10 }]}
+                    onPress={deleteAccount}
+                >
+                    {dloading ? (
+                        <ActivityIndicator color={colors.WHITE} size="small" />
+                    ) : (
+                        <Text style={styles.updateButtonText}>{t('delete_account_lebel')}</Text>
+                    )}
+                </TouchableOpacity>
             </ScrollView>
 
             {uploadImage()}
+            <WaygoDialog
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                showButtons={alertConfig.showButtons}
+                onConfirm={alertConfig.onConfirm}
+                onClose={alertConfig.onClose}
+                confirmText={alertConfig.confirmText}
+                cancelText={alertConfig.cancelText}
+            />
         </View>
     );
 }

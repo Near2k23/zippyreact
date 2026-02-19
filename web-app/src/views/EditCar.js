@@ -9,13 +9,14 @@ import { useSelector, useDispatch } from "react-redux";
 import { Typography, TextField, Button, Grid, Card, useMediaQuery } from "@mui/material";
 import { api } from "common";
 import { useTranslation } from "react-i18next";
-import { useParams,useLocation } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import CircularLoading from "components/CircularLoading";
 import { colors } from "components/Theme/WebTheme";
 import { MAIN_COLOR, SECONDORY_COLOR, FONT_FAMILY } from "../common/sharedFunctions";
 import { makeStyles } from "@mui/styles";
 import GoBackButton from "components/GoBackButton";
 import { getLangKey } from "common/src/other/getLangKey";
+import { VEHICLE_COLORS, getVehicleColorByKey } from 'common/src/other/VehicleColors';
 
 const useStyles = makeStyles((theme) => ({
   typography: {
@@ -193,7 +194,7 @@ const EditCar = () => {
   const [loading, setLoading] = useState(false);
   const classes = useStyles();
   const isMidScreen = useMediaQuery('(max-width:1199px)');
-  const {state}=useLocation()
+  const { state } = useLocation()
 
   useEffect(() => {
     if (id) {
@@ -215,13 +216,14 @@ const EditCar = () => {
         vehicleNumber: "",
         vehicleMake: "",
         carType: "",
+        vehicleColor: "",
         driver: auth && auth.profile.usertype === "driver" ? auth.profile.uid : "",
         vehicleModel: "",
         other_info: "",
         active: false,
       });
     }
-  }, [carlistdata,id, navigate, auth]);
+  }, [carlistdata, id, navigate, auth]);
 
   useEffect(() => {
     if (carlistdata.cars) {
@@ -335,6 +337,9 @@ const EditCar = () => {
   const handelChangeCarType = (event) => {
     setData({ ...data, carType: event.target.value });
   };
+  const handelChangeColor = (event) => {
+    setData({ ...data, vehicleColor: event.target.value });
+  };
   const handleInputChange = (e) => {
     setData({ ...data, [e.target.id]: e.target.value });
   };
@@ -363,7 +368,7 @@ const EditCar = () => {
               );
             }
             setLoading(false);
-            navigate("/cars",{state:{pageNo:state?.pageNo}});
+            navigate("/cars", { state: { pageNo: state?.pageNo } });
           } else {
             setLoading(false);
             setCommonAlert({ open: true, msg: t("make_changes_to_update") });
@@ -439,7 +444,7 @@ const EditCar = () => {
         })
 
       }
-    }else{
+    } else {
       setCommonAlert({ open: true, msg: t('demo_mode') });
       setLoading(false);
     }
@@ -473,8 +478,8 @@ const EditCar = () => {
           >
             {id ? t("update_car_title") : t("add_car_title")}
           </Typography>
-    
-          <GoBackButton isRTL={isRTL}   onClick={() => { navigate("/cars",{state:{pageNo:state?.pageNo}}); }} />
+
+          <GoBackButton isRTL={isRTL} onClick={() => { navigate("/cars", { state: { pageNo: state?.pageNo } }); }} />
           <Grid
             container
             spacing={2}
@@ -482,12 +487,12 @@ const EditCar = () => {
               gridTemplateColumns: "50%",
               rowGap: "20px",
               marginY: 1,
-              direction:isRTL === "rtl" ? "rtl" : "ltr",
+              direction: isRTL === "rtl" ? "rtl" : "ltr",
             }}
           >
             <Grid item xs={12} sm={12} md={12} lg={6} xl={6}>
               <TextField
-                 InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
                 label={t("vehicle_reg_no")}
                 id={"vehicleNumber"}
                 value={data?.vehicleNumber || ""}
@@ -501,7 +506,7 @@ const EditCar = () => {
             </Grid>
             <Grid item xs={12} sm={12} md={12} lg={6} xl={6}>
               <TextField
-                 InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
                 label={t("vehicle_model_name")}
                 id={"vehicleMake"}
                 value={data?.vehicleMake || ""}
@@ -515,7 +520,7 @@ const EditCar = () => {
             </Grid>
             <Grid item xs={12} sm={12} md={12} lg={6} xl={6}>
               <TextField
-                 InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
                 label={t("vehicle_model_no")}
                 id={"vehicleModel"}
                 value={data?.vehicleModel || ""}
@@ -529,7 +534,7 @@ const EditCar = () => {
             </Grid>
             <Grid item xs={12} sm={12} md={12} lg={6} xl={6}>
               <TextField
-                 InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
                 label={t("other_info")}
                 id={"other_info"}
                 value={data?.other_info || ""}
@@ -680,7 +685,62 @@ const EditCar = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} sm={12} md={12} lg={12} xl={ 12}
+            <Grid
+              item
+              xs={12}
+              sm={12}
+              md={12}
+              lg={6}
+              xl={6}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <FormControl
+                fullWidth
+                style={{ direction: isRTL === "rtl" ? "rtl" : "ltr" }}
+              >
+                <InputLabel
+                  id="vehicle-color-label"
+                  className={isRTL === "rtl" ? classes.right : ""}
+                  sx={{ "&.Mui-focused": { color: MAIN_COLOR } }}
+                >
+                  {<Typography className={classes.typography}>{t("vehicle_color")}</Typography>}
+                </InputLabel>
+                <Select
+                  labelId="vehicle-color-label"
+                  id="vehicle-color-select"
+                  value={data?.vehicleColor || ""}
+                  label={t("vehicle_color")}
+                  onChange={handelChangeColor}
+                  disabled={data?.active ? true : false}
+                  className={
+                    isRTL === "rtl"
+                      ? classes.selectField_rtl_1
+                      : classes.selectField
+                  }
+                >
+                  <MenuItem value="">
+                    <Typography className={classes.typography}>{t("select_vehicle_color")}</Typography>
+                  </MenuItem>
+                  {VEHICLE_COLORS.map((colorItem) => (
+                    <MenuItem
+                      key={colorItem.key}
+                      value={colorItem.key}
+                      style={{ direction: isRTL === "rtl" ? "rtl" : "ltr" }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ display: 'inline-block', width: 20, height: 20, borderRadius: '50%', backgroundColor: colorItem.hex, border: '1px solid #E2E9EC' }} />
+                        <Typography className={classes.typography}>{t(colorItem.labelKey)}</Typography>
+                      </div>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={12} md={12} lg={12} xl={12}
               display="flex"
               justifyContent="center"
               alignItems="center">
@@ -689,13 +749,13 @@ const EditCar = () => {
                   borderRadius: "19px",
                   backgroundColor: MAIN_COLOR,
                   minHeight: 50,
-                  width: (isMidScreen ? '100%' :  '50%'),
+                  width: (isMidScreen ? '100%' : '50%'),
                   textAlign: "center",
                 }}
-                onClick={()=>{
-                  if(id){
+                onClick={() => {
+                  if (id) {
                     updateCar();
-                  }else{
+                  } else {
                     addCar();
                   }
                 }}

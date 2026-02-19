@@ -30,6 +30,7 @@ import * as ImagePicker from 'expo-image-picker';
 import ActionSheet from "react-native-actions-sheet";
 import { getLangKey } from 'common/src/other/getLangKey';
 import { getFilteredCarTypesByZone } from 'common/src/other/ZonePriceHelper';
+import { VEHICLE_COLORS, getVehicleColorByKey } from 'common/src/other/VehicleColors';
 
 export default function CarEditScreen(props) {
     const { t } = i18n;
@@ -71,9 +72,9 @@ export default function CarEditScreen(props) {
 
     useEffect(() => {
         if (auth?.profile?.mode) {
-            if (auth.profile.mode === 'system'){
+            if (auth.profile.mode === 'system') {
                 setMode(colorScheme);
-            }else{
+            } else {
                 setMode(auth.profile.mode);
             }
         } else {
@@ -87,10 +88,12 @@ export default function CarEditScreen(props) {
         vehicleMake: car && car.vehicleMake ? car.vehicleMake : null,
         vehicleModel: car && car.vehicleModel ? car.vehicleModel : null,
         carType: car && car.carType ? car.carType : null,
+        vehicleColor: car && car.vehicleColor ? car.vehicleColor : null,
         other_info: car && car.other_info ? car.other_info : "",
         approved: car && car.approved ? car.approved : null,
         active: car && car.active ? car.active : null
     });
+    const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
 
     const [blob, setBlob] = useState();
     const pickerRef1 = React.createRef();
@@ -104,7 +107,7 @@ export default function CarEditScreen(props) {
             for (let i = 0; i < sorted.length; i++) {
                 arr.push({ label: t(getLangKey(sorted[i].name)), value: sorted[i].name });
             }
-            
+
             if (!car || !car.id) {
                 const type1Car = sorted.find(carType => carType.id === "type1");
                 if (type1Car) {
@@ -113,7 +116,7 @@ export default function CarEditScreen(props) {
                     setState(prevState => ({ ...prevState, carType: arr[0].value }));
                 }
             }
-            
+
             setCarTypes(arr);
         }
     }, [cartypes, currentZone]);
@@ -124,7 +127,7 @@ export default function CarEditScreen(props) {
 
     useEffect(() => {
         if (gps.location && zonesdata.zones && zonesdata.zones.length > 0) {
-            try{ console.log('ZONES_GPS_CAREDIT', { lat: gps.location.lat, lng: gps.location.lng }); }catch(e){}
+            try { console.log('ZONES_GPS_CAREDIT', { lat: gps.location.lat, lng: gps.location.lng }); } catch (e) { }
             const detectedZone = detectZoneByLocation(gps.location.lat, gps.location.lng, zonesdata.zones);
 
             const hasGeometryMatch = !!(detectedZone && detectedZone.geometry);
@@ -167,50 +170,50 @@ export default function CarEditScreen(props) {
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
-        Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-        (e) => {
-            isKeyboardVisible.current = true;
-            const currentFocusedInput = focusedInputRef.current;
-            if (currentFocusedInput && inputRefs.current[currentFocusedInput] && scrollViewRef.current && !hasScrolledForCurrentInput.current) {
-                inputRefs.current[currentFocusedInput].measure((x, y, width, height, pageX, pageY) => {
-                    const keyboardHeight = e.endCoordinates.height;
-                    const screenHeight = Dimensions.get('window').height;
-                    const visibleHeight = screenHeight - keyboardHeight;
-                    
-                    if (pageY + height + 50 > visibleHeight) {
-                        const inputContainer = inputLayouts.current[currentFocusedInput];
-                        if (inputContainer && inputContainer.baseY !== undefined) {
-                            const targetScrollY = scrollOffsetRef.current + inputContainer.baseY - 100;
-                            hasScrolledForCurrentInput.current = true;
-                            setTimeout(() => {
-                                if (scrollViewRef.current && isKeyboardVisible.current) {
-                                    scrollViewRef.current.scrollTo({
-                                        y: Math.max(0, targetScrollY),
-                                        animated: true
-                                    });
-                                }
-                            }, Platform.OS === 'ios' ? 100 : 200);
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            (e) => {
+                isKeyboardVisible.current = true;
+                const currentFocusedInput = focusedInputRef.current;
+                if (currentFocusedInput && inputRefs.current[currentFocusedInput] && scrollViewRef.current && !hasScrolledForCurrentInput.current) {
+                    inputRefs.current[currentFocusedInput].measure((x, y, width, height, pageX, pageY) => {
+                        const keyboardHeight = e.endCoordinates.height;
+                        const screenHeight = Dimensions.get('window').height;
+                        const visibleHeight = screenHeight - keyboardHeight;
+
+                        if (pageY + height + 50 > visibleHeight) {
+                            const inputContainer = inputLayouts.current[currentFocusedInput];
+                            if (inputContainer && inputContainer.baseY !== undefined) {
+                                const targetScrollY = scrollOffsetRef.current + inputContainer.baseY - 100;
+                                hasScrolledForCurrentInput.current = true;
+                                setTimeout(() => {
+                                    if (scrollViewRef.current && isKeyboardVisible.current) {
+                                        scrollViewRef.current.scrollTo({
+                                            y: Math.max(0, targetScrollY),
+                                            animated: true
+                                        });
+                                    }
+                                }, Platform.OS === 'ios' ? 100 : 200);
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
-        }
-    );
+        );
 
-    const keyboardDidHideListener = Keyboard.addListener(
-        Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-        () => {
-            isKeyboardVisible.current = false;
-            hasScrolledForCurrentInput.current = false;
-        }
-    );
+        const keyboardDidHideListener = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => {
+                isKeyboardVisible.current = false;
+                hasScrolledForCurrentInput.current = false;
+            }
+        );
 
-    return () => {
-        keyboardDidShowListener.remove();
-        keyboardDidHideListener.remove();
-    };
-}, []);
-    
+        return () => {
+            keyboardDidShowListener.remove();
+            keyboardDidHideListener.remove();
+        };
+    }, []);
+
     // Crear blob para la imagen existente cuando se carga el componente
     useEffect(() => {
         const createBlobFromExistingImage = async () => {
@@ -240,7 +243,7 @@ export default function CarEditScreen(props) {
                 setLoading(false);
             }
         };
-        
+
         createBlobFromExistingImage();
     }, [state.car_image]);
 
@@ -255,18 +258,18 @@ export default function CarEditScreen(props) {
                     style={{ width: '90%', alignSelf: 'center', paddingLeft: 20, paddingRight: 20, borderColor: colors.SHADOW, borderBottomWidth: 1, height: 60, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => { _pickImage('CAMERA') }}
                 >
-                    <Text style={{ color: colors.BLUE,fontFamily:fonts.Bold }}>{t('camera')}</Text>
+                    <Text style={{ color: colors.BLUE, fontFamily: fonts.Bold }}>{t('camera')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={{ width: '90%', alignSelf: 'center', paddingLeft: 20, paddingRight: 20, borderBottomWidth: 1, borderColor: colors.SHADOW, height: 60, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => { _pickImage('MEDIA') }}
                 >
-                    <Text style={{ color: colors.BLUE,fontFamily:fonts.Bold}}>{t('medialibrary')}</Text>
+                    <Text style={{ color: colors.BLUE, fontFamily: fonts.Bold }}>{t('medialibrary')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={{ width: '90%', alignSelf: 'center', paddingLeft: 20, paddingRight: 20, height: 50, alignItems: 'center', justifyContent: 'center' }}
                     onPress={() => { actionSheetRef.current?.setModalVisible(false); }}>
-                    <Text style={{ color: 'red',fontFamily:fonts.Bold }}>{t('cancel')}</Text>
+                    <Text style={{ color: 'red', fontFamily: fonts.Bold }}>{t('cancel')}</Text>
                 </TouchableOpacity>
             </ActionSheet>
         )
@@ -283,16 +286,16 @@ export default function CarEditScreen(props) {
 
         if (status === 'granted') {
             let pickFrom = permissionType === 'CAMERA' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-            
+
             let result = await pickFrom({
                 allowsEditing: true,
                 aspect: [4, 3],
                 quality: 0.8
             });
-            
+
             // Cerrar el ActionSheet después de la selección
             actionSheetRef.current?.setModalVisible(false);
-            
+
             if (!result.canceled && result.assets && result.assets[0]) {
                 setLoading(true);
                 const imageUri = result.assets[0].uri;
@@ -354,7 +357,7 @@ export default function CarEditScreen(props) {
                 } else {
                     newData['approved'] = false;
                 }
-                
+
                 // Si tenemos blob, usamos updateUserCarWithImage, de lo contrario usamos updateUserCar
                 if (blob) {
                     dispatch(updateUserCarWithImage(newData, blob));
@@ -365,6 +368,7 @@ export default function CarEditScreen(props) {
                         vehicleNumber: newData.vehicleNumber,
                         vehicleMake: newData.vehicleMake,
                         vehicleModel: newData.vehicleModel,
+                        vehicleColor: newData.vehicleColor || null,
                         other_info: newData.other_info ? newData.other_info : "",
                         car_image: newData.car_image,
                         active: newData.active,
@@ -405,6 +409,7 @@ export default function CarEditScreen(props) {
             vehicleNumber: car.vehicleNumber,
             vehicleMake: car.vehicleMake,
             vehicleModel: car.vehicleModel,
+            vehicleColor: car.vehicleColor || null,
             other_info: car.other_info ? car.other_info : "",
             car_image: car.car_image,
             carApproved: car.approved,
@@ -416,7 +421,7 @@ export default function CarEditScreen(props) {
 
     const RemoteImage = React.memo(({ uri, desiredWidth }) => {
         const [desiredHeight, setDesiredHeight] = useState(0);
-        
+
         useEffect(() => {
             if (uri) {
                 setDesiredHeight(0);
@@ -432,30 +437,30 @@ export default function CarEditScreen(props) {
                 );
             }
         }, [uri, desiredWidth]);
-        
+
         return (
-            <Image 
-                source={{ uri }} 
-                style={{ 
-                    width: desiredWidth, 
-                    height: desiredHeight || desiredWidth * 0.75 
-                }} 
+            <Image
+                source={{ uri }}
+                style={{
+                    width: desiredWidth,
+                    height: desiredHeight || desiredWidth * 0.75
+                }}
             />
         );
     });
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>
-            <KeyboardAvoidingView 
-                style={styles.keyboardAvoidingView} 
+            <KeyboardAvoidingView
+                style={styles.keyboardAvoidingView}
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
                 keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
                 enabled={true}
             >
-                <ScrollView 
+                <ScrollView
                     ref={scrollViewRef}
-                    style={styles.scrollViewStyle} 
-                    showsVerticalScrollIndicator={false} 
+                    style={styles.scrollViewStyle}
+                    showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingHorizontal: 12.5, paddingBottom: 30 }}
                     keyboardShouldPersistTaps="handled"
                     nestedScrollEnabled={true}
@@ -469,7 +474,7 @@ export default function CarEditScreen(props) {
                     }}
                     scrollEventThrottle={16}
                 >
-                  
+
                     <View style={styles.form}>
                         {
                             uploadImage()
@@ -510,7 +515,7 @@ export default function CarEditScreen(props) {
                             ) : (
                                 <View style={styles.capturePhoto}>
                                     <View>
-                                        <Text style={[styles.capturePhotoTitle, styles.fontStyle,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}>{t('upload_car_image')}</Text>
+                                        <Text style={[styles.capturePhotoTitle, styles.fontStyle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('upload_car_image')}</Text>
                                     </View>
                                     {!car || !car.id ? (
                                         <View style={[styles.capturePicClick, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -536,202 +541,302 @@ export default function CarEditScreen(props) {
                                 </View>
                             )}
 
-                        <View style={styles.containerStyle}>
-                            {car && car.id ? (
+                            <View style={styles.containerStyle}>
+                                {car && car.id ? (
+                                    <View style={styles.inputContainerStyle}>
+                                        <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                            {t('select_vehicle_type')}
+                                        </Text>
+                                        <TextInput
+                                            editable={false}
+                                            value={t(getLangKey(car.carType))}
+                                            style={[
+                                                styles.textInputStyle,
+                                                {
+                                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                    borderColor: '#E2E9EC'
+                                                }
+                                            ]}
+                                        />
+                                    </View>
+                                ) : null}
+
+                                {/* Vehicle Color Dropdown */}
                                 <View style={styles.inputContainerStyle}>
                                     <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
-                                        {t('select_vehicle_type')}
+                                        {t('vehicle_color')}
+                                    </Text>
+                                    {car && car.id ? (
+                                        <View style={[styles.textInputStyle, { flexDirection: 'row', alignItems: 'center', backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE, borderColor: '#E2E9EC' }]}>
+                                            {state.vehicleColor ? (
+                                                <>
+                                                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: getVehicleColorByKey(state.vehicleColor)?.hex || '#CCC', borderWidth: 1, borderColor: '#E2E9EC', marginRight: 10 }} />
+                                                    <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                                                        {t(getVehicleColorByKey(state.vehicleColor)?.labelKey || '')}
+                                                    </Text>
+                                                </>
+                                            ) : (
+                                                <Text style={{ fontFamily: fonts.Regular, color: colors.SHADOW }}>{t('select_vehicle_color')}</Text>
+                                            )}
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity
+                                            onPress={() => setColorDropdownOpen(!colorDropdownOpen)}
+                                            style={[
+                                                styles.textInputStyle,
+                                                {
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                    borderColor: colorDropdownOpen ? colors.INPUT_FOCUS : '#E2E9EC'
+                                                }
+                                            ]}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                {state.vehicleColor ? (
+                                                    <>
+                                                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: getVehicleColorByKey(state.vehicleColor)?.hex || '#CCC', borderWidth: 1, borderColor: '#E2E9EC', marginRight: 10 }} />
+                                                        <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                                                            {t(getVehicleColorByKey(state.vehicleColor)?.labelKey || '')}
+                                                        </Text>
+                                                    </>
+                                                ) : (
+                                                    <Text style={{ fontFamily: fonts.Regular, color: colors.SHADOW }}>{t('select_vehicle_color')}</Text>
+                                                )}
+                                            </View>
+                                            <Ionicons name={colorDropdownOpen ? 'chevron-up' : 'chevron-down'} size={18} color={mode === 'dark' ? colors.WHITE : '#A7A9AC'} />
+                                        </TouchableOpacity>
+                                    )}
+                                    {colorDropdownOpen && !(car && car.id) ? (
+                                        <View style={{
+                                            borderWidth: 1,
+                                            borderColor: '#E2E9EC',
+                                            borderRadius: 10,
+                                            marginTop: 4,
+                                            maxHeight: 200,
+                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                            overflow: 'hidden'
+                                        }}>
+                                            <ScrollView nestedScrollEnabled={true} showsVerticalScrollIndicator={true}>
+                                                {VEHICLE_COLORS.map((colorItem) => (
+                                                    <TouchableOpacity
+                                                        key={colorItem.key}
+                                                        onPress={() => {
+                                                            setState({ ...state, vehicleColor: colorItem.key });
+                                                            setColorDropdownOpen(false);
+                                                        }}
+                                                        style={{
+                                                            flexDirection: 'row',
+                                                            alignItems: 'center',
+                                                            paddingVertical: 10,
+                                                            paddingHorizontal: 12,
+                                                            backgroundColor: state.vehicleColor === colorItem.key
+                                                                ? (mode === 'dark' ? '#222' : '#F0F7FF')
+                                                                : 'transparent',
+                                                            borderBottomWidth: 0.5,
+                                                            borderBottomColor: '#E2E9EC'
+                                                        }}
+                                                    >
+                                                        <View style={{
+                                                            width: 24,
+                                                            height: 24,
+                                                            borderRadius: 12,
+                                                            backgroundColor: colorItem.hex,
+                                                            borderWidth: 1,
+                                                            borderColor: '#E2E9EC',
+                                                            marginRight: 12
+                                                        }} />
+                                                        <Text style={{
+                                                            fontFamily: fonts.Regular,
+                                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                            fontSize: 14
+                                                        }}>
+                                                            {t(colorItem.labelKey)}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    ) : null}
+                                </View>
+
+                                <View
+                                    style={styles.inputContainerStyle}
+                                    onLayout={(event) => {
+                                        const layout = event.nativeEvent.layout;
+                                        if (inputLayouts.current['vehicleMake']?.baseY !== layout.y) {
+                                            inputLayouts.current['vehicleMake'] = {
+                                                baseY: layout.y
+                                            };
+                                        }
+                                    }}
+                                >
+                                    <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                        {t('vehicle_model_name')}
                                     </Text>
                                     <TextInput
-                                        editable={false}
-                                        value={t(getLangKey(car.carType))}
+                                        ref={(ref) => inputRefs.current['vehicleMake'] = ref}
+                                        editable={!(car && car.id)}
+                                        value={state.vehicleMake}
+                                        onChangeText={(text) => setState({ ...state, vehicleMake: text })}
+                                        onFocus={() => setFocusedInput('vehicleMake')}
+                                        onBlur={() => setFocusedInput(null)}
                                         style={[
                                             styles.textInputStyle,
-                                            { 
+                                            focusedInput === 'vehicleMake' && styles.inputFocused,
+                                            {
                                                 backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
                                                 color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                borderColor: '#E2E9EC'
+                                                borderColor: focusedInput === 'vehicleMake' ? colors.INPUT_FOCUS : '#E2E9EC'
                                             }
                                         ]}
+                                        placeholderTextColor={colors.SHADOW}
                                     />
                                 </View>
+
+                                <View
+                                    style={styles.inputContainerStyle}
+                                    onLayout={(event) => {
+                                        const layout = event.nativeEvent.layout;
+                                        if (inputLayouts.current['vehicleModel']?.baseY !== layout.y) {
+                                            inputLayouts.current['vehicleModel'] = {
+                                                baseY: layout.y
+                                            };
+                                        }
+                                    }}
+                                >
+                                    <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                        {t('vehicle_model_no')}
+                                    </Text>
+                                    <TextInput
+                                        ref={(ref) => inputRefs.current['vehicleModel'] = ref}
+                                        editable={!(car && car.id)}
+                                        value={state.vehicleModel}
+                                        onChangeText={(text) => setState({ ...state, vehicleModel: text })}
+                                        onFocus={() => setFocusedInput('vehicleModel')}
+                                        onBlur={() => setFocusedInput(null)}
+                                        style={[
+                                            styles.textInputStyle,
+                                            focusedInput === 'vehicleModel' && styles.inputFocused,
+                                            {
+                                                backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                borderColor: focusedInput === 'vehicleModel' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                            }
+                                        ]}
+                                        placeholderTextColor={colors.SHADOW}
+                                    />
+                                </View>
+
+                                <View
+                                    style={styles.inputContainerStyle}
+                                    onLayout={(event) => {
+                                        const layout = event.nativeEvent.layout;
+                                        inputLayouts.current['vehicleNumber'] = {
+                                            baseY: layout.y
+                                        };
+                                    }}
+                                >
+                                    <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                        {t('vehicle_reg_no')}
+                                    </Text>
+                                    <TextInput
+                                        ref={(ref) => inputRefs.current['vehicleNumber'] = ref}
+                                        editable={!(car && car.id)}
+                                        value={state.vehicleNumber}
+                                        onChangeText={(text) => setState({ ...state, vehicleNumber: text })}
+                                        onFocus={() => setFocusedInput('vehicleNumber')}
+                                        onBlur={() => setFocusedInput(null)}
+                                        style={[
+                                            styles.textInputStyle,
+                                            focusedInput === 'vehicleNumber' && styles.inputFocused,
+                                            {
+                                                backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                borderColor: focusedInput === 'vehicleNumber' ? colors.INPUT_FOCUS : '#E2E9EC'
+                                            }
+                                        ]}
+                                        placeholderTextColor={colors.SHADOW}
+                                    />
+                                </View>
+
+                                <View
+                                    style={styles.inputContainerStyle}
+                                    onLayout={(event) => {
+                                        const layout = event.nativeEvent.layout;
+                                        if (inputLayouts.current['other_info']?.baseY !== layout.y) {
+                                            inputLayouts.current['other_info'] = {
+                                                baseY: layout.y
+                                            };
+                                        }
+                                    }}
+                                >
+                                    <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
+                                        {t('other_info')}
+                                    </Text>
+                                    <TextInput
+                                        ref={(ref) => inputRefs.current['other_info'] = ref}
+                                        editable={!(car && car.id)}
+                                        value={state.other_info}
+                                        onChangeText={(text) => setState({ ...state, other_info: text })}
+                                        onFocus={() => setFocusedInput('other_info')}
+                                        onBlur={() => setFocusedInput(null)}
+                                        multiline
+                                        numberOfLines={3}
+                                        style={[
+                                            styles.textInputStyle,
+                                            focusedInput === 'other_info' && styles.inputFocused,
+                                            {
+                                                backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
+                                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                borderColor: focusedInput === 'other_info' ? colors.INPUT_FOCUS : '#E2E9EC',
+                                                height: 80,
+                                                textAlignVertical: 'top'
+                                            }
+                                        ]}
+                                        placeholderTextColor={colors.SHADOW}
+                                    />
+                                </View>
+                            </View>
+                            {!car || !car.id ? (
+                                <View style={styles.buttonContainer}>
+                                    {!car ? (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.registerButton,
+                                                loading && styles.registerButtonClicked,
+                                                { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
+                                            ]}
+                                            onPress={onSave}
+                                            disabled={loading}
+                                        >
+                                            {loading ? (
+                                                <ActivityIndicator size="small" color={colors.WHITE} />
+                                            ) : (
+                                                <Text style={styles.buttonStyle}>{t('save')}</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.registerButton,
+                                                loading && styles.registerButtonClicked,
+                                                { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
+                                            ]}
+                                            onPress={makeActive}
+                                            disabled={loading}
+                                        >
+                                            {loading ? (
+                                                <ActivityIndicator size="small" color={colors.WHITE} />
+                                            ) : (
+                                                <Text style={styles.buttonStyle}>{t('save')}</Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             ) : null}
-
-                            <View 
-                                style={styles.inputContainerStyle}
-                                onLayout={(event) => {
-                                    const layout = event.nativeEvent.layout;
-                                    if (inputLayouts.current['vehicleMake']?.baseY !== layout.y) {
-                                        inputLayouts.current['vehicleMake'] = { 
-                                            baseY: layout.y
-                                        };
-                                    }
-                                }}
-                            >
-                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
-                                    {t('vehicle_model_name')}
-                                </Text>
-                                <TextInput
-                                    ref={(ref) => inputRefs.current['vehicleMake'] = ref}
-                                    editable={!(car && car.id)}
-                                    value={state.vehicleMake}
-                                    onChangeText={(text) => setState({ ...state, vehicleMake: text })}
-                                    onFocus={() => setFocusedInput('vehicleMake')}
-                                    onBlur={() => setFocusedInput(null)}
-                                    style={[
-                                        styles.textInputStyle,
-                                        focusedInput === 'vehicleMake' && styles.inputFocused,
-                                        {
-                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                            borderColor: focusedInput === 'vehicleMake' ? colors.INPUT_FOCUS : '#E2E9EC'
-                                        }
-                                    ]}
-                                    placeholderTextColor={colors.SHADOW}
-                                />
-                            </View>
-
-                            <View 
-                                style={styles.inputContainerStyle}
-                                onLayout={(event) => {
-                                    const layout = event.nativeEvent.layout;
-                                    if (inputLayouts.current['vehicleModel']?.baseY !== layout.y) {
-                                        inputLayouts.current['vehicleModel'] = { 
-                                            baseY: layout.y
-                                        };
-                                    }
-                                }}
-                            >
-                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
-                                    {t('vehicle_model_no')}
-                                </Text>
-                                <TextInput
-                                    ref={(ref) => inputRefs.current['vehicleModel'] = ref}
-                                    editable={!(car && car.id)}
-                                    value={state.vehicleModel}
-                                    onChangeText={(text) => setState({ ...state, vehicleModel: text })}
-                                    onFocus={() => setFocusedInput('vehicleModel')}
-                                    onBlur={() => setFocusedInput(null)}
-                                    style={[
-                                        styles.textInputStyle,
-                                        focusedInput === 'vehicleModel' && styles.inputFocused,
-                                        {
-                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                            borderColor: focusedInput === 'vehicleModel' ? colors.INPUT_FOCUS : '#E2E9EC'
-                                        }
-                                    ]}
-                                    placeholderTextColor={colors.SHADOW}
-                                />
-                            </View>
-
-                            <View 
-                                style={styles.inputContainerStyle}
-                                onLayout={(event) => {
-                                    const layout = event.nativeEvent.layout;
-                                    inputLayouts.current['vehicleNumber'] = { 
-                                        baseY: layout.y
-                                    };
-                                }}
-                            >
-                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
-                                    {t('vehicle_reg_no')}
-                                </Text>
-                                <TextInput
-                                    ref={(ref) => inputRefs.current['vehicleNumber'] = ref}
-                                    editable={!(car && car.id)}
-                                    value={state.vehicleNumber}
-                                    onChangeText={(text) => setState({ ...state, vehicleNumber: text })}
-                                    onFocus={() => setFocusedInput('vehicleNumber')}
-                                    onBlur={() => setFocusedInput(null)}
-                                    style={[
-                                        styles.textInputStyle,
-                                        focusedInput === 'vehicleNumber' && styles.inputFocused,
-                                        {
-                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                            borderColor: focusedInput === 'vehicleNumber' ? colors.INPUT_FOCUS : '#E2E9EC'
-                                        }
-                                    ]}
-                                    placeholderTextColor={colors.SHADOW}
-                                />
-                            </View>
-
-                            <View 
-                                style={styles.inputContainerStyle}
-                                onLayout={(event) => {
-                                    const layout = event.nativeEvent.layout;
-                                    if (inputLayouts.current['other_info']?.baseY !== layout.y) {
-                                        inputLayouts.current['other_info'] = { 
-                                            baseY: layout.y
-                                        };
-                                    }
-                                }}
-                            >
-                                <Text style={[styles.inputLabel, { color: mode === 'dark' ? colors.WHITE : '#A7A9AC' }]}>
-                                    {t('other_info')}
-                                </Text>
-                                <TextInput
-                                    ref={(ref) => inputRefs.current['other_info'] = ref}
-                                    editable={!(car && car.id)}
-                                    value={state.other_info}
-                                    onChangeText={(text) => setState({ ...state, other_info: text })}
-                                    onFocus={() => setFocusedInput('other_info')}
-                                    onBlur={() => setFocusedInput(null)}
-                                    multiline
-                                    numberOfLines={3}
-                                    style={[
-                                        styles.textInputStyle,
-                                        focusedInput === 'other_info' && styles.inputFocused,
-                                        {
-                                            backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                            borderColor: focusedInput === 'other_info' ? colors.INPUT_FOCUS : '#E2E9EC',
-                                            height: 80,
-                                            textAlignVertical: 'top'
-                                        }
-                                    ]}
-                                    placeholderTextColor={colors.SHADOW}
-                                />
-                            </View>
-                        </View>
-                        {!car || !car.id ? (
-                            <View style={styles.buttonContainer}>
-                                {!car ? (
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.registerButton,
-                                            loading && styles.registerButtonClicked,
-                                            { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
-                                        ]}
-                                        onPress={onSave}
-                                        disabled={loading}
-                                    >
-                                        {loading ? (
-                                            <ActivityIndicator size="small" color={colors.WHITE} />
-                                        ) : (
-                                            <Text style={styles.buttonStyle}>{t('save')}</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.registerButton,
-                                            loading && styles.registerButtonClicked,
-                                            { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#1369B4' }
-                                        ]}
-                                        onPress={makeActive}
-                                        disabled={loading}
-                                    >
-                                        {loading ? (
-                                            <ActivityIndicator size="small" color={colors.WHITE} />
-                                        ) : (
-                                            <Text style={styles.buttonStyle}>{t('save')}</Text>
-                                        )}
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        ) : null}
                         </View>
                     </View>
                 </ScrollView>

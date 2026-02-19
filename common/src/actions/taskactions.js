@@ -10,7 +10,7 @@ import { updateProfile } from "./authactions";
 import { RequestPushMsg } from "../other/NotificationFunctions";
 import { firebase } from '../config/configureFirebase';
 import { onValue, runTransaction, get, off, push } from "firebase/database";
-import {driverQueue} from '../other/sharedFunctions';
+import { driverQueue } from '../other/sharedFunctions';
 
 export const fetchTasks = () => (dispatch) => {
   const { auth, tasksRef } = firebase;
@@ -46,37 +46,52 @@ export const fetchTasks = () => (dispatch) => {
 };
 
 export const acceptTask = (task) => (dispatch) => {
-  const { auth, trackingRef, singleUserRef, singleBookingRef } = firebase;
+  const { auth, trackingRef, singleUserRef, singleBookingRef, carsRef } = firebase;
 
   const uid = auth.currentUser.uid;
 
-  onValue(singleUserRef(uid), (snapshot) => {
-    let profile = snapshot.val();
+  get(singleUserRef(uid)).then((profileSnapshot) => {
+    const profile = profileSnapshot.val();
+    let carColor = profile?.vehicleColor || "";
 
-    runTransaction(singleBookingRef(task.id),(booking) => {
-      let fleetCommission_fee= profile?.fleetadmin ? ((parseFloat(booking?.estimate) - parseFloat(booking?.convenience_fees)) * parseFloat(booking?.fleet_admin_comission) / 100).toFixed(2):0;
-      let driver_fee = parseFloat(parseFloat(booking?.estimate) - (parseFloat(booking?.convenience_fees) + parseFloat(fleetCommission_fee) )).toFixed(2);
-        if (booking && booking.requestedDrivers) {
-          booking.driver = uid;
-          booking.driver_image = profile.profile_image ? profile.profile_image : "";
-          booking.car_image =  profile.car_image ? profile.car_image : "";
-          booking.driver_name = profile.firstName + " " + profile.lastName;
-          booking.driver_contact = profile.mobile;
-          booking.driver_token = profile.pushToken ? profile.pushToken : '';
-          booking.vehicle_number = profile.vehicleNumber ? profile.vehicleNumber : "";
-          booking.vehicleModel = profile.vehicleModel ? profile.vehicleModel : "";
-          booking.vehicleMake = profile.vehicleMake ? profile.vehicleMake : "";
-          booking.driverRating = profile.rating ? profile.rating : "0";
-          booking.fleetCommission= fleetCommission_fee? fleetCommission_fee : "0"
-          booking.fleetadmin = profile.fleetadmin ? profile.fleetadmin : "";
-          booking.status = "ACCEPTED";
-          booking.driver_share = driver_fee? driver_fee : "0";
-          booking.driverDeviceId = task.driverDeviceId? task.driverDeviceId: null;
-          booking.requestedDrivers = null;
-          booking.driverEstimates = null;
-          return booking;
+    if (!carColor) {
+      return get(carsRef(uid, 'driver')).then((carsSnapshot) => {
+        const carsData = carsSnapshot.val();
+        if (carsData) {
+          const carsList = Object.keys(carsData).map((k) => ({ id: k, ...carsData[k] }));
+          const activeCar = carsList.find((c) => c.active === true);
+          if (activeCar?.vehicleColor) carColor = activeCar.vehicleColor;
         }
-      })
+        return { profile, carColor };
+      });
+    }
+    return Promise.resolve({ profile, carColor });
+  }).then(({ profile, carColor }) => {
+    runTransaction(singleBookingRef(task.id), (booking) => {
+      let fleetCommission_fee = profile?.fleetadmin ? ((parseFloat(booking?.estimate) - parseFloat(booking?.convenience_fees)) * parseFloat(booking?.fleet_admin_comission) / 100).toFixed(2) : 0;
+      let driver_fee = parseFloat(parseFloat(booking?.estimate) - (parseFloat(booking?.convenience_fees) + parseFloat(fleetCommission_fee))).toFixed(2);
+      if (booking && booking.requestedDrivers) {
+        booking.driver = uid;
+        booking.driver_image = profile.profile_image ? profile.profile_image : "";
+        booking.car_image = profile.car_image ? profile.car_image : "";
+        booking.car_color = carColor || "";
+        booking.driver_name = profile.firstName + " " + profile.lastName;
+        booking.driver_contact = profile.mobile;
+        booking.driver_token = profile.pushToken ? profile.pushToken : '';
+        booking.vehicle_number = profile.vehicleNumber ? profile.vehicleNumber : "";
+        booking.vehicleModel = profile.vehicleModel ? profile.vehicleModel : "";
+        booking.vehicleMake = profile.vehicleMake ? profile.vehicleMake : "";
+        booking.driverRating = profile.rating ? profile.rating : "0";
+        booking.fleetCommission = fleetCommission_fee ? fleetCommission_fee : "0"
+        booking.fleetadmin = profile.fleetadmin ? profile.fleetadmin : "";
+        booking.status = "ACCEPTED";
+        booking.driver_share = driver_fee ? driver_fee : "0";
+        booking.driverDeviceId = task.driverDeviceId ? task.driverDeviceId : null;
+        booking.requestedDrivers = null;
+        booking.driverEstimates = null;
+        return booking;
+      }
+    })
       .then(() => {
         get(singleBookingRef(task.id))
           .then((snapshot) => {
@@ -94,7 +109,7 @@ export const acceptTask = (task) => (dispatch) => {
                     store.getState().languagedata.defaultLanguage
                       .notification_title,
                   msg:
-                   profile.firstName +
+                    profile.firstName +
                     store.getState().languagedata.defaultLanguage
                       .accept_booking_request,
                   screen: "BookedCab",
@@ -121,7 +136,9 @@ export const acceptTask = (task) => (dispatch) => {
             console.error(error);
           });
       });
-  },{onlyOnce:true});
+  }).catch((error) => {
+    console.error(error);
+  });
 };
 
 export const cancelTask = (bookingId) => (dispatch) => {
@@ -130,37 +147,37 @@ export const cancelTask = (bookingId) => (dispatch) => {
   const uid = auth.currentUser.uid;
 
   runTransaction(singleBookingRef(bookingId), (booking) => {
-      if (booking && booking.requestedDrivers) {
-        if (
-          booking.requestedDrivers !== null &&
-          Object.keys(booking.requestedDrivers).length === 1
-        ) {
-          booking.status = "NEW";
-          booking.requestedDrivers = null;
-          booking.driverEstimates = null;
-          RequestPushMsg(booking.customer_token, {
-            title:
-              store.getState().languagedata.defaultLanguage.notification_title,
-            msg:
-              store.getState().languagedata.defaultLanguage.booking_cancelled +
-              bookingId,
-            screen: "BookedCab",
-            params: { bookingId: bookingId },
-          });
-          dispatch({
-            type: CANCEL_TASK,
-            payload: { uid: uid, bookingId: bookingId },
-          });
-        }else{
-          delete booking.requestedDrivers[uid];
-        }
-        if(booking.driverOffers && booking.driverOffers[uid]){
-          delete booking.driverOffers[uid];
-        }
-        if(booking.selectedBid && booking.selectedBid.driver === uid){
-          delete booking.selectedBid;
-        }
-        return booking;
+    if (booking && booking.requestedDrivers) {
+      if (
+        booking.requestedDrivers !== null &&
+        Object.keys(booking.requestedDrivers).length === 1
+      ) {
+        booking.status = "NEW";
+        booking.requestedDrivers = null;
+        booking.driverEstimates = null;
+        RequestPushMsg(booking.customer_token, {
+          title:
+            store.getState().languagedata.defaultLanguage.notification_title,
+          msg:
+            store.getState().languagedata.defaultLanguage.booking_cancelled +
+            bookingId,
+          screen: "BookedCab",
+          params: { bookingId: bookingId },
+        });
+        dispatch({
+          type: CANCEL_TASK,
+          payload: { uid: uid, bookingId: bookingId },
+        });
+      } else {
+        delete booking.requestedDrivers[uid];
       }
-    });
+      if (booking.driverOffers && booking.driverOffers[uid]) {
+        delete booking.driverOffers[uid];
+      }
+      if (booking.selectedBid && booking.selectedBid.driver === uid) {
+        delete booking.selectedBid;
+      }
+      return booking;
+    }
+  });
 };
