@@ -31,6 +31,7 @@ import { usedreferralreducer } from "../reducers/usedreferralreducer";
 import { fleetadminearningreducer } from "../reducers/fleetadminearningreducer";
 import { dynamichourreducer } from "../reducers/dynamichourreducer";
 import { zonereducer } from "../reducers/zonereducer";
+import { taxreducer } from "../reducers/taxreducer";
 
 const rootReducer = {
   auth: authreducer,
@@ -63,6 +64,7 @@ const rootReducer = {
   fleetadminearningdata: fleetadminearningreducer,
   dynamichourdata: dynamichourreducer,
   zonesdata: zonereducer,
+  taxdata: taxreducer,
 };
 
 export default configureStore({

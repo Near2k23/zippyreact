@@ -52,7 +52,7 @@ import EditCar from "views/EditCar.js";
 import EditCarType from "views/EditCarType.js";
 import EditUser from "views/EditUser.js";
 import PaymentSettings from "views/PaymentSettings.js";
-// Use the libraries defined in GoogleMapApiOptions
+import Taxes from './views/Taxes';
 const libraries = GoogleMapApiOptions.libraries;
 
 i18n
@@ -96,6 +96,7 @@ function App() {
                 <Route path="/cars" element={<ProtectedRoute permit={"admin,fleetadmin,driver"}><CarsList /></ProtectedRoute>}/>
                 <Route path="/addbookings" element={<ProtectedRoute permit={"admin,fleetadmin,customer"}><AddBookings /></ProtectedRoute>}/>
                 <Route path="/promos" element={<ProtectedRoute permit={"admin"}><Promos /></ProtectedRoute>}/>
+                <Route path="/taxes" element={<ProtectedRoute permit={"admin"}><Taxes /></ProtectedRoute>}/>
                 <Route path="/dynamic-hours" element={<ProtectedRoute permit={"admin"}><DynamicHours /></ProtectedRoute>}/>
                 <Route path="/users/:id" element={<ProtectedRoute permit={"admin,fleetadmin"}><Users /></ProtectedRoute>}/>
                 <Route path="/users/customerdetails/:id" element={<ProtectedRoute permit={"admin,fleetadmin"}><CustomerDetails/></ProtectedRoute>}/>

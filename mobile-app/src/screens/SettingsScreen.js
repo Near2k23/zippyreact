@@ -69,6 +69,12 @@ export default function SettingsScreen(props) {
     const fadeAnims = useRef({}).current;
     const profileAnim = useRef(new Animated.Value(0)).current;
     const [animationComplete, setAnimationComplete] = useState(false);
+    const [headerSolid, setHeaderSolid] = useState(false);
+
+    const handleScroll = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        setHeaderSolid(y > 50);
+    };
 
     useEffect(() => {
         // Initialize animations
@@ -214,7 +220,7 @@ export default function SettingsScreen(props) {
             
             {/* Custom Header */}
             <View style={[styles.customHeader, { 
-                backgroundColor: 'transparent',
+                backgroundColor: headerSolid ? (mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND) : 'transparent',
                 paddingTop: Platform.OS === 'ios' ? 50 : 30,
                 paddingHorizontal: 20,
                 paddingBottom: 15,
@@ -235,6 +241,8 @@ export default function SettingsScreen(props) {
                 style={styles.scrollView}
                 contentContainerStyle={{ flexGrow: 1 }}
                 showsVerticalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
             >
                 {/* Profile Section */}
             <Animated.View 

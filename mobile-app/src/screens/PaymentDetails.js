@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -37,6 +37,7 @@ export default function PaymentDetails(props) {
   const auth = useSelector(state => state.auth);
   const settings = useSelector(state => state.settingsdata?.settings || {});
   const providers = useSelector(state => state.paymentmethods?.providers || []);
+  const taxesData = useSelector(state => state.taxdata?.taxes);
   const { booking } = props.route.params;
   const [promodalVisible, setPromodalVisible] = useState(false);
   const { t } = i18n;
@@ -89,8 +90,47 @@ export default function PaymentDetails(props) {
     usedWalletMoney: booking.payment_mode === 'wallet'? booking.trip_cost:0,
     promo_applied: booking.promo_applied?booking.promo_applied:false,
     promo_details: booking.promo_details?booking.promo_details:null,
-    payableAmount: booking.payableAmount?booking.payableAmount:booking.trip_cost
+    payableAmount: booking.payableAmount?booking.payableAmount:booking.trip_cost,
+    taxAmount: 0
   });
+
+  const isCustomer = profile?.usertype === 'customer';
+  const isOnlinePayment = booking.payment_mode === 'card';
+
+  const visibleTaxes = useMemo(() => {
+    if (!isCustomer || !taxesData) return [];
+    const baseAmount = booking.trip_cost;
+    return taxesData
+      .filter(tax => tax.active && tax.isVisible)
+      .filter(tax => !tax.onlyPaymentOnline || isOnlinePayment)
+      .map(tax => ({
+        ...tax,
+        calculatedAmount: tax.type === 'percentage'
+          ? parseFloat((baseAmount * tax.value / 100).toFixed(settings.decimal || 2))
+          : parseFloat(tax.value)
+      }));
+  }, [isCustomer, taxesData, isOnlinePayment, booking.trip_cost, settings.decimal]);
+
+  useEffect(() => {
+    if (!isCustomer || !taxesData || !settings.decimal) return;
+    const baseAmount = booking.trip_cost;
+    let totalTax = 0;
+    taxesData.forEach(tax => {
+      if (!tax.active) return;
+      if (tax.onlyPaymentOnline && !isOnlinePayment) return;
+      if (tax.type === 'percentage') {
+        totalTax += parseFloat((baseAmount * tax.value / 100).toFixed(settings.decimal));
+      } else {
+        totalTax += parseFloat(tax.value);
+      }
+    });
+    totalTax = parseFloat(totalTax.toFixed(settings.decimal));
+    setPayDetails(prev => ({
+      ...prev,
+      taxAmount: totalTax,
+      payableAmount: parseFloat((parseFloat(prev.amount) + totalTax - parseFloat(prev.discount)).toFixed(settings.decimal))
+    }));
+  }, [isCustomer, taxesData, settings.decimal, isOnlinePayment, booking.trip_cost]);
 
   const promoModal = () => {
     return (
@@ -160,7 +200,7 @@ export default function PaymentDetails(props) {
   const openPromoModal = () => {
     setPromodalVisible(!promodalVisible);
     let data = { ...payDetails };
-    data.payableAmount = data.amount;
+    data.payableAmount = parseFloat((parseFloat(data.amount) + (data.taxAmount || 0)).toFixed(settings.decimal));
     data.discount = 0;
     data.promo_applied = false;
     data.promo_details = null;
@@ -173,7 +213,7 @@ export default function PaymentDetails(props) {
     data.promo_details.user_avail = parseInt(data.promo_details.user_avail) - 1;
     delete data.promo_details.usersUsed[auth.profile.uid];
     dispatch(editPromo(data.promo_details));
-    data.payableAmount = data.amount;
+    data.payableAmount = parseFloat((parseFloat(data.amount) + (data.taxAmount || 0)).toFixed(settings.decimal));
     data.discount = 0;
     data.promo_applied = false;
     data.promo_details = null;
@@ -208,6 +248,9 @@ export default function PaymentDetails(props) {
       curBooking.payableAmount = parseFloat(parseFloat(payDetails.payableAmount).toFixed(settings.decimal));
       curBooking.promo_applied = payDetails.promo_applied;
       curBooking.promo_details = payDetails.promo_details;
+      if (isCustomer) {
+        curBooking.taxAmount = payDetails.taxAmount || 0;
+      }
 
       if(curBooking.status === 'ACCEPTED'){
         curBooking.driver = curBooking.selectedBid.driver;
@@ -267,6 +310,9 @@ export default function PaymentDetails(props) {
       curBooking.payableAmount = parseFloat(payDetails.payableAmount).toFixed(settings.decimal);
       curBooking.promo_applied = payDetails.promo_applied;
       curBooking.promo_details = payDetails.promo_details;
+      if (isCustomer) {
+        curBooking.taxAmount = payDetails.taxAmount || 0;
+      }
 
       if(curBooking.status === 'ACCEPTED'){
         curBooking.driver = curBooking.selectedBid.driver;
@@ -324,9 +370,11 @@ export default function PaymentDetails(props) {
           cashPaymentAmount: 0,
           payableAmount: parseFloat(parseFloat(payDetails.payableAmount).toFixed(settings.decimal)),
           promo_applied: payDetails.promo_applied,
-          promo_details: payDetails.promo_details 
+          promo_details: payDetails.promo_details,
+          taxAmount: payDetails.taxAmount || 0
         };
         curBooking.paymentPacket = paymentPacket;
+        curBooking.taxAmount = payDetails.taxAmount || 0;
         
         setIsLoading(true);
         dispatch(updateBooking(curBooking));
@@ -445,7 +493,6 @@ export default function PaymentDetails(props) {
       >
 
 
-        {/* Trip Details Card for Driver */}
         {profile && profile.usertype == "driver" ? (
           <View style={[styles.tripCard, {
             backgroundColor: mode === 'dark' ? colors.HEADER : colors.WHITE,
@@ -541,7 +588,6 @@ export default function PaymentDetails(props) {
           </View>
         ) : null}
 
-        {/* Payment Summary Card */}
         {profile ? (
           <View style={[styles.paymentCard, {
             backgroundColor: mode === 'dark' ? colors.HEADER : colors.WHITE,
@@ -573,6 +619,30 @@ export default function PaymentDetails(props) {
                   </Text>
                 )}
               </View>
+
+              {visibleTaxes.map((tax) => (
+                <View key={tax.id} style={[styles.paymentRow, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
+                  <View style={{flexDirection: isRTL ? "row-reverse" : "row", alignItems: 'center'}}>
+                    <Text style={[styles.paymentLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                      {tax.name}
+                    </Text>
+                    <TouchableOpacity onPress={() => Alert.alert(tax.name, tax.description)} style={{marginLeft: 6, marginRight: 6}}>
+                      <Ionicons name="information-circle-outline" size={16} color={mode === 'dark' ? colors.WHITE : '#999'} />
+                    </TouchableOpacity>
+                  </View>
+                  {settings.swipe_symbol === false ? (
+                    <Text style={[styles.paymentValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                      {settings.symbol}{" "}
+                      {formatAmount(tax.calculatedAmount, settings.decimal, settings.country)}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.paymentValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                      {formatAmount(tax.calculatedAmount, settings.decimal, settings.country)}{" "}
+                      {settings.symbol}
+                    </Text>
+                  )}
+                </View>
+              ))}
 
               <View style={[styles.paymentRow, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
                 <Text style={[styles.paymentLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
@@ -615,7 +685,6 @@ export default function PaymentDetails(props) {
           </View>
         ) : null}
 
-        {/* Promo Section */}
          {profile &&
          profile.usertype == "customer" &&
          (booking.status == "PAYMENT_PENDING" ||
@@ -638,7 +707,6 @@ export default function PaymentDetails(props) {
            </View>
          ) : null}
 
-         {/* Action Buttons */}
          <View style={styles.actionButtonsContainer}>
            {profile &&
            profile.usertype == "customer" &&

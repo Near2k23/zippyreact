@@ -527,6 +527,7 @@ export default function AppCommon({ children }) {
             dispatch(api.fetchAddresses());
             dispatch(api.fetchWalletHistory());
             dispatch(api.fetchComplain());
+            dispatch(api.fetchTaxes());
             initialFunctionsNotCalled.current = false;
           } else if (role === 'driver') {
             dispatch(api.fetchBookings());

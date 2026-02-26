@@ -183,6 +183,7 @@ export default function MapScreen(props) {
     const [zoneDetectionMessage, setZoneDetectionMessage] = useState('');
     const [showTermsDialog, setShowTermsDialog] = useState(false);
     const [showLocationPermissionDialog, setShowLocationPermissionDialog] = useState(false);
+    const [noServiceInZoneDialogDismissed, setNoServiceInZoneDialogDismissed] = useState(false);
 
     const handleTermsCancel = () => {
         BackHandler.exitApp();
@@ -1950,8 +1951,23 @@ export default function MapScreen(props) {
         }
     }
 
+    const noServiceInZone = showInitialScreen && currentZone && (cars != null) && (cars.length === 0 || getFilteredCarTypesWithZonePrices().length === 0);
+
+    useEffect(() => {
+        if (!noServiceInZone) {
+            setNoServiceInZoneDialogDismissed(false);
+        }
+    }, [noServiceInZone]);
+
     return (
         <View style={styles.container}>
+            <WaygoDialog
+                visible={noServiceInZone && !noServiceInZoneDialogDismissed}
+                onClose={() => setNoServiceInZoneDialogDismissed(true)}
+                title={t('no_service_in_zone_title') || 'Sin servicio'}
+                message={t('no_service_in_zone') || 'No hay servicio en tu zona'}
+                type="info"
+            />
             {!showInitialScreen ? (
                 <View style={styles.mapcontainer}>
                     {region && region.latitude && pageActive.current ?
@@ -2349,7 +2365,8 @@ export default function MapScreen(props) {
                                 );
                             }
 
-                            const isLoading = !currentZone || !cars || cars.length === 0;
+                            const isLoading = !currentZone || cars == null;
+                            const noServiceInZone = !isLoading && (cars.length === 0 || filteredCars.length === 0);
 
                             if (isLoading) {
                                 return (
@@ -2359,6 +2376,9 @@ export default function MapScreen(props) {
                                         </View>
                                     </View>
                                 );
+                            }
+                            if (noServiceInZone) {
+                                return null;
                             }
                             return filteredCars.length > 0 ? (
                                 <View style={styles.serviceTypesContainer}>
@@ -3447,7 +3467,7 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         overflow: 'visible',
-        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 70 : 60) : 60,
+        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 10 : 5) : 60,
         backgroundColor: 'transparent',
         zIndex: 1,
     },
@@ -3484,7 +3504,7 @@ const styles = StyleSheet.create({
     },
     chipWrapper: {
         marginTop: 10,
-        marginBottom: Platform.OS === 'ios' ? 5 : 25,
+        marginBottom: 20,
         marginHorizontal: -20,
     },
     chipScrollContainer: {

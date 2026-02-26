@@ -2,7 +2,6 @@ import React, {useState, useEffect} from 'react';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
-// import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import Avatar from '@mui/material/Avatar';
@@ -39,6 +38,7 @@ import SosIcon from '@mui/icons-material/Sos';
 import PublicIcon from '@mui/icons-material/Public';
 import { FONT_FAMILY } from "../common/sharedFunctions"
 import AnnouncementOutlinedIcon from '@mui/icons-material/AnnouncementOutlined';
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import GeneralNotifications from './GeneralNotifications';
 import {
   Breadcrumb,
@@ -53,7 +53,6 @@ import {
 
 const drawerWidth = 260;
 
-// Minimal light theme constants
 const LIGHT_BG = '#F7F7F7';
 const TEXT_PRIMARY = '#111111';
 const TEXT_SECONDARY = '#555555';
@@ -95,7 +94,6 @@ export default function ResponsiveDrawer(props) {
   };
 
   const handleNotificationClick = (notification) => {
-    // Navegar directamente a la pantalla correspondiente
     switch (notification.type || 'withdraws') {
       case 'withdraws':
         navigate('/withdraws');
@@ -121,7 +119,6 @@ export default function ResponsiveDrawer(props) {
     setMobileOpen(false);
   };
 
-  // Mapeo de rutas a claves de traducción
   const routeKeyMap = {
     '': 'home',
     'dashboard': 'dashboard_text',
@@ -134,6 +131,7 @@ export default function ResponsiveDrawer(props) {
     'addtowallet': 'add_to_wallet',
     'allreports': 'report',
     'promos': 'promo',
+    'taxes': 'taxes',
     'dynamic-hours': 'dynamic_hours',
     'notifications': 'push_notifications',
     'sos': 'sos',
@@ -181,6 +179,7 @@ export default function ResponsiveDrawer(props) {
           
             {name : t('report'), url:'/allreports', icon: <AssessmentIcon />, access: ['admin','fleetadmin']},
             {name : t('promo'), url:'/promos', icon: <OfferIcon />, access: ['admin']},
+            {name : t('taxes'), url:'/taxes', icon: <ReceiptLongIcon />, access: ['admin']},
             {name : t('dynamic_hours'), url:'/dynamic-hours', icon: <OfferIcon />, access: ['admin']},
             {name : t('push_notifications'), url:'/notifications', icon: <NotifyIcon />, access: ['admin']},
             {name : t('sos'), url:'/sos', icon: <SosIcon />, access: ['admin']},

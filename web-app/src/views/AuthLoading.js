@@ -30,7 +30,8 @@ function AuthLoading(props) {
     fetchSos,
     fetchSMSConfig,
     fetchFleetAdminEarnings,
-    fetchDynamicHours
+    fetchDynamicHours,
+    fetchTaxes
   } = api;
   const dispatch = useDispatch();
   const auth = useSelector((state) => state.auth);
@@ -120,6 +121,7 @@ function AuthLoading(props) {
           dispatch(fetchSMSConfig());
           dispatch(fetchSos());
           dispatch(fetchDynamicHours());
+          dispatch(fetchTaxes());
         } else if (role === "fleetadmin") {
           dispatch(fetchUsers());
           dispatch(fetchBookings());
@@ -158,7 +160,8 @@ function AuthLoading(props) {
     fetchSos,
     fetchFleetAdminEarnings,
     t,
-    fetchDynamicHours
+    fetchDynamicHours,
+    fetchTaxes
   ]);
 
   return settingsdata.loading ? (

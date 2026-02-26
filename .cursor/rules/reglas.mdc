@@ -1,6 +1,0 @@
----
-alwaysApply: true
----
-No crear comentarios en el codigo.
-Usar siempre Yarn.
-Si hay comentarios en el archivo a editar se debem eliminar

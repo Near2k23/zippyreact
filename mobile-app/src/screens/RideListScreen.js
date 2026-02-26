@@ -26,6 +26,12 @@ export default function RideListPage(props) {
     const auth = useSelector(state => state.auth);
     const [bookingData, setBookingData] = useState([]);
     const [tabIndex, setTabIndex] = useState(0);
+    const [headerSolid, setHeaderSolid] = useState(false);
+
+    const handleScroll = (event) => {
+        const y = event.nativeEvent.contentOffset.y;
+        setHeaderSolid(y > 50);
+    };
     const { t } = i18n;
     const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
     let colorScheme = useColorScheme();
@@ -299,7 +305,7 @@ export default function RideListPage(props) {
             
             {/* Custom Header */}
             <View style={[styles.customHeader, { 
-                backgroundColor: 'transparent',
+                backgroundColor: headerSolid ? (mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND) : 'transparent',
                 paddingTop: Platform.OS === 'ios' ? 50 : 30,
                 paddingHorizontal: 20,
                 paddingBottom: 15,
@@ -323,6 +329,8 @@ export default function RideListPage(props) {
                 contentContainerStyle={[styles.listContainer, { paddingTop: Platform.OS === 'ios' ? 100 : 80 }]}
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={renderFilterHeader}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={[styles.emptyText, { color: colors.SHADOW }]}>
