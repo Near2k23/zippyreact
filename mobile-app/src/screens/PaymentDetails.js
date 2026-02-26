@@ -621,22 +621,59 @@ export default function PaymentDetails(props) {
               </View>
 
               {visibleTaxes.map((tax) => (
-                <View key={tax.id} style={[styles.paymentRow, {flexDirection: isRTL ? "row-reverse" : "row"}]}>
-                  <View style={{flexDirection: isRTL ? "row-reverse" : "row", alignItems: 'center'}}>
-                    <Text style={[styles.paymentLabel, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                <View
+                  key={tax.id}
+                  style={[
+                    styles.paymentRow,
+                    { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }
+                  ]}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
+                    <Text
+                      style={[
+                        styles.paymentLabel,
+                        {
+                          color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                          textAlign: isRTL ? "right" : "left"
+                        }
+                      ]}
+                    >
                       {tax.name}
                     </Text>
-                    <TouchableOpacity onPress={() => Alert.alert(tax.name, tax.description)} style={{marginLeft: 6, marginRight: 6}}>
-                      <Ionicons name="information-circle-outline" size={16} color={mode === 'dark' ? colors.WHITE : '#999'} />
+                    <TouchableOpacity
+                      onPress={() => Alert.alert(tax.name, tax.description)}
+                      style={{ marginLeft: 6 }}
+                    >
+                      <Ionicons
+                        name="information-circle-outline"
+                        size={16}
+                        color={mode === 'dark' ? colors.WHITE : '#999'}
+                      />
                     </TouchableOpacity>
                   </View>
                   {settings.swipe_symbol === false ? (
-                    <Text style={[styles.paymentValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                    <Text
+                      style={[
+                        styles.paymentValue,
+                        {
+                          color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                          textAlign: isRTL ? "right" : "left"
+                        }
+                      ]}
+                    >
                       {settings.symbol}{" "}
                       {formatAmount(tax.calculatedAmount, settings.decimal, settings.country)}
                     </Text>
                   ) : (
-                    <Text style={[styles.paymentValue, {color: mode === 'dark' ? colors.WHITE : colors.BLACK, textAlign: isRTL ? "right" : "left"}]}>
+                    <Text
+                      style={[
+                        styles.paymentValue,
+                        {
+                          color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                          textAlign: isRTL ? "right" : "left"
+                        }
+                      ]}
+                    >
                       {formatAmount(tax.calculatedAmount, settings.decimal, settings.country)}{" "}
                       {settings.symbol}
                     </Text>

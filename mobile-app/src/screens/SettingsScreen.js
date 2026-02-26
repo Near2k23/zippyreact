@@ -70,10 +70,17 @@ export default function SettingsScreen(props) {
     const profileAnim = useRef(new Animated.Value(0)).current;
     const [animationComplete, setAnimationComplete] = useState(false);
     const [headerSolid, setHeaderSolid] = useState(false);
+    const scrollY = useRef(new Animated.Value(0)).current;
+    const gradientOpacity = scrollY.interpolate({
+        inputRange: [0, 50],
+        outputRange: [1, 0],
+        extrapolate: 'clamp'
+    });
 
     const handleScroll = (event) => {
         const y = event.nativeEvent.contentOffset.y;
         setHeaderSolid(y > 50);
+        scrollY.setValue(y);
     };
 
     useEffect(() => {
@@ -215,10 +222,8 @@ export default function SettingsScreen(props) {
 
     return (
         <View style={[styles.mainView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
-            {/* Header Gradient */}
-            <HeaderGradient mode={mode} />
+            <HeaderGradient mode={mode} style={{ opacity: gradientOpacity }} />
             
-            {/* Custom Header */}
             <View style={[styles.customHeader, { 
                 backgroundColor: headerSolid ? (mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND) : 'transparent',
                 paddingTop: Platform.OS === 'ios' ? 50 : 30,

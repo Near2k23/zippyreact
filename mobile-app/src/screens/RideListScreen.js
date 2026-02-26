@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -7,7 +7,8 @@ import {
     FlatList,
     Dimensions,
     useColorScheme,
-    Platform
+    Platform,
+    Animated
 } from 'react-native';
 import { colors } from '../common/theme';
 import { fonts } from '../common/font';
@@ -27,10 +28,17 @@ export default function RideListPage(props) {
     const [bookingData, setBookingData] = useState([]);
     const [tabIndex, setTabIndex] = useState(0);
     const [headerSolid, setHeaderSolid] = useState(false);
+    const scrollY = useRef(new Animated.Value(0)).current;
+    const gradientOpacity = scrollY.interpolate({
+        inputRange: [0, 50],
+        outputRange: [1, 0],
+        extrapolate: 'clamp'
+    });
 
     const handleScroll = (event) => {
         const y = event.nativeEvent.contentOffset.y;
         setHeaderSolid(y > 50);
+        scrollY.setValue(y);
     };
     const { t } = i18n;
     const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
@@ -300,10 +308,7 @@ export default function RideListPage(props) {
 
     return (
         <View style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : '#FFF' }]}>
-            {/* Header Gradient */}
-            <HeaderGradient mode={mode} />
-            
-            {/* Custom Header */}
+            <HeaderGradient mode={mode} style={{ opacity: gradientOpacity }} />
             <View style={[styles.customHeader, { 
                 backgroundColor: headerSolid ? (mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND) : 'transparent',
                 paddingTop: Platform.OS === 'ios' ? 50 : 30,
