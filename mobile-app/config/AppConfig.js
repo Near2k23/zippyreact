@@ -2,7 +2,7 @@ module.exports.AppConfig = {
   app_name: 'WayGO',
   app_description: 'Viajes',
   app_identifier: 'com.sofytecapps.waygo',
-  ios_app_version: '1.0.1',
+  ios_app_version: '1.0.2',
   android_app_version: 101,
   expo_owner: 'sofytecapps',
   expo_slug: 'waygo',
