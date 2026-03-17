@@ -2,7 +2,7 @@
 	"app_name": "WayGO",
 	"app_description": "Viajes",
 	"app_identifier": "com.sofytecapps.waygo",
-	"ios_app_version": "1.0.2",
+	"ios_app_version": "1.0.3",
 	"android_app_version": "102",
 	"firebaseProjectId": "waygo-561e9",
 	"googleApiKeys": {
