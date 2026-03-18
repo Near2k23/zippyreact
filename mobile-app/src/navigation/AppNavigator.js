@@ -9,7 +9,6 @@ import {
     View,
     Text,
     TouchableOpacity,
-    Animated
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -46,12 +45,11 @@ var { height, width } = Dimensions.get('window');
 import { useSelector, useDispatch } from "react-redux";
 import i18n from 'i18n-js';
 import * as Notifications from 'expo-notifications';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../common/theme';
 import { Icon } from "react-native-elements";
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
-import { CommonActions } from '@react-navigation/native';
 import { fonts } from '../common/font';
+import TabBarIcon from '../components/TabBarIcon';
 import DeviceInfo from 'react-native-device-info';
 import { Linking } from 'react-native';
 import { useColorScheme } from 'react-native';
@@ -249,84 +247,16 @@ export default function AppContainer() {
             <Tab.Navigator
                 screenOptions={({ route }) => ({
                     animationEnabled: Platform.OS == 'android' ? false : true,
-                    tabBarIcon: ({ focused, color, size }) => {
-                        const scaleAnim = useRef(new Animated.Value(1)).current;
-                        const opacityAnim = useRef(new Animated.Value(1)).current;
-
-                        useEffect(() => {
-                            if (focused) {
-                                Animated.sequence([
-                                    Animated.timing(scaleAnim, {
-                                        toValue: 1.2,
-                                        duration: 150,
-                                        useNativeDriver: true,
-                                    }),
-                                    Animated.timing(scaleAnim, {
-                                        toValue: 1,
-                                        duration: 150,
-                                        useNativeDriver: true,
-                                    })
-                                ]).start();
-
-                                Animated.timing(opacityAnim, {
-                                    toValue: 0.7,
-                                    duration: 100,
-                                    useNativeDriver: true,
-                                }).start(() => {
-                                    Animated.timing(opacityAnim, {
-                                        toValue: 1,
-                                        duration: 100,
-                                        useNativeDriver: true,
-                                    }).start();
-                                });
-                            }
-                        }, [focused]);
-
-                        let iconName, iconType;
-                        if (route.name === 'Home') {
-                            iconName = 'home';
-                            iconType = 'material';
-                        } else if (route.name === 'DriverTrips') {
-                            iconName = 'home';
-                            iconType = 'material';
-                        } else if (route.name === 'RideList') {
-                            iconName = 'history';
-                            iconType = 'material';
-                        } else if (route.name === 'Settings') {
-                            iconName = 'person';
-                            iconType = 'material';
-                        }
-                        return (
-                            <Animated.View style={{ 
-                                flexDirection: 'column',
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                flex: 1,
-                                transform: [{ scale: scaleAnim }],
-                                opacity: opacityAnim
-                            }}>
-                                <Icon
-                                    name={iconName}
-                                    type={iconType}
-                                    size={size + 5}
-                                    color={color}
-                                    style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
-                                />
-                                <Text style={{
-                                    color: color,
-                                    fontSize: 10,
-                                    fontFamily: fonts.Medium,
-                                    marginTop: 2,
-                                    textAlign: 'center',
-                                }}>
-                                    {route.name === 'Home' ? t('home') : 
-                                     route.name === 'DriverTrips' ? t('task_list') :
-                                     route.name === 'RideList' ? t('ride_list_title') :
-                                     route.name === 'Settings' ? t('profile') : ''}
-                                </Text>
-                            </Animated.View>
-                        );
-                    },
+                    tabBarIcon: ({ focused, color, size }) => (
+                        <TabBarIcon
+                            routeName={route.name}
+                            focused={focused}
+                            color={color}
+                            size={size}
+                            isRTL={isRTL}
+                            t={t}
+                        />
+                    ),
                     tabBarActiveTintColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
                     tabBarInactiveTintColor: colors.SHADOW,
                     tabBarStyle: {
@@ -360,17 +290,6 @@ export default function AppContainer() {
                     <Tab.Screen name="Home" 
                         component={MapScreen} 
                         options={{ title: t('home'), headerShown: false }}
-                        listeners={({ navigation, route }) => ({
-                            tabPress: e => {
-                                e.preventDefault()
-                                navigation.dispatch(
-                                    CommonActions.reset({
-                                        index: 0,
-                                        routes: [{ name: route.name }]
-                                    })
-                                )
-                            },
-                        })}
                     />
                 : null}
                 {auth.profile && auth.profile.usertype && auth.profile.usertype == 'driver' ?
@@ -399,17 +318,6 @@ export default function AppContainer() {
                                 </View>
                             )
                         }}
-                        listeners={({ navigation, route }) => ({
-                            tabPress: e => {
-                                e.preventDefault()
-                                navigation.dispatch(
-                                    CommonActions.reset({
-                                        index: 0,
-                                        routes: [{ name: route.name }]
-                                    })
-                                )
-                            },
-                        })}
                     />
                 : null}
                 <Tab.Screen name="RideList"
@@ -417,34 +325,12 @@ export default function AppContainer() {
                     options={{
                         headerShown: false
                     }}
-                    listeners={({ navigation, route }) => ({
-                        tabPress: e => {
-                            e.preventDefault()
-                            navigation.dispatch(
-                                CommonActions.reset({
-                                    index: 0,
-                                    routes: [{ name: route.name }]
-                                })
-                            )
-                        },
-                    })}
                 />
                 <Tab.Screen name="Settings" 
                     component={SettingsScreen} 
                     options={{
                         headerShown: false
                     }}
-                    listeners={({ navigation, route }) => ({
-                        tabPress: e => {
-                            e.preventDefault()
-                            navigation.dispatch(
-                                CommonActions.reset({
-                                    index: 0,
-                                    routes: [{ name: route.name }]
-                                })
-                            )
-                        },
-                    })}
                 />
             </Tab.Navigator>
         );
