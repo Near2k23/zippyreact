@@ -146,11 +146,12 @@ __generated__
 web-build/
 web-report/
 .vscode
-android
+# Nativos solo en la raíz del repo (no ignorar mobile-app/android ni mobile-app/ios)
+/android/
+/ios/
 mobile-app/dist
-android/
-ios/
 AccessKey.*
+!common/src/other/AccessKey.js
 .DS_Store
 .env.local
 .env.development.local

@@ -51,9 +51,11 @@ async function validateBasicAuth(authHeader, config) {
  * @param {Object} request - Objeto de petición HTTP
  * @param {Object} config - Configuración del proyecto
  * @param {Object} userData - Datos del usuario
+ * @param {Object} [options] - Opciones adicionales
+ * @param {string} [options.appVariant] - 'driver' | 'rider' | undefined (legacy web)
  * @returns {Promise<Object>} Perfil formateado o error
  */
-async function formatUserProfile(request, config, userData) {
+async function formatUserProfile(request, config, userData, options) {
   const isAuthorized = await validateBasicAuth(
     request.headers.authorization,
     config
@@ -69,6 +71,14 @@ async function formatUserProfile(request, config, userData) {
     alphabet[Math.floor(Math.random() * alphabet.length)]
   ).join('');
 
+  const appVariant = options && options.appVariant;
+  let usertype = 'customer';
+  if (appVariant === 'driver') {
+    usertype = 'driver';
+  } else if (appVariant && appVariant !== 'rider') {
+    return { error: 'Invalid appVariant' };
+  }
+
   // Crear perfil base
   const userProfile = {
     uid: userData.uid,
@@ -77,7 +87,7 @@ async function formatUserProfile(request, config, userData) {
     lastName: userData.lastName,
     mobile: userData.mobile,
     email: userData.email,
-    usertype: 'customer',
+    usertype: usertype,
     referralId: referralId,
     approved: true,
     walletBalance: 0,

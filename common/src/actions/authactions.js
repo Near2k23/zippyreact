@@ -127,13 +127,21 @@ export const fetchUser = () => (dispatch) => {
           const settings = store.getState().settingsdata.settings;
           let host = window && window.location && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
           let url = `${host}/check_auth_exists`;
+          const bodyPayload = {data: JSON.stringify(data)};
+          if (typeof window === 'undefined' || !window.document) {
+            try {
+              const Constants = require('expo-constants').default;
+              const variant = Constants?.expoConfig?.extra?.appVariant;
+              if (variant) bodyPayload.appVariant = variant;
+            } catch (e) { /* web / entorno sin expo-constants */ }
+          }
           const response = await fetch(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               "Authorization": "Basic " + base64.encode(config.projectId + ":" + AccessKey)
             },
-            body: JSON.stringify({data: JSON.stringify(data)})
+            body: JSON.stringify(bodyPayload)
           })
           const json = await response.json();
           if(json.uid){
@@ -445,6 +453,20 @@ export const signOff = () => (dispatch) => {
         },2000)
       }
   },{onlyOnce: true});
+};
+
+/** Cierre inmediato de sesión (p. ej. variante de app incorrecta). No usa el flujo con delay de `signOff`. */
+export const signOutImmediate = () => async (dispatch) => {
+  const { auth } = firebase;
+  try {
+    await signOut(auth);
+  } catch (e) {
+    // ignore
+  }
+  dispatch({
+    type: USER_SIGN_OUT,
+    payload: null
+  });
 };
 
 export const updateProfile = (updateData) => async (dispatch) => {

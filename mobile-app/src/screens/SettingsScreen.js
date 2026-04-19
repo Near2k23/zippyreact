@@ -16,6 +16,7 @@ import Button from '../components/Button';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WaygoDialog from '../components/WaygoDialog';
 import HeaderGradient from '../components/HeaderGradient';
+import { isDriver } from '../appVariant';
 
 export default function SettingsScreen(props) {
     const { t } = i18n;
@@ -32,6 +33,7 @@ export default function SettingsScreen(props) {
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [convertModalVisible, setConvertModalVisible] = useState(false);
     const [sosModalVisible, setSosModalVisible] = useState(false);
+    const variantUserType = isDriver ? 'driver' : 'customer';
 
     let colorScheme = useColorScheme();
     const [mode, setMode] = useState();
@@ -66,6 +68,13 @@ export default function SettingsScreen(props) {
         { name: t('logout'), icon: 'logout', navigationName: 'Logout', type: 'antdesign' }
     ];
 
+    const filteredMenuList = menuList.filter(item => {
+        if (!isDriver && (item.navigationName === 'Cars' || item.navigationName === 'MyEarning')) {
+            return false;
+        }
+        return true;
+    });
+
     const fadeAnims = useRef({}).current;
     const profileAnim = useRef(new Animated.Value(0)).current;
     const [animationComplete, setAnimationComplete] = useState(false);
@@ -85,7 +94,7 @@ export default function SettingsScreen(props) {
 
     useEffect(() => {
         // Initialize animations
-        menuList.forEach((_, index) => {
+        filteredMenuList.forEach((_, index) => {
             fadeAnims[index] = new Animated.Value(0);
         });
 
@@ -99,7 +108,7 @@ export default function SettingsScreen(props) {
                 useNativeDriver: true
             }),
             // Menu items animation - all at once
-            ...menuList.map((_, index) => 
+            ...filteredMenuList.map((_, index) =>
                 Animated.spring(fadeAnims[index], {
                     toValue: 1,
                     friction: 8,
@@ -306,20 +315,17 @@ export default function SettingsScreen(props) {
                 </Text>
             
             <View style={[styles.menuContainer, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
-                {menuList.map((item, index) => {
+                {filteredMenuList.map((item, index) => {
                     // Conditional rendering logic
-                        if (auth.profile && auth.profile.usertype == "customer" && (item.navigationName == "Cars" || item.navigationName == "MyEarning")) {
+                        if (variantUserType == "driver" && (item.navigationName == "Sos") && !(settings && settings.panic && settings.panic.length > 0)) {
                             return null;
-                        }
-                        else if (auth.profile && (auth.profile.usertype == "driver") && (item.navigationName == "Sos") && !(settings && settings.panic && settings.panic.length > 0)) {
+                        } else if (variantUserType == "customer" && (item.navigationName == "Sos") && appConsts.hasOptions) {
                             return null;
-                        } else if (auth.profile && auth.profile.usertype == "customer" && (item.navigationName == "Sos") && appConsts.hasOptions) {
+                        } else if (variantUserType == "customer" && (item.navigationName == "Sos") && !(settings && settings.panic && settings.panic.length > 0)) {
                             return null;
-                        } else if (auth.profile && auth.profile.usertype == "customer" && (item.navigationName == "Sos") && !(settings && settings.panic && settings.panic.length > 0)) {
+                        } else if (variantUserType == "customer" && (item.navigationName == "editUser") && !(settings && ((settings.bank_fields && settings.RiderWithDraw) || settings.imageIdApproval))) {
                             return null;
-                        } else if (auth.profile && auth.profile.usertype == "customer" && (item.navigationName == "editUser") && !(settings && ((settings.bank_fields && settings.RiderWithDraw) || settings.imageIdApproval))) {
-                            return null;
-                        } else if (auth.profile && auth.profile.usertype == "driver" && (item.navigationName == "editUser") && !(settings && (settings.bank_fields || settings.imageIdApproval || settings.license_image_required))) {
+                        } else if (variantUserType == "driver" && (item.navigationName == "editUser") && !(settings && (settings.bank_fields || settings.imageIdApproval || settings.license_image_required))) {
                             return null;
                         } else {
                             return (

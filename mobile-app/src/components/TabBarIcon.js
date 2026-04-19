@@ -2,20 +2,31 @@ import React, { useRef, useEffect } from 'react';
 import { Animated, Text } from 'react-native';
 import { Icon } from 'react-native-elements';
 import { fonts } from '../common/font';
+import { isDriver } from '../appVariant';
 
-const ICON_MAP = {
-    Home: { name: 'home', type: 'material' },
-    DriverTrips: { name: 'home', type: 'material' },
-    RideList: { name: 'history', type: 'material' },
-    Settings: { name: 'person', type: 'material' },
-};
+const ICON_MAP = isDriver
+    ? {
+        DriverTrips: { name: 'home', type: 'material' },
+        RideList: { name: 'history', type: 'material' },
+        Settings: { name: 'person', type: 'material' },
+    }
+    : {
+        Home: { name: 'home', type: 'material' },
+        RideList: { name: 'history', type: 'material' },
+        Settings: { name: 'person', type: 'material' },
+    };
 
-const LABEL_MAP = {
-    Home: 'home',
-    DriverTrips: 'task_list',
-    RideList: 'ride_list_title',
-    Settings: 'profile',
-};
+const LABEL_MAP = isDriver
+    ? {
+        DriverTrips: 'task_list',
+        RideList: 'ride_list_title',
+        Settings: 'profile',
+    }
+    : {
+        Home: 'home',
+        RideList: 'ride_list_title',
+        Settings: 'profile',
+    };
 
 export default function TabBarIcon({ routeName, focused, color, size, isRTL, t }) {
     const scaleAnim = useRef(new Animated.Value(1)).current;

@@ -1047,7 +1047,7 @@ exports.user_signup = onRequest(async (request, response) => {
                     console.log('SIGNUP DEBUG - Checking email verification:', {
                         email: userDetails.email,
                         emailKey: emailKey,
-                        verifiedDataExists: !!verifiedData,
+                        verifiedDataExists: Boolean(verifiedData),
                         verifiedData: verifiedData
                     });
                     
@@ -1286,6 +1286,7 @@ exports.check_auth_exists = onRequest(async (request, response) => {
     }
     response.set("Access-Control-Allow-Headers", "Content-Type");
     let data = JSON.parse(request.body.data);
+    const appVariant = request.body.appVariant; // 'driver' | 'rider' | undefined (web legacy)
     
     if (settings && settings.emailVerificationRequired && data.uid) {
         try {
@@ -1308,11 +1309,15 @@ exports.check_auth_exists = onRequest(async (request, response) => {
         }
     }
     
-    const userData = await rgf.formatUserProfile(request, config, data);
+    const existingSnap = data.uid ? await db.ref('users/' + data.uid).once('value') : null;
+    if (existingSnap && existingSnap.exists()) {
+        return response.send(existingSnap.val());
+    }
+    const userData = await rgf.formatUserProfile(request, config, data, { appVariant });
     if(userData.uid){
         db.ref('users/' + userData.uid).set(userData);
     }
-    response.send(userData)
+    return response.send(userData);
 });
 
 

@@ -11,6 +11,47 @@ const { exec } = require('child_process');
 const cmd = process.argv[2];
 const workDir = process.cwd();
 
+/**
+ * En EAS, `postinstall` corre con EAS_BUILD=true y antes salíamos sin generar este archivo.
+ * Metro necesita `common/src/other/AccessKey.js` (importado por GoogleAPIFunctions / authactions).
+ */
+function writeAccessKeyForEasBuild() {
+  const accessKeyPath = path.join(workDir, 'common/src/other/AccessKey.js');
+  const configPath = path.join(workDir, 'functions/config.json');
+  let content = 'export default "";\n';
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const accessKeyCipher = CryptoJS.AES.encrypt(
+        config.encryptionKey || '',
+        config.encryptionKey
+      ).toString();
+      content = `export default ${JSON.stringify(accessKeyCipher)};\n`;
+    } else {
+      const fromEnv =
+        process.env.EXPO_PUBLIC_ACCESS_KEY ||
+        process.env.WAYGO_ACCESS_KEY ||
+        process.env.ACCESS_KEY;
+      if (fromEnv) {
+        content = `export default ${JSON.stringify(fromEnv)};\n`;
+      }
+    }
+  } catch (e) {
+    console.error('[waygo] EAS: error generando AccessKey:', e?.message || e);
+  }
+  fs.ensureDirSync(path.dirname(accessKeyPath));
+  fs.writeFileSync(accessKeyPath, content, 'utf8');
+  console.log('[waygo] EAS: common/src/other/AccessKey.js generado');
+}
+
+if (process.env.EAS_BUILD === 'true') {
+  if (cmd === 'install') {
+    writeAccessKeyForEasBuild();
+  }
+  console.log('[waygo] EAS build detectado, omitiendo configuracion de Firebase.');
+  process.exit(0);
+}
+
 function logStep(message) {
   console.log(`[waygo] ${message}`);
 }
@@ -112,7 +153,10 @@ async function install() {
 
   // AccessKey (encriptado localmente, sin llamadas de licencia)
   const accessKeyCipher = CryptoJS.AES.encrypt(config.encryptionKey || '', config.encryptionKey).toString();
-  await writeText(path.join(workDir, 'common/src/other/AccessKey.js'), `export default "${accessKeyCipher}";\n`);
+  await writeText(
+    path.join(workDir, 'common/src/other/AccessKey.js'),
+    `export default ${JSON.stringify(accessKeyCipher)};\n`
+  );
 
   // .firebaserc
   await writeText(path.join(workDir, '.firebaserc'), JSON.stringify({ projects: { default: config.firebaseProjectId } }, null, 2));

@@ -43,6 +43,7 @@ import CustomSplashScreen from '../screens/CustomSplashScreen';
 import Complain from '../screens/Complain';
 var { height, width } = Dimensions.get('window');
 import { useSelector, useDispatch } from "react-redux";
+import { api } from 'common';
 import i18n from 'i18n-js';
 import * as Notifications from 'expo-notifications';
 import { colors } from '../common/theme';
@@ -54,6 +55,8 @@ import DeviceInfo from 'react-native-device-info';
 import { Linking } from 'react-native';
 import { useColorScheme } from 'react-native';
 import { FirebaseConfig } from '../../config/FirebaseConfig';
+import WaygoDialog from '../components/WaygoDialog';
+import { isDriver } from '../appVariant';
 
 
 const hasNotch = DeviceInfo.hasNotch();
@@ -63,11 +66,20 @@ const Tab = createBottomTabNavigator();
 
 export default function AppContainer() {
     const { t } = i18n;
+    const dispatch = useDispatch();
     const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
     const auth = useSelector(state => state.auth);
     const activeBookings = useSelector(state => state.bookinglistdata.active);
     const responseListener = useRef();
     const navigationRef = useNavigationContainerRef();
+    const expectedUserType = isDriver ? 'driver' : 'customer';
+    const isMismatch = Boolean(
+        auth?.profile?.uid &&
+        auth.profile.usertype &&
+        auth.profile.usertype !== expectedUserType
+    );
+    const [wrongAppDialogVisible, setWrongAppDialogVisible] = useState(false);
+    const mismatchHandledRef = useRef(false);
     
     // All useState hooks called unconditionally
     let colorScheme = useColorScheme();
@@ -111,6 +123,23 @@ export default function AppContainer() {
             StatusBar.setBarStyle(mode === 'dark' ? 'white' : 'black');
         }
     }, [mode]);
+
+    useEffect(() => {
+        if (!auth?.profile?.uid || !auth.profile.usertype) {
+            mismatchHandledRef.current = false;
+            return;
+        }
+        if (auth.profile.usertype === expectedUserType) {
+            mismatchHandledRef.current = false;
+            return;
+        }
+        if (mismatchHandledRef.current) {
+            return;
+        }
+        mismatchHandledRef.current = true;
+        setWrongAppDialogVisible(true);
+        dispatch(api.signOutImmediate());
+    }, [auth?.profile?.uid, auth?.profile?.usertype, expectedUserType, dispatch]);
 
     // Notification listener effect
     useEffect(() => {
@@ -337,6 +366,7 @@ export default function AppContainer() {
     }
 
     return (
+        <>
         <NavigationContainer ref={navigationRef} linking={linking}>
             <Stack.Navigator
                 screenOptions={{
@@ -344,7 +374,7 @@ export default function AppContainer() {
                     //animationEnabled: false,
                 }}
             >
-                {auth.profile && auth.profile.uid ?
+                {auth.profile && auth.profile.uid && !isMismatch ?
                     <Stack.Group>
                         <Stack.Screen name="TabRoot" component={TabRoot} options={{ headerShown: false, }} />
                         <Stack.Screen name="Profile" component={ProfileScreen} options={screenOptions(t('profile_setting_menu'))} />
@@ -385,5 +415,20 @@ export default function AppContainer() {
                 }
             </Stack.Navigator>
         </NavigationContainer>
+        <WaygoDialog
+            visible={wrongAppDialogVisible}
+            onClose={() => setWrongAppDialogVisible(false)}
+            title="App incorrecta"
+            message="Tu cuenta es de otra aplicación. Descarga la app correcta para continuar."
+            type="warning"
+            showButtons={true}
+            singleButton={true}
+            confirmText="OK"
+            onConfirm={() => {
+                Linking.openURL('https://waygodriver.com');
+                setWrongAppDialogVisible(false);
+            }}
+        />
+        </>
     );
 }

@@ -16,6 +16,8 @@ export default function WaygoDialog({
     icon,
     iconColor,
     showButtons = false,
+    /** Si es true, solo se muestra el botón de confirmación (sin cancelar). */
+    singleButton = false,
     onConfirm,
     confirmText = 'Confirmar',
     cancelText = 'Cancelar',
@@ -57,17 +59,20 @@ export default function WaygoDialog({
 
     const iconProps = getIconProps();
 
+    const handleBackdropPress = singleButton ? undefined : onClose;
+    const handleRequestClose = singleButton ? () => {} : onClose;
+
     return (
         <Modal
             animationType="fade"
             transparent={true}
             visible={visible}
-            onRequestClose={onClose}
+            onRequestClose={handleRequestClose}
         >
             <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
-                onPress={onClose}
+                onPress={handleBackdropPress}
             >
                 <TouchableOpacity
                     style={[styles.modalContent, {
@@ -117,21 +122,23 @@ export default function WaygoDialog({
                             <View style={[styles.buttonContainer, {
                                 flexDirection: isRTL ? 'row-reverse' : 'row'
                             }]}>
-                                <TouchableOpacity
-                                    style={[styles.button, styles.cancelButton, {
-                                        backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#E2E9EC'
-                                    }]}
-                                    onPress={onClose}
-                                >
-                                    <Text style={[styles.buttonText, {
-                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK
-                                    }]}>
-                                        {cancelText}
-                                    </Text>
-                                </TouchableOpacity>
+                                {!singleButton && (
+                                    <TouchableOpacity
+                                        style={[styles.button, styles.cancelButton, {
+                                            backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#E2E9EC'
+                                        }]}
+                                        onPress={onClose}
+                                    >
+                                        <Text style={[styles.buttonText, {
+                                            color: mode === 'dark' ? colors.WHITE : colors.BLACK
+                                        }]}>
+                                            {cancelText}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
 
                                 <TouchableOpacity
-                                    style={[styles.button, styles.confirmButton, {
+                                    style={[styles.button, styles.confirmButton, singleButton && styles.buttonFullWidth, {
                                         backgroundColor: type === 'warning' ? colors.RED :
                                             (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR)
                                     }]}
@@ -226,6 +233,10 @@ const styles = StyleSheet.create({
     },
     confirmButton: {
         // Sin borde para el botón principal
+    },
+    buttonFullWidth: {
+        flex: 1,
+        maxWidth: '100%',
     },
     buttonText: {
         fontSize: 14,

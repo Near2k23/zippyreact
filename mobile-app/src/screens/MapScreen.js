@@ -486,9 +486,7 @@ export default function MapScreen(props) {
 
     useEffect(() => {
         if (tripdata.pickup && tripdata.pickup.add && tripdata.drop && tripdata.drop.add && showInitialScreen) {
-            if (tripdata.drop.source === 'search') {
-                setShowInitialScreen(false);
-            }
+            setShowInitialScreen(false);
         }
     }, [tripdata.pickup, tripdata.drop, showInitialScreen]);
 
@@ -1139,7 +1137,19 @@ export default function MapScreen(props) {
     };
 
     const handleNewTrip = () => {
-        if (tripdata.pickup && tripdata.pickup.add) {
+        const hasResolvedPickup = tripdata.pickup && tripdata.pickup.add;
+        const canUseCurrentLocation = gps && gps.location && gps.location.lat && gps.location.lng && currentLocation;
+
+        if (!hasResolvedPickup && canUseCurrentLocation) {
+            dispatch(updateTripPickup({
+                lat: gps.location.lat,
+                lng: gps.location.lng,
+                add: currentLocation,
+                source: 'gps'
+            }));
+        }
+
+        if (hasResolvedPickup || canUseCurrentLocation) {
             dispatch(updatSelPointType('drop'));
             props.navigation.navigate('Search', {
                 locationType: "drop",
@@ -1359,6 +1369,14 @@ export default function MapScreen(props) {
 
         if (found) {
             setCurrentLocation(res);
+            if (!tripdata.pickup?.add || tripdata.pickup?.source === 'gps') {
+                dispatch(updateTripPickup({
+                    lat: pos.latitude,
+                    lng: pos.longitude,
+                    add: res,
+                    source: 'gps'
+                }));
+            }
             setLoadingLocation(false);
         } else {
             fetchAddressfromCoords(latlng).then((add) => {
@@ -1370,6 +1388,14 @@ export default function MapScreen(props) {
                     });
                     storeAddresses(storedAddresses);
                     setCurrentLocation(add);
+                    if (!tripdata.pickup?.add || tripdata.pickup?.source === 'gps') {
+                        dispatch(updateTripPickup({
+                            lat: pos.latitude,
+                            lng: pos.longitude,
+                            add: add,
+                            source: 'gps'
+                        }));
+                    }
                 }
                 setLoadingLocation(false);
             }).catch((error) => {
@@ -1932,6 +1958,13 @@ export default function MapScreen(props) {
         return (shouldShowForDriver || shouldShowForRider) && !hasSocialSecurity;
     }
 
+    const exitMapSelection = () => {
+        setSelectFromMap(false);
+        setMapSelectionType(null);
+        setIsResolvingTapAddress(false);
+        props.navigation.navigate('TabRoot', { screen: 'Home' });
+    }
+
     const onMapSelectComplete = () => {
         if ((tripdata.pickup && tripdata.pickup.source == 'mapSelect') || (tripdata.drop && tripdata.drop.source == 'mapSelect')) {
             if (tripdata.selected === 'pickup') {
@@ -1946,8 +1979,7 @@ export default function MapScreen(props) {
             } else if (mapSelectionType === 'drop') {
                 dispatch(updateTripDrop({ ...tripdata.drop, source: "region-change" }))
             }
-            setSelectFromMap(false);
-            setMapSelectionType(null);
+            exitMapSelection();
         }
     }
 
@@ -2102,11 +2134,15 @@ export default function MapScreen(props) {
                         <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                             {!showInitialScreen ? (
                                 <TouchableOpacity onPress={() => {
-                                    setShowInitialScreen(true);
-                                    setRouteCoords([]);
-                                    setHasAutoFitted(false);
-                                    dispatch(clearTripPoints());
-                                    dispatch(clearEstimate());
+                                    if (selectFromMap && mapSelectionType) {
+                                        exitMapSelection();
+                                    } else {
+                                        setShowInitialScreen(true);
+                                        setRouteCoords([]);
+                                        setHasAutoFitted(false);
+                                        dispatch(clearTripPoints());
+                                        dispatch(clearEstimate());
+                                    }
                                 }} style={styles.backButton}>
                                     <Icon
                                         name="arrow-back"

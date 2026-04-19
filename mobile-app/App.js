@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Asset } from 'expo-asset';
 import * as Font from 'expo-font';
-import AppContainer from './src/navigation/AppNavigator';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import {
@@ -17,13 +16,21 @@ import {
   FirebaseProvider,
   store
 } from 'common';
-import AppCommon from './AppCommon';
 import { FirebaseConfig } from './config/FirebaseConfig';
 import { colors } from './src/common/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { GluestackUIProvider } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
+import { isDriver } from './src/appVariant';
+
+const AppContainer = isDriver
+  ? require('./src/navigation/AppNavigator.driver').default
+  : require('./src/navigation/AppNavigator.rider').default;
+
+const AppCommon = isDriver
+  ? require('./AppCommon.driver').default
+  : require('./AppCommon.rider').default;
 
 SplashScreen.preventAutoHideAsync();
 

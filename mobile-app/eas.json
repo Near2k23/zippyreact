@@ -4,7 +4,25 @@
       "channel": "development",
       "autoIncrement": false,
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "cache": {
+        "key": "dev-android-v4-postinstall-prebuild"
+      }
+    },
+    "development:driver": {
+      "extends": "development",
+      "env": {
+        "APP_VARIANT": "driver"
+      }
+    },
+    "development:rider": {
+      "extends": "development",
+      "env": {
+        "APP_VARIANT": "rider"
+      }
     },
     "simulator": {
       "channel": "simulator",
@@ -26,11 +44,47 @@
       },
       "distribution": "internal"
     },
+    "preview:driver": {
+      "extends": "preview",
+      "env": {
+        "APP_VARIANT": "driver"
+      }
+    },
+    "preview:rider": {
+      "extends": "preview",
+      "env": {
+        "APP_VARIANT": "rider"
+      }
+    },
     "production": {
       "channel": "production",
       "autoIncrement": false,
       "android": {
         "buildType": "app-bundle"
+      }
+    },
+    "production:driver": {
+      "extends": "production",
+      "env": {
+        "APP_VARIANT": "driver"
+      }
+    },
+    "production:rider": {
+      "extends": "production",
+      "env": {
+        "APP_VARIANT": "rider"
+      }
+    },
+    "production-apk:driver": {
+      "extends": "production:driver",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production-apk:rider": {
+      "extends": "production:rider",
+      "android": {
+        "buildType": "apk"
       }
     }
   },

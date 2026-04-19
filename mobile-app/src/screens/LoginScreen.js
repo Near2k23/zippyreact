@@ -36,6 +36,7 @@ import { fonts } from "../common/font";
 import { Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal, SelectBackdrop, SelectContent, SelectItem, ChevronDownIcon } from '@gluestack-ui/themed';
 import RNPickerSelect from '../components/RNPickerSelect';
 import WaygoDialog from '../components/WaygoDialog';
+import { isDriver } from '../appVariant';
 
 GoogleSignin.configure(ClientIds);
 
@@ -539,9 +540,9 @@ export default function LoginScreen(props) {
         }
     }
 
-    const openRegister = (usertype = 'customer') => {
+    const openRegister = () => {
         pageActive.current = false;
-        if (usertype === 'driver') {
+        if (isDriver) {
             props.navigation.navigate("RegisterDriver");
         } else {
             props.navigation.navigate("Register");
@@ -865,20 +866,22 @@ export default function LoginScreen(props) {
                                 </TouchableOpacity>
                             </>
                         ) : (
-                            <View style={{ width: '100%', flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                                <TouchableOpacity style={[styles.registerButton, { width: 'auto', paddingHorizontal: 20 }]} onPress={() => openRegister('customer')}>
-                                    <Text style={styles.registerButtonText}>{t('register') || 'Registrarse'}</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity style={[styles.loginButton, { flex: 1 }]} onPress={onPressLogin}>
-                                    {loading ? (
-                                        <ActivityIndicator color={colors.WHITE} />
-                                    ) : (
-                                        <Text style={styles.loginButtonText}>
-                                            {settings.mobileLogin ? (isNaN(state.contact) ? t('signIn') : t('request_otp')) : t('signIn')}
-                                        </Text>
-                                    )}
-                                </TouchableOpacity>
-                            </View>
+                            <>
+                                <View style={styles.authActionsRow}>
+                                    <TouchableOpacity style={styles.registerButtonInline} onPress={openRegister}>
+                                        <Text style={styles.registerButtonText}>{ t('signup') || 'Registro' }</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.loginButtonInline} onPress={onPressLogin}>
+                                        {loading ? (
+                                            <ActivityIndicator color={colors.WHITE} />
+                                        ) : (
+                                            <Text style={styles.loginButtonText}>
+                                                {settings.mobileLogin ? (isNaN(state.contact) ? t('signIn') : t('request_otp')) : t('signIn')}
+                                            </Text>
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </>
                         )}
                     </Animated.View>
 
@@ -913,9 +916,6 @@ export default function LoginScreen(props) {
                     : null}
 
                     <View style={styles.bottomLinksContainer}>
-                        <TouchableOpacity onPress={() => openRegister('driver')} style={styles.bottomLinkItem}>
-                            <Text style={styles.bottomLinkText}>{t('are_you_driver') || '¿Eres conductor?'}</Text>
-                        </TouchableOpacity>
                         <TouchableOpacity onPress={openTerms} style={styles.bottomLinkItem}>
                             <Text style={styles.bottomLinkText}>{t('terms')}</Text>
                         </TouchableOpacity>
@@ -1031,26 +1031,68 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginTop: 4
     },
+    authActionsRow: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        columnGap: 10,
+        marginTop: 4
+    },
+    loginButtonInline: {
+        flex: 1,
+        backgroundColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
     loginButtonText: {
         color: colors.WHITE,
         fontSize: 16,
         fontFamily: fonts.Bold
     },
+    secondaryActionsContainer: {
+        width: '100%',
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 10
+    },
     registerButton: {
+        flex: 1,
         backgroundColor: colors.WHITE,
         borderWidth: 2,
         borderColor: '#1369B4',
         borderRadius: 10,
         paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 4
     },
+    registerButtonInline: {
+        width: 140,
+        backgroundColor: colors.WHITE,
+        borderWidth: 2,
+        borderColor: '#1369B4',
+        borderRadius: 10,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
     registerButtonText: {
         color: '#1369B4',
         fontSize: 14,
-        fontFamily: fonts.Bold
+        fontFamily: fonts.Bold,
+        textAlign: 'center'
+    },
+    registerButtonSubText: {
+        marginTop: 1,
+        color: '#1369B4',
+        fontSize: 11,
+        fontFamily: fonts.Regular,
+        opacity: 0.9,
+        textAlign: 'center'
     },
     bottomLinksContainer: {
         width: '100%',
