@@ -15,10 +15,10 @@ import {
     ActivityIndicator,
     useColorScheme,
     TouchableOpacity,
-    SafeAreaView,
     Modal,
     BackHandler
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icon } from 'react-native-elements';
 import { colors } from '../common/theme';
 import * as Location from 'expo-location';

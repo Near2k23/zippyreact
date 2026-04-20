@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { GluestackUIProvider } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { isDriver } from './src/appVariant';
 
 const AppContainer = isDriver
@@ -215,18 +216,20 @@ export default function App() {
   }
 
   return (
-    <Provider store={store}>
-      <FirebaseProvider 
-        config={FirebaseConfig} 
-        AsyncStorage={AsyncStorage}
-      >
-        <GluestackUIProvider config={config}>
-          <AppCommon>
-            <AppContainer />
-          </AppCommon>
-        </GluestackUIProvider>
-      </FirebaseProvider>
-    </Provider>
+    <SafeAreaProvider>
+      <Provider store={store}>
+        <FirebaseProvider
+          config={FirebaseConfig}
+          AsyncStorage={AsyncStorage}
+        >
+          <GluestackUIProvider config={config}>
+            <AppCommon>
+              <AppContainer />
+            </AppCommon>
+          </GluestackUIProvider>
+        </FirebaseProvider>
+      </Provider>
+    </SafeAreaProvider>
   );
 }
 

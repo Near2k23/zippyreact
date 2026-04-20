@@ -119,7 +119,6 @@ export default function AppContainer() {
     // Set status bar color based on theme
     useEffect(() => {
         if (Platform.OS === 'android') {
-            StatusBar.setBackgroundColor(mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR);
             StatusBar.setBarStyle(mode === 'dark' ? 'white' : 'black');
         }
     }, [mode]);

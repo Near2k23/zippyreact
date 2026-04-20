@@ -1,8 +1,8 @@
-import { AppConfig } from './config/AppConfig';
 import { GoogleMapApiConfig } from './config/GoogleMapApiConfig';
 
 const APP_VARIANT = process.env.APP_VARIANT || 'rider';
 const isDriver = APP_VARIANT === 'driver';
+const { AppConfig } = isDriver ? require('./config/AppConfig.driver') : require('./config/AppConfig.rider');
 const iosGoogleServicesFile = isDriver ? './GoogleService-Info.driver.plist' : './GoogleService-Info.plist';
 
 const locationPermissionText = 'For a reliable ride, App collects location data from the time you open the app until a trip ends. This improves pickups, support, and more.';
@@ -10,11 +10,8 @@ const backgroundLocationPermissionText = 'This app uses the always location acce
 
 const androidPermissions = [
   'CAMERA',
-  'READ_EXTERNAL_STORAGE',
-  'WRITE_EXTERNAL_STORAGE',
   'ACCESS_FINE_LOCATION',
   'ACCESS_COARSE_LOCATION',
-  'CAMERA_ROLL',
   'FOREGROUND_SERVICE',
   'SCHEDULE_EXACT_ALARM'
 ];
@@ -55,20 +52,19 @@ if (isDriver) {
 }
 
 export default {
-  name: isDriver ? `${AppConfig.app_name} Driver` : AppConfig.app_name,
+  name: AppConfig.app_name,
   description: AppConfig.app_description,
   owner: AppConfig.expo_owner,
   slug: AppConfig.expo_slug,
   scheme: AppConfig.expo_slug,
-  privacy: 'public',
+  newArchEnabled: true,
   runtimeVersion: {
     policy: 'appVersion'
   },
   userInterfaceStyle: 'automatic',
   platforms: ['ios', 'android'],
   androidStatusBar: {
-    hidden: true,
-    translucent: true
+    hidden: true
   },
   version: AppConfig.ios_app_version,
   orientation: 'portrait',
@@ -94,7 +90,6 @@ export default {
   },
   ios: {
     associatedDomains: ['applinks:' + AppConfig.expo_slug + '.page.link'],
-    newArchEnabled: false,
     splash: {
       image: './assets/images/logo_splash.png',
       resizeMode: 'contain',
@@ -103,7 +98,7 @@ export default {
     supportsTablet: true,
     usesAppleSignIn: true,
     // Debe coincidir con el `BUNDLE_ID` del `GoogleService-Info*.plist` seleccionado.
-    bundleIdentifier: isDriver ? 'com.waygo.driver' : AppConfig.app_identifier,
+    bundleIdentifier: AppConfig.app_identifier,
     entitlements: {
       'com.apple.developer.devicecheck.appattest-environment': 'production'
     },
@@ -136,12 +131,9 @@ export default {
   },
   android: {
     // El `google-services.json` incluye clientes distintos por paquete.
-    // Para driver usamos el package registrado en Firebase: `com.waygo.driver`.
-    // Para rider mantenemos el identificador base del proyecto.
-    package: isDriver ? 'com.waygo.driver' : AppConfig.app_identifier,
+    // Para driver usamos `com.zippyco.driver` y para rider `com.zippyco.zippy`.
+    package: AppConfig.android_package,
     versionCode: AppConfig.android_app_version,
-    newArchEnabled: false,
-    edgeToEdgeEnabled: false,
     splash: {
       image: './assets/images/logo_splash.png',
       resizeMode: 'contain',

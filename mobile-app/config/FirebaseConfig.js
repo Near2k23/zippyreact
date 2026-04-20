@@ -1,12 +1,12 @@
 module.exports.FirebaseConfig = {
-  "projectId": "waygo-561e9",
-  "appId": "1:210137526589:web:c01d28091df61483575554",
-  "databaseURL": "https://waygo-561e9-default-rtdb.firebaseio.com",
-  "storageBucket": "waygo-561e9.firebasestorage.app",
-  "apiKey": "AIzaSyBMyI9AA3BPl7otA-lhOtky8OQU7D71338",
-  "authDomain": "waygo-561e9.firebaseapp.com",
-  "messagingSenderId": "210137526589",
-  "measurementId": "G-V21PVQH3XP",
-  "projectNumber": "210137526589",
+  "projectId": "zippy-co",
+  "appId": "1:464986575236:web:24a9fc8c88e9c389364dd1",
+  "databaseURL": "https://zippy-co-default-rtdb.firebaseio.com",
+  "storageBucket": "zippy-co.firebasestorage.app",
+  "apiKey": "AIzaSyDCKVgjYSz_daLN8gLrdT1KoCZf-uBRnMg",
+  "authDomain": "zippy-co.firebaseapp.com",
+  "messagingSenderId": "464986575236",
+  "measurementId": "G-0WWGYD5K2M",
+  "projectNumber": "464986575236",
   "version": "2"
 };

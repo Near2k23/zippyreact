@@ -14,10 +14,10 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     useColorScheme,
-    SafeAreaView,
     KeyboardAvoidingView,
     Animated
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input } from '../../components/ui/input';
 import { useDispatch, useSelector } from 'react-redux';
 import { api } from 'common';

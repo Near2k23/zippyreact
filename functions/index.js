@@ -19,11 +19,19 @@ const { getAuth } = require('firebase-admin/auth');
 const functions = require("firebase-functions/v2");
 const {setGlobalOptions} = require("firebase-functions/v2");
 
-admin.initializeApp();
+/** Misma heurística que antes: RTDB regional *.REGION.firebasedatabase.app → parts.length === 4 */
+function regionFromDatabaseUrl(databaseURL) {
+  if (!databaseURL || typeof databaseURL !== 'string') return 'us-central1';
+  const parts = databaseURL.split('.');
+  return parts.length === 4 ? parts[1] : 'us-central1';
+}
 
-const databaseURL = admin.app().options.databaseURL;
+admin.initializeApp({
+  databaseURL: config.databaseURL,
+  projectId: config.projectId || config.firebaseProjectId,
+});
 
-setGlobalOptions({ region: databaseURL.split('.').length===4?databaseURL.split('.')[1]:'us-central1'});
+setGlobalOptions({ region: regionFromDatabaseUrl(config.databaseURL) });
 
 var methods = [
     "braintree",

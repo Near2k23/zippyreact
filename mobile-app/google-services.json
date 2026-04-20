@@ -1,41 +1,42 @@
 {
   "project_info": {
-    "project_number": "210137526589",
-    "firebase_url": "https://waygo-561e9-default-rtdb.firebaseio.com",
-    "project_id": "waygo-561e9",
-    "storage_bucket": "waygo-561e9.firebasestorage.app"
+    "project_number": "464986575236",
+    "firebase_url": "https://zippy-co-default-rtdb.firebaseio.com",
+    "project_id": "zippy-co",
+    "storage_bucket": "zippy-co.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:210137526589:android:6912a237b6edbadb575554",
+        "mobilesdk_app_id": "1:464986575236:android:e69de4fa78f94598364dd1",
         "android_client_info": {
-          "package_name": "com.sofytecapps.waygo"
+          "package_name": "com.zippyco.driver"
         }
       },
       "oauth_client": [
         {
-          "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+          "client_id": "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCRIDFTkzqcXl1V3BpjN_ITvvqTtAECSjQ"
+          "current_key": "AIzaSyBJvWN_csuUfxrJDnb96DVLGQ8SxYJ2EoY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+              "client_id": "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "210137526589-3pu92m8r32ib8qsmrnsqdntc34107tfi.apps.googleusercontent.com",
+              "client_id": "464986575236-7t8k6hpl4nqmt0724giebi9dtfk65pen.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.zippy.rides"
+                "bundle_id": "com.zippyco.tienda",
+                "app_store_id": "6756533071"
               }
             }
           ]
@@ -44,34 +45,35 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:210137526589:android:07b89a9c6a28c589575554",
+        "mobilesdk_app_id": "1:464986575236:android:00e830989ea08098364dd1",
         "android_client_info": {
-          "package_name": "com.tecnosoluciones.waygorides"
+          "package_name": "com.zippyco.tienda"
         }
       },
       "oauth_client": [
         {
-          "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+          "client_id": "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCRIDFTkzqcXl1V3BpjN_ITvvqTtAECSjQ"
+          "current_key": "AIzaSyBJvWN_csuUfxrJDnb96DVLGQ8SxYJ2EoY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+              "client_id": "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "210137526589-3pu92m8r32ib8qsmrnsqdntc34107tfi.apps.googleusercontent.com",
+              "client_id": "464986575236-7t8k6hpl4nqmt0724giebi9dtfk65pen.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.zippy.rides"
+                "bundle_id": "com.zippyco.tienda",
+                "app_store_id": "6756533071"
               }
             }
           ]
@@ -80,70 +82,51 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:210137526589:android:62c83ec182eda5dd575554",
+        "mobilesdk_app_id": "1:464986575236:android:23b5a938e97564b1364dd1",
         "android_client_info": {
-          "package_name": "com.waygo.driver"
+          "package_name": "com.zippyco.zippy"
         }
       },
       "oauth_client": [
         {
-          "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+          "client_id": "464986575236-0td60asqbpi7on0qu22o4urd7ncqs0qr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zippyco.zippy",
+            "certificate_hash": "6baf0fa27dfe06276e9077609be279c7ded0e448"
+          }
+        },
+        {
+          "client_id": "464986575236-kh5fhsas4clhgheinnv4rq570rrc2l4d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zippyco.zippy",
+            "certificate_hash": "f715f5d89a8228061d2c48fbae317f7c7ddd86c8"
+          }
+        },
+        {
+          "client_id": "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCRIDFTkzqcXl1V3BpjN_ITvvqTtAECSjQ"
+          "current_key": "AIzaSyBJvWN_csuUfxrJDnb96DVLGQ8SxYJ2EoY"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
+              "client_id": "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "210137526589-3pu92m8r32ib8qsmrnsqdntc34107tfi.apps.googleusercontent.com",
+              "client_id": "464986575236-7t8k6hpl4nqmt0724giebi9dtfk65pen.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.zippy.rides"
-              }
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:210137526589:android:ecd75e1a29430f43575554",
-        "android_client_info": {
-          "package_name": "com.waygo.rides"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyCRIDFTkzqcXl1V3BpjN_ITvvqTtAECSjQ"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "210137526589-3pu92m8r32ib8qsmrnsqdntc34107tfi.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.zippy.rides"
+                "bundle_id": "com.zippyco.tienda",
+                "app_store_id": "6756533071"
               }
             }
           ]

@@ -3,21 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>210137526589-aqqkfi98hj31n6amslq3geed7bb7sjfa.apps.googleusercontent.com</string>
+	<string>464986575236-is42udcu5ffc4l33jub0kfn52k49c2sn.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.210137526589-aqqkfi98hj31n6amslq3geed7bb7sjfa</string>
+	<string>com.googleusercontent.apps.464986575236-is42udcu5ffc4l33jub0kfn52k49c2sn</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>464986575236-0td60asqbpi7on0qu22o4urd7ncqs0qr.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCEU3x4mTYAROyrvCW_5mas_jRVXCdqfSo</string>
+	<string>AIzaSyAsb9izOauczqiBCRVOybVgefnMAaYjYU8</string>
 	<key>GCM_SENDER_ID</key>
-	<string>210137526589</string>
+	<string>464986575236</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.waygo.driver</string>
+	<string>com.zippyco.zippy</string>
 	<key>PROJECT_ID</key>
-	<string>waygo-561e9</string>
+	<string>zippy-co</string>
 	<key>STORAGE_BUCKET</key>
-	<string>waygo-561e9.firebasestorage.app</string>
+	<string>zippy-co.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -29,8 +31,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:210137526589:ios:42c3b490a31db1c0575554</string>
+	<string>1:464986575236:ios:0ceed6331ebe36b6364dd1</string>
 	<key>DATABASE_URL</key>
-	<string>https://waygo-561e9-default-rtdb.firebaseio.com</string>
+	<string>https://zippy-co-default-rtdb.firebaseio.com</string>
 </dict>
 </plist>

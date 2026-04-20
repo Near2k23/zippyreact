@@ -13,13 +13,15 @@
     "app:rider-lan": "cross-env APP_VARIANT=rider node scripts/expo-start-lan-local-ip.cjs",
     "app:localhost": "yarn workspace mobile-app start --localhost",
     "app:tunnel": "yarn workspace mobile-app start --tunnel",
-    "app:publish": "cd mobile-app && eas update",
+    "app:publish": "cd mobile-app && eas update --environment production",
     "app:build-ios": "cd mobile-app && eas build --platform ios --profile production",
     "app:build-android": "cd mobile-app && eas build --platform android --profile production",
     "app:build-android-apk": "cd mobile-app && eas build --platform android --profile preview",
     "app:build-ios-sim": "cd mobile-app && eas build -p ios --profile simulator",
     "app:build-dev-client": "cd mobile-app && eas build --profile development",
     "app:build-dev-android-apk": "cd mobile-app && eas build --platform android --profile development",
+    "app:developmente:driver": "cd mobile-app && cross-env APP_VARIANT=driver eas build --platform android --profile development",
+    "app:developmente:rider": "cd mobile-app && cross-env APP_VARIANT=rider eas build --platform android --profile development",
     "build:driver:android": "cd mobile-app && cross-env APP_VARIANT=driver eas build --platform android --profile preview:driver",
     "build:driver:ios": "cd mobile-app && cross-env APP_VARIANT=driver eas build --platform ios --profile production:driver",
     "build:rider:android": "cd mobile-app && cross-env APP_VARIANT=rider eas build --platform android --profile preview:rider",
@@ -30,8 +32,8 @@
     "app:upgrade-sdk": "yarn workspace mobile-app upgrade-sdk",
     "web": "yarn workspace web-app start",
     "web:deploy": "yarn workspace web-app build && firebase deploy --only hosting",
-    "web:functions": "yarn workspace functions deploy --only functions",
-    "deploy": "yarn workspace web-app build && firebase deploy && node script/install.js initialize",
+    "web:functions": "cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 yarn workspace functions deploy --only functions",
+    "deploy": "yarn workspace web-app build && cross-env FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy && node script/install.js initialize",
     "postinstall": "patch-package && node script/install.js install && node scripts/eas-android-prebuild.cjs",
     "android": "expo run:android",
     "ios": "expo run:ios"
@@ -55,15 +57,9 @@
     "open": "^8.4.0",
     "patch-package": "^8.0.0",
     "fast-xml-parser": "^4.3.2",
-    "expo": "~53.0.11",
-    "react": "19.0.0",
-    "react-native": "0.79.3"
-  },
-  "resolutions": {
-    "@expo/config-plugins": "~10.1.1",
-    "@expo/prebuild-config": "~9.0.0",
-    "react-native-safe-area-context": "5.4.0",
-    "@babel/core": "^7.20.0"
+    "expo": "~55.0.15",
+    "react": "19.2.0",
+    "react-native": "0.83.4"
   },
   "expo": {
     "doctor": {

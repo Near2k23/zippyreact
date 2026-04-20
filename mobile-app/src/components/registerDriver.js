@@ -10,11 +10,11 @@ import {
     Alert,
     TouchableOpacity,
     TextInput,
-    SafeAreaView,
     useColorScheme,
     Animated,
     ActivityIndicator
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Input } from '../../components/ui/input';
 import { colors } from '../common/theme';
 var { height,width } = Dimensions.get('window');
@@ -1430,5 +1430,4 @@ const styles = StyleSheet.create({
         flex: 1
     }
 });
-
 

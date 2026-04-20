@@ -10,11 +10,11 @@ import {
     Alert,
     TouchableOpacity,
     TextInput,
-    SafeAreaView,
     useColorScheme,
     ActivityIndicator,
     Image
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../common/theme';
 var { height, width } = Dimensions.get('window');
 import i18n from 'i18n-js';

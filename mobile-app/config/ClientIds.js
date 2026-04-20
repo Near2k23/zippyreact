@@ -1,5 +1,5 @@
 module.exports.ClientIds = {
-  iosClientId: "210137526589-3pu92m8r32ib8qsmrnsqdntc34107tfi.apps.googleusercontent.com",
+  iosClientId: "464986575236-7t8k6hpl4nqmt0724giebi9dtfk65pen.apps.googleusercontent.com",
   androidClientId: "",
-  webClientId: "210137526589-c9oc06sf5u9dd9uijnhjm45vatqplbjv.apps.googleusercontent.com"
+  webClientId: "464986575236-hemhjr95cooh85ihd3jp9ha1cgu6o052.apps.googleusercontent.com"
 }

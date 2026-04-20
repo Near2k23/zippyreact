@@ -130,7 +130,10 @@ export const fetchUser = () => (dispatch) => {
           const bodyPayload = {data: JSON.stringify(data)};
           if (typeof window === 'undefined' || !window.document) {
             try {
-              const Constants = require('expo-constants').default;
+              // Evita que el bundler web (CRA) resuelva expo → expo-modules-core (.ts).
+              const { default: Constants } = await import(
+                /* webpackIgnore: true */ 'expo-constants'
+              );
               const variant = Constants?.expoConfig?.extra?.appVariant;
               if (variant) bodyPayload.appVariant = variant;
             } catch (e) { /* web / entorno sin expo-constants */ }

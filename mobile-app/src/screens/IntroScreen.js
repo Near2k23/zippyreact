@@ -7,10 +7,10 @@ import {
     Dimensions,
     StyleSheet,
     StatusBar,
-    SafeAreaView,
     BackHandler,
     Animated
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../common/theme';
 import { fonts } from '../common/font';

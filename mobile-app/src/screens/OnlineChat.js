@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Image,
   Linking
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from "../common/theme";
 import { fonts } from "../common/font";
 import i18n from 'i18n-js';
