@@ -2,6 +2,18 @@ import {  createTheme } from '@mui/material/styles';
 import { FONT_FAMILY } from 'common/sharedFunctions';
 
 const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#F97316',
+      light: '#FDBA74',
+      dark: '#EA580C',
+      contrastText: '#FFFFFF',
+    },
+    secondary: {
+      main: '#1F2937',
+      contrastText: '#FFFFFF',
+    },
+  },
   components: {
     MuiTableCell: {
       styleOverrides: {
@@ -98,6 +110,9 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           fontFamily: FONT_FAMILY,
+          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#F97316',
+          },
         },
       },
     },

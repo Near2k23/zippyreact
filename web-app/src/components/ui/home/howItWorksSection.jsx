@@ -34,7 +34,7 @@ const HowItWorksSection = () => {
   ];
 
   return (
-    <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50">
+    <section className="py-20" style={{ background: 'linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 100%)' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <Title variant="section" isVisible={isVisible}>
@@ -59,7 +59,7 @@ const HowItWorksSection = () => {
         <div className={`text-center mt-16 transition-all duration-1000 ease-out transform delay-1000 ${
           isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
         }`}>
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full mb-4" style={{ background: 'var(--gradient-primary)' }}>
             <Check sx={{ fontSize: 24, color: 'white' }} />
           </div>
           <p className="text-lg font-semibold text-gray-700">

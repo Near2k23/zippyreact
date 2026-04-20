@@ -78,7 +78,7 @@ const Navbar = ({ logoSrc, logoSrcDark, darkText = false }) => {
     <>
       <header className={`fixed top-0 left-0 right-0 z-[1000] w-full transition-all duration-300 ease-in-out ${
         isScrolled 
-          ? 'bg-white/80 backdrop-blur-[20px] border-b border-gray-200/30 shadow-[0_4px_20px_rgba(0,0,0,0.08)]' 
+          ? 'bg-white/85 backdrop-blur-[20px] border-b shadow-[0_10px_35px_rgba(249,115,22,0.10)]' 
           : 'bg-transparent border-b border-transparent'
       }`}>
         <div className="max-w-[1200px] mx-auto flex justify-between items-center px-8 py-5 w-full box-border overflow-visible">

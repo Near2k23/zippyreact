@@ -37,8 +37,6 @@ import { createTheme } from '@mui/material';
 import { useJsApiLoader } from '@react-google-maps/api';
 import TermCondition from "views/TermCondition.js";
 import DriverAgreement from "views/DriverAgreement.js";
-import { GoogleOAuthProvider } from '@react-oauth/google';
-import { webClientId } from "config/ClientIds.js";
 import { HelmetProvider } from "react-helmet-async";
 import Sos from './views/Sos';
 import DriverDetails from "views/DriverDetails.js";
@@ -76,13 +74,27 @@ function App() {
     libraries
   })
 
-  const theme = createTheme()
+  const theme = createTheme({
+    palette: {
+      primary: {
+        main: '#F97316',
+        light: '#FDBA74',
+        dark: '#EA580C',
+        contrastText: '#FFFFFF',
+      },
+      secondary: {
+        main: '#1F2937',
+        light: '#374151',
+        dark: '#111827',
+        contrastText: '#FFFFFF',
+      },
+    },
+  })
 
   return (
     <HelmetProvider>
     <Provider store={store}>
       <FirebaseProvider config={FirebaseConfig}>
-        <GoogleOAuthProvider clientId={webClientId}>
         <ThemeProvider theme={theme}>
           <AuthLoading>
           <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
@@ -135,7 +147,6 @@ function App() {
             </BrowserRouter>
           </AuthLoading>
         </ThemeProvider>
-        </GoogleOAuthProvider>
       </FirebaseProvider>
     </Provider>
     </HelmetProvider>

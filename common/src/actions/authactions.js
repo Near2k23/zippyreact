@@ -25,6 +25,21 @@ import { uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import base64 from 'react-native-base64';
 import AccessKey from '../other/AccessKey';
 
+const buildEmailNotVerifiedError = (defaultLanguage) => ({
+  code: 'auth/email-not-verified',
+  message: defaultLanguage?.email_not_verified || 'Por favor verifica tu correo electr\u00f3nico antes de iniciar sesi\u00f3n. Revisa tu bandeja de entrada y spam.'
+});
+
+const requiresVerifiedEmail = (settings, user) =>
+  Boolean(settings && settings.emailVerificationRequired === true && user?.email && !user?.emailVerified);
+
+const isSocialLoginUser = (user) =>
+  Boolean(
+    user?.providerData &&
+    user.providerData.length > 0 &&
+    (user.providerData[0].providerId === "google.com" || user.providerData[0].providerId === "apple.com")
+  );
+
 export const fetchUser = () => (dispatch) => {
   const {
     auth,
@@ -40,13 +55,15 @@ export const fetchUser = () => (dispatch) => {
     if (user) {
       const settings = store.getState().settingsdata?.settings;
       
-      if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
-        const isSocialLogin = user.providerData && user.providerData.length > 0 && 
-          (user.providerData[0].providerId === "google.com" || user.providerData[0].providerId === "apple.com");
+      if (requiresVerifiedEmail(settings, user) && !isSocialLoginUser(user)) {
         
-        if (!isSocialLogin) {
-          try {
-            await sendEmailVerification(user);
+        await signOut(auth);
+        dispatch({
+          type: FETCH_USER_FAILED,
+          payload: buildEmailNotVerifiedError(store.getState().languagedata?.defaultLanguage)
+        });
+        return;
+        /*
             await signOut(auth);
             dispatch({
               type: FETCH_USER_FAILED,
@@ -71,6 +88,8 @@ export const fetchUser = () => (dispatch) => {
         }
       }
       
+      */
+      }
       onValue(singleUserRef(user.uid), async snapshot => {
         if (snapshot.val()) {
           let profile = snapshot.val();
@@ -161,6 +180,9 @@ export const fetchUser = () => (dispatch) => {
         }
       });
     } else {
+      if (store.getState().auth?.error?.msg?.code === 'auth/email-not-verified') {
+        return;
+      }
       dispatch({
         type: FETCH_USER_FAILED,
         payload: { code: store.getState().languagedata.defaultLanguage.auth_error, message: store.getState().languagedata.defaultLanguage.not_logged_in }
@@ -276,10 +298,14 @@ export const mobileSignIn = (verficationId, code) => async (dispatch) => {
       const user = userCredential.user;
       const settings = store.getState().settingsdata?.settings;
       
-      if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
-        try {
-          await sendEmailVerification(user);
-          await signOut(auth);
+      if (requiresVerifiedEmail(settings, user) && !isSocialLoginUser(user)) {
+        await signOut(auth);
+        dispatch({
+          type: USER_SIGN_IN_FAILED,
+          payload: buildEmailNotVerifiedError(store.getState().languagedata?.defaultLanguage)
+        });
+        return;
+        /*
           dispatch({
             type: USER_SIGN_IN_FAILED,
             payload: { 
@@ -298,6 +324,7 @@ export const mobileSignIn = (verficationId, code) => async (dispatch) => {
             }
           });
         }
+      */
       } else {
         //OnAuthStateChange takes care of Navigation
       }
@@ -374,6 +401,34 @@ export const googleLogin = (idToken, accessToken) => (dispatch) => {
         payload: error
       });
     });
+}
+
+export const googlePopupLogin = () => async (dispatch) => {
+
+  const {
+    auth,
+    googleProvider
+  } = firebase;
+  const defaultLanguage = store.getState().languagedata?.defaultLanguage || {};
+
+  dispatch({
+    type: USER_SIGN_IN,
+    payload: null
+  });
+
+  googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+  try {
+    await signInWithPopup(auth, googleProvider);
+    return { success: true };
+  } catch (error) {
+    const friendlyError = getFirebaseErrorMessage(error, defaultLanguage);
+    dispatch({
+      type: USER_SIGN_IN_FAILED,
+      payload: friendlyError
+    });
+    return { success: false, error: friendlyError };
+  }
 }
 
 export const appleSignIn = (credentialData) => (dispatch) => {
@@ -712,10 +767,14 @@ export const verifyEmailPassword = (email, pass) => async (dispatch) => {
       const user = userCredential.user;
       const settings = store.getState().settingsdata?.settings;
       
-      if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
-        try {
-          await sendEmailVerification(user);
-          await signOut(authRef());
+      if (requiresVerifiedEmail(settings, user) && !isSocialLoginUser(user)) {
+        await signOut(authRef());
+        dispatch({
+          type: USER_SIGN_IN_FAILED,
+          payload: buildEmailNotVerifiedError(defaultLanguage)
+        });
+        return;
+        /*
           dispatch({
             type: USER_SIGN_IN_FAILED,
             payload: { 
@@ -734,6 +793,7 @@ export const verifyEmailPassword = (email, pass) => async (dispatch) => {
             }
           });
         }
+      */
       } else {
         //OnAuthStateChange takes care of Navigation
       }
@@ -810,10 +870,14 @@ export const verifyMobileOtp = (mobile, otp) => async (dispatch) => {
         .then(async (userCredential) => {
           const user = userCredential.user;
           
-          if (settings && settings.emailVerificationRequired === true && user.email && !user.emailVerified) {
-            try {
-              await sendEmailVerification(user);
+          if (requiresVerifiedEmail(settings, user) && !isSocialLoginUser(user)) {
               await signOut(auth);
+              dispatch({
+                type: USER_SIGN_IN_FAILED,
+                payload: buildEmailNotVerifiedError(store.getState().languagedata?.defaultLanguage)
+              });
+              return;
+              /*
               dispatch({
                 type: USER_SIGN_IN_FAILED,
                 payload: { 
@@ -832,6 +896,7 @@ export const verifyMobileOtp = (mobile, otp) => async (dispatch) => {
                 }
               });
             }
+          */
           } else {
             //OnAuthStateChange takes care of Navigation
           }

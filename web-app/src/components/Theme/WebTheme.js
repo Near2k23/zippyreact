@@ -10,7 +10,7 @@ export const colors = {
     Header_Text: "#FFFFFF",
     Header_Text_back: "#435152",
     Table_Header: '#BFCACD',
-    Action_Button_Back: '#0A6AAD',
+    Action_Button_Back: '#EA580C',
     ALERT_BUTTON_GOTO_COLOR: "#c6e2f6",
     ALERT_BUTTON_CLOSE_COLOR:  "#ea969d",
     HEADER: '#2a383b',
@@ -31,8 +31,8 @@ export const colors = {
     BLUE:"#00acee",
     
 
-  TAXIPRIMARY: "#06113C",
-  TAXISECONDORY: "#DDDEEE",
+  TAXIPRIMARY: "#F97316",
+  TAXISECONDORY: "#FFF7ED",
 
   DELIVERYPRIMARY: "#FE805D",
   DELIVERYSECONDORY: "#E7F1F9",

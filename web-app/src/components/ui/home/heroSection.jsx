@@ -37,11 +37,11 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 overflow-hidden pt-16 sm:pt-12">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16 sm:pt-12" style={{ background: 'linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 48%, #FFEDD5 100%)' }}>
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-40 h-40 sm:w-60 sm:h-60 bg-blue-100 rounded-full opacity-20"></div>
-        <div className="absolute -bottom-10 -left-10 w-48 h-48 sm:w-72 sm:h-72 bg-indigo-100 rounded-full opacity-20"></div>
-        <div className="absolute top-1/2 left-1/4 w-16 h-16 sm:w-24 sm:h-24 bg-yellow-100 rounded-full opacity-30"></div>
+        <div className="absolute -top-10 -right-10 w-40 h-40 sm:w-60 sm:h-60 rounded-full opacity-25 blur-2xl" style={{ background: 'rgba(249, 115, 22, 0.18)' }}></div>
+        <div className="absolute -bottom-10 -left-10 w-48 h-48 sm:w-72 sm:h-72 rounded-full opacity-25 blur-2xl" style={{ background: 'rgba(251, 191, 36, 0.18)' }}></div>
+        <div className="absolute top-1/2 left-1/4 w-16 h-16 sm:w-24 sm:h-24 rounded-full opacity-30 blur-xl" style={{ background: 'rgba(234, 88, 12, 0.14)' }}></div>
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Card2 = ({ number, icon, title, description, index, isVisible, iconColor = "from-blue-600 to-indigo-600" }) => {
+const Card2 = ({ number, icon, title, description, index, isVisible, iconColor = "from-orange-500 to-amber-500" }) => {
   return (
     <div
       className={`text-center transition-all duration-700 ease-out transform ${

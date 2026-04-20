@@ -5,7 +5,7 @@ const Card = ({ title, description, icon, iconColor, index, isVisible }) => {
     if (typeof window !== 'undefined') {
       return getComputedStyle(document.documentElement).getPropertyValue(variable.replace('var(', '').replace(')', ''));
     }
-    return '#3B82F6';
+    return '#F97316';
   };
 
   const resolvedColor = iconColor.startsWith('var(') ? resolveCssVariable(iconColor) : iconColor;

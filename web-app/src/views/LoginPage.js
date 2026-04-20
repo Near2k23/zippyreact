@@ -8,13 +8,13 @@ import CountrySelect from '../components/CountrySelect';
 import { FirebaseContext, api } from 'common';
 import { useTranslation } from "react-i18next";
 import { useNavigate } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
 import { FONT_FAMILY } from "../common/sharedFunctions.js"
 import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import TextField from '@mui/material/TextField';
+import GoogleIcon from '@mui/icons-material/Google';
 
 const inputStyles = makeStyles((theme) => ({
   textField: {
@@ -72,7 +72,7 @@ export default function LoginPage(props) {
   const { authRef, RecaptchaVerifier, signInWithPhoneNumber } = useContext(FirebaseContext);
   const { t, i18n} = useTranslation();
   const {
-    googleLogin,
+    googlePopupLogin,
     countries,
     sendResetMail,
     verifyEmailPassword,
@@ -147,18 +147,13 @@ export default function LoginPage(props) {
         }
       }
     }
-    if (auth.error && auth.error.flag && auth.error.msg.message !== t('not_logged_in')) {
+    if (auth.error && auth.error.flag && auth.error.msg?.message && auth.error.msg.message !== t('not_logged_in')) {
       if (auth.error.msg.message === t('require_approval')){
         showToast(t('require_approval'), 'warning', 4000, 'top-right', t('warning') || 'Advertencia');
-      } else if(auth.error.msg.message === "Firebase: Error (auth/invalid-verification-code)."){
-        showToast(t('login_error'), 'error', 4000, 'top-right', t('error') || 'Error');
-        setIsLoading(false);
       } else{
-        if(data.contact && (data.contact === '' ||  !(!data.contact))){
-          showToast(t('login_error'), 'error', 4000, 'top-right', t('error') || 'Error');
-          setIsLoading(false);
-        }
+        showToast(auth.error.msg.message, 'error', 5000, 'top-right', t('error') || 'Error');
       }
+      setIsLoading(false);
     }
     if(auth.verificationId && otpCalled){
       setOtpCalled(false);
@@ -167,13 +162,10 @@ export default function LoginPage(props) {
   }, [auth.profile, auth.error, auth.verificationId, navigate, data, data.email, data.contact, capatchaReady, RecaptchaVerifier, t, setData, otpCalled, setOtpCalled, showToast]);
 
 
-  const handleGoogleLogin = (credentialResponse) => {
-    if(credentialResponse && credentialResponse.credential){
-      dispatch(googleLogin(credentialResponse.credential,null))
-    } else {
-      showToast(t('login_error'), 'error', 4000, 'top-right', t('error') || 'Error');
-      setIsLoading(false);
-    }
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    await dispatch(googlePopupLogin());
+    setIsLoading(false);
   }
 
   const onInputChange = (event) => {
@@ -435,6 +427,24 @@ export default function LoginPage(props) {
     }, 1000);
   };
 
+  const renderGoogleButton = () => (
+    <button
+      type="button"
+      onClick={handleGoogleLogin}
+      disabled={isLoading}
+      className="w-full inline-flex items-center justify-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+      style={{
+        borderColor: 'rgba(249, 115, 22, 0.18)',
+        backgroundColor: 'rgba(255,255,255,0.82)',
+        color: 'var(--text-primary)',
+        boxShadow: '0 12px 32px rgba(15, 23, 42, 0.06)',
+      }}
+    >
+      <GoogleIcon sx={{ color: '#EA4335', fontSize: 20 }} />
+      <span>{t('or_continue_with')} Google</span>
+    </button>
+  );
+
   return (
     <div>
       <Navbar 
@@ -442,20 +452,23 @@ export default function LoginPage(props) {
         logoSrcDark={require("../assets/img/logo.png")}
         darkText={true}
       />
-      <div className="relative min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-indigo-50 overflow-hidden">
+      <div className="relative min-h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 46%, #FFEDD5 100%)' }}>
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-10 -right-10 w-40 h-40 sm:w-60 sm:h-60 bg-blue-100 rounded-full opacity-20"></div>
-          <div className="absolute -bottom-10 -left-10 w-48 h-48 sm:w-72 sm:h-72 bg-indigo-100 rounded-full opacity-20"></div>
-          <div className="absolute top-1/2 left-1/4 w-16 h-16 sm:w-24 sm:h-24 bg-yellow-100 rounded-full opacity-30"></div>
+          <div className="absolute -top-10 -right-10 w-40 h-40 sm:w-64 sm:h-64 rounded-full opacity-30 blur-2xl" style={{ background: 'rgba(249, 115, 22, 0.18)' }}></div>
+          <div className="absolute -bottom-10 -left-10 w-48 h-48 sm:w-72 sm:h-72 rounded-full opacity-30 blur-2xl" style={{ background: 'rgba(251, 191, 36, 0.2)' }}></div>
+          <div className="absolute top-1/2 left-1/4 w-20 h-20 sm:w-28 sm:h-28 rounded-full opacity-30 blur-xl" style={{ background: 'rgba(234, 88, 12, 0.16)' }}></div>
         </div>
         
         <div className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 w-full py-32">
           <div className="w-full max-w-6xl mx-auto">
-            <div className="bg-white/10 backdrop-blur-[20px] rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden flex flex-col lg:flex-row min-h-[600px] border border-white/30">
-              <div className="w-full lg:w-1/2 p-8 lg:p-12">
+            <div className="overflow-hidden flex flex-col lg:flex-row min-h-[600px] rounded-[32px] border shadow-[0_30px_80px_rgba(15,23,42,0.12)]" style={{ background: 'rgba(255,255,255,0.72)', borderColor: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(26px)' }}>
+              <div className="w-full lg:w-1/2 p-8 lg:p-12" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(255,247,237,0.92) 100%)' }}>
                 {showSignUp ? (
                   <div className="h-full flex flex-col">
                     <div className="text-center mb-8">
+                      <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] mb-4" style={{ background: 'rgba(249, 115, 22, 0.12)', color: 'var(--primary-dark)' }}>
+                        Nuevo acceso
+                      </div>
                       <h1 className="text-3xl font-bold text-[var(--text-primary)] mb-2">
                         {t("create_account")}
                       </h1>
@@ -678,12 +691,7 @@ export default function LoginPage(props) {
                       </div>
                     </div>
 
-                    <div className="flex justify-center space-x-4">
-                      <GoogleLogin
-                        onSuccess={handleGoogleLogin}
-                        onError={handleGoogleLogin}
-                      />
-                    </div>
+                    <div className="flex justify-center">{renderGoogleButton()}</div>
 
                     <div className="text-center mt-6">
                       <p className="text-[var(--text-secondary)]">
@@ -699,7 +707,10 @@ export default function LoginPage(props) {
                   </div>
                 ) : (
                   <div className="h-full flex flex-col">
-                                      <div className="text-center mb-8">
+                    <div className="text-center mb-8">
+                    <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] mb-4" style={{ background: 'rgba(249, 115, 22, 0.12)', color: 'var(--primary-dark)' }}>
+                      Dashboard seguro
+                    </div>
                     <div className="mb-4">
                       <img 
                         src={require("../assets/img/logo.png")} 
@@ -842,12 +853,7 @@ export default function LoginPage(props) {
                       </div>
                     </div>
 
-                    <div className="flex justify-center space-x-4">
-                      <GoogleLogin
-                        onSuccess={handleGoogleLogin}
-                        onError={handleGoogleLogin}
-                      />
-                    </div>
+                    <div className="flex justify-center">{renderGoogleButton()}</div>
 
                     <div className="text-center mt-6">
                       <p className="text-[var(--text-secondary)]">
@@ -871,7 +877,20 @@ export default function LoginPage(props) {
                     alt="Ciudad vibrante" 
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30"></div>
+                  <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, rgba(17,24,39,0.84) 0%, rgba(249,115,22,0.46) 50%, rgba(17,24,39,0.82) 100%)' }}></div>
+                </div>
+                <div className="relative z-10 flex h-full items-end p-8 lg:p-10">
+                  <div className="max-w-md rounded-[28px] border p-6 text-white shadow-[0_20px_60px_rgba(0,0,0,0.22)]" style={{ background: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.22)', backdropFilter: 'blur(18px)' }}>
+                    <div className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] mb-4" style={{ background: 'rgba(255,255,255,0.14)' }}>
+                      {settings?.CompanyName || 'Waygo'}
+                    </div>
+                    <h2 className="text-2xl sm:text-3xl font-bold mb-3">
+                      Control m&aacute;s claro, acceso m&aacute;s r&aacute;pido.
+                    </h2>
+                    <p className="text-white/80 leading-relaxed">
+                      Inicia sesi&oacute;n, administra tu operaci&oacute;n y mant&eacute;n el flujo diario en un panel m&aacute;s c&aacute;lido y enfocado.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
