@@ -2536,9 +2536,9 @@ export default function MapScreen(props) {
                                             style={[
                                                 styles.serviceShortcutCard,
                                                 {
-                                                    backgroundColor: mode === 'dark' ? '#23262B' : 'transparent',
-                                                    borderWidth: mode === 'dark' ? 1 : 0,
-                                                    borderColor: mode === 'dark' ? '#2E3238' : 'transparent'
+                                                    backgroundColor: 'transparent',
+                                                    borderWidth: 0,
+                                                    borderColor: 'transparent'
                                                 }
                                             ]}
                                         >
@@ -2554,9 +2554,9 @@ export default function MapScreen(props) {
                                             style={[
                                                 styles.serviceShortcutCard,
                                                 {
-                                                    backgroundColor: mode === 'dark' ? '#23262B' : 'transparent',
-                                                    borderWidth: mode === 'dark' ? 1 : 0,
-                                                    borderColor: mode === 'dark' ? '#2E3238' : 'transparent'
+                                                    backgroundColor: 'transparent',
+                                                    borderWidth: 0,
+                                                    borderColor: 'transparent'
                                                 }
                                             ]}
                                         >
@@ -2616,9 +2616,9 @@ export default function MapScreen(props) {
                                                 style={[
                                                     styles.quickActionCard,
                                                     {
-                                                        backgroundColor: mode === 'dark' ? '#23262B' : 'transparent',
-                                                        borderWidth: mode === 'dark' ? 1 : 0,
-                                                        borderColor: mode === 'dark' ? '#2E3238' : 'transparent'
+                                                        backgroundColor: 'transparent',
+                                                        borderWidth: 0,
+                                                        borderColor: 'transparent'
                                                     }
                                                 ]}
                                                 onPress={item.onPress}
@@ -4002,7 +4002,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        padding: 20,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
         paddingTop: 6,
         paddingBottom: 26,
     },
@@ -4093,22 +4094,22 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     homeServicesContainer: {
-        marginBottom: 22,
+        marginBottom: 16,
     },
     serviceShortcutRow: {
-        gap: 12,
+        gap: 8,
         alignItems: 'stretch',
     },
     serviceShortcutCard: {
         flex: 1,
-        minHeight: 246,
-        borderRadius: 34,
-        paddingHorizontal: 14,
-        paddingTop: 14,
-        paddingBottom: 16,
+        minHeight: 226,
+        borderRadius: 30,
+        paddingHorizontal: 6,
+        paddingTop: 6,
+        paddingBottom: 10,
         justifyContent: 'space-between',
         alignItems: 'center',
-        gap: 12,
+        gap: 8,
     },
     homeServiceCardDisabled: {
         opacity: 0.55,
@@ -4116,47 +4117,47 @@ const styles = StyleSheet.create({
     serviceShortcutIconWrap: {
         width: '100%',
         flex: 1,
-        minHeight: 174,
-        borderRadius: 30,
+        minHeight: 164,
+        borderRadius: 28,
         alignItems: 'center',
         justifyContent: 'center',
     },
     serviceShortcutImageRide: {
-        width: 156,
-        height: 116,
+        width: 148,
+        height: 108,
     },
     serviceShortcutImageErrand: {
-        width: 164,
-        height: 164,
+        width: 154,
+        height: 154,
     },
     serviceShortcutTitle: {
-        fontSize: 24,
+        fontSize: 23,
         fontFamily: fonts.Medium,
         color: '#111111',
         textAlign: 'center',
     },
     quickActionsRow: {
-        marginTop: 14,
+        marginTop: 10,
         justifyContent: 'center',
         gap: 2,
     },
     quickActionCard: {
         flex: 1,
-        minHeight: 88,
+        minHeight: 82,
         borderRadius: 20,
-        paddingHorizontal: 2,
-        paddingVertical: 2,
+        paddingHorizontal: 0,
+        paddingVertical: 0,
         alignItems: 'center',
         justifyContent: 'flex-start',
         backgroundColor: 'transparent',
     },
     quickActionIconWrap: {
-        width: 58,
-        height: 58,
-        borderRadius: 20,
+        width: 54,
+        height: 54,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
+        marginBottom: 7,
     },
     quickActionText: {
         fontSize: 12,
@@ -4165,11 +4166,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     walletBalanceCard: {
-        marginTop: 18,
-        borderRadius: 28,
-        minHeight: 104,
-        paddingHorizontal: 18,
-        paddingVertical: 16,
+        marginTop: 12,
+        borderRadius: 24,
+        minHeight: 96,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         alignItems: 'center',
         justifyContent: 'space-between',
         shadowColor: '#0F172A',
@@ -4177,7 +4178,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.18,
         shadowRadius: 24,
         elevation: 6,
-        marginBottom: 16,
+        marginBottom: 10,
     },
     walletBalanceLeft: {
         flex: 1,
