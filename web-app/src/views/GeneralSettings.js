@@ -595,6 +595,48 @@ const GeneralSettings = (props) => {
                   value={data.tipMoneyField}
                   helperText={"Ej: 10,15,25,40"}
                 />
+                <Typography component="h1" variant="h5" style={{ marginTop: '15px', textAlign: isRTL === 'rtl' ? 'right' : 'left', fontFamily:FONT_FAMILY }}>
+                  Mandados
+                </Typography>
+                <FormControlLabel
+                  style={{ flexDirection: isRTL === 'rtl' ? 'row-reverse' : 'row' }}
+                  control={
+                    <Switch
+                      checked={data.enableErrands !== undefined ? data.enableErrands : false}
+                      onChange={handleSwitchChange}
+                      name="enableErrands"
+                      color="primary"
+                    />
+                  }
+                  label={<Typography className={classes.typography}>Habilitar mandados</Typography>}
+                />
+                <TextField
+                  InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                  className={isRTL === "rtl" ? classes.rootRtl : classes.textField}
+                  variant="outlined"
+                  margin="normal"
+                  fullWidth
+                  id="errandSearchCost"
+                  label="Costo por busqueda"
+                  name="errandSearchCost"
+                  autoComplete="errandSearchCost"
+                  onChange={handleThreshold}
+                  value={data.errandSearchCost !== undefined ? data.errandSearchCost : 0}
+                />
+                <TextField
+                  InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                  className={isRTL === "rtl" ? classes.rootRtl : classes.textField}
+                  variant="outlined"
+                  margin="normal"
+                  fullWidth
+                  id="errandOnlinePaymentThreshold"
+                  label="Umbral para pago online obligatorio"
+                  name="errandOnlinePaymentThreshold"
+                  autoComplete="errandOnlinePaymentThreshold"
+                  onChange={handleThreshold}
+                  value={data.errandOnlinePaymentThreshold !== undefined ? data.errandOnlinePaymentThreshold : 0}
+                  helperText="Si el valor del pedido supera este monto, el efectivo queda bloqueado."
+                />
                 <DeliveryFlow
                   data={data.bookingFlow}
                   handleChange={handleChange}

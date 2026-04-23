@@ -13,6 +13,7 @@ import Dashboard from './views/Dashboard';
 import CarTypes from './views/CarTypes';
 import AddBookings from './views/AddBookings';
 import Promos from './views/Promos';
+import Banners from './views/Banners';
 import DynamicHours from './views/DynamicHours';
 import Zones from './views/Zones';
 import Users from './views/Users';
@@ -101,6 +102,7 @@ function App() {
               <Routes>
                 <Route path="/dashboard" element={<ProtectedRoute permit={"admin,fleetadmin"}><Dashboard /></ProtectedRoute>}/>
                 <Route path="/bookings" element={<ProtectedRoute permit={"customer,admin,driver,fleetadmin"}><BookingHistory /></ProtectedRoute>}/>
+                <Route path="/errands" element={<ProtectedRoute permit={"customer,admin,driver,fleetadmin"}><BookingHistory serviceTypeFilter="ERRAND" /></ProtectedRoute>}/>
                 <Route path="/bookings/bookingdetails/:id" element={<ProtectedRoute permit={"customer,admin,driver,fleetadmin"}><BookingDetails /></ProtectedRoute>}/>
                 <Route path="/profile" element={<ProtectedRoute permit={"customer,admin,driver,fleetadmin"}><MyProfile /></ProtectedRoute>}/>
                 <Route path="/cartypes" element={<ProtectedRoute permit={"admin"}><CarTypes /></ProtectedRoute>}/>
@@ -108,6 +110,7 @@ function App() {
                 <Route path="/cars" element={<ProtectedRoute permit={"admin,fleetadmin,driver"}><CarsList /></ProtectedRoute>}/>
                 <Route path="/addbookings" element={<ProtectedRoute permit={"admin,fleetadmin,customer"}><AddBookings /></ProtectedRoute>}/>
                 <Route path="/promos" element={<ProtectedRoute permit={"admin"}><Promos /></ProtectedRoute>}/>
+                <Route path="/banners" element={<ProtectedRoute permit={"admin"}><Banners /></ProtectedRoute>}/>
                 <Route path="/taxes" element={<ProtectedRoute permit={"admin"}><Taxes /></ProtectedRoute>}/>
                 <Route path="/dynamic-hours" element={<ProtectedRoute permit={"admin"}><DynamicHours /></ProtectedRoute>}/>
                 <Route path="/users/:id" element={<ProtectedRoute permit={"admin,fleetadmin"}><Users /></ProtectedRoute>}/>

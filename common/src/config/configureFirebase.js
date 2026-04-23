@@ -43,6 +43,8 @@ const createFullStructure = (app, db, auth, storage, config) => {
         carDocImage:(id) =>  stRef(storage, `cartypes/${id}`),     
         promoRef: ref(db, 'promos'),
         promoEditRef:(id) => ref(db, "promos/"+ id),
+        bannerRef: ref(db, 'banners'),
+        bannerEditRef:(id) => ref(db, "banners/"+ id),
         dynamicHoursRef: ref(db, 'dynamic_hours'),
         dynamicHoursEditRef:(id) => ref(db, 'dynamic_hours/' + id),
         notifyRef: ref(db,"notifications/"),

@@ -109,6 +109,7 @@ export default function CarTypes() {
     fleet_admin_fee: 0,
     extra_info: '',
     pos: 0,
+    acceptErrands: false,
   }),[]);
   const [editForm, setEditForm] = useState(initialEditForm);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -209,6 +210,7 @@ export default function CarTypes() {
       return `${zone?.symbol || ''}${formatAmount(value, zone?.decimal || settings.decimal, settings.country)}`;
     } },
     { accessorKey: 'extra_info', header: t('extra_info') },
+    { accessorKey: 'acceptErrands', header: 'Mandados', cell: ({row}) => row.original.acceptErrands ? 'Si' : 'No' },
     { accessorKey: 'pos', header: t('position') },
   ]), [t, settings.decimal, settings.country, zonesdata.zones, selectedZone]);
 
@@ -329,6 +331,7 @@ export default function CarTypes() {
       image: row.image || '',
       extra_info: row.extra_info || '',
       pos: row.pos || 0,
+      acceptErrands: !!row.acceptErrands,
       zones: row.zones || [],
     });
     setEditDialogOpen(true);
@@ -439,6 +442,7 @@ export default function CarTypes() {
               convenience_fee_type: t('convenience_fee_type'),
               fleet_admin_fee: t('fleet_admin_comission'),
               extra_info: t('extra_info'),
+              acceptErrands: 'Mandados',
               pos: t('position')
             }}
             renderActions={(row) => (
@@ -728,6 +732,16 @@ export default function CarTypes() {
                   />
                 </label>
                 <input type="number" value={editForm.pos} onChange={(e)=>setEditForm(prev=>({...prev, pos: Number(e.target.value)}))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', paddingTop: '26px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#374151' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!editForm.acceptErrands}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, acceptErrands: e.target.checked }))}
+                  />
+                  Este tipo de vehiculo acepta mandados
+                </label>
               </div>
             </div>
             <div>

@@ -13,6 +13,7 @@ import * as driverearningaction from './actions/driverearningaction';
 import * as earningreportsaction from './actions/earningreportsaction';
 import * as notificationactions from './actions/notificationactions';
 import * as promoactions from './actions/promoactions';
+import * as banneractions from './actions/banneractions';
 import * as dynamichouractions from './actions/dynamichouractions';
 import * as usersactions from './actions/usersactions';
 import * as settingsactions from './actions/settingsactions';
@@ -51,6 +52,7 @@ const api = {
     ...earningreportsaction,
     ...notificationactions,
     ...promoactions,
+    ...banneractions,
     ...dynamichouractions,
     ...usersactions,
     ...settingsactions,

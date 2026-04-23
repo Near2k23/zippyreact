@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeBottomTabNavigator } from '@react-navigation/bottom-tabs/unstable';
 import { Dimensions, Platform, StatusBar, View, Text, TouchableOpacity, Linking, useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -37,15 +37,12 @@ import * as Notifications from 'expo-notifications';
 import { colors } from '../common/theme';
 import { Icon } from 'react-native-elements';
 import { MAIN_COLOR, MAIN_COLOR_DARK } from '../common/sharedFunctions';
-import TabBarIcon from '../components/TabBarIcon';
-import DeviceInfo from 'react-native-device-info';
 import { FirebaseConfig } from '../../config/FirebaseConfig';
 
 Dimensions.get('window');
 
-const hasNotch = DeviceInfo.hasNotch();
 const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator();
+const Tab = createNativeBottomTabNavigator();
 
 export default function AppContainer() {
   const { t } = i18n;
@@ -172,33 +169,37 @@ export default function AppContainer() {
     header: ({ navigation }) => <CustomHeader title={title} navigation={navigation} />
   });
 
+  const getNativeTabIcon = (routeName, focused) => {
+    const iconMap = {
+      DriverTrips: { type: 'image', source: require('../../assets/images/y (2).png'), tinted: true },
+      RideList: { type: 'image', source: require('../../assets/images/ruta.png'), tinted: true },
+      Settings: { type: 'image', source: require('../../assets/images/menu.png'), tinted: true }
+    };
+
+    return iconMap[routeName] || { type: 'image', source: require('../../assets/images/ruta.png'), tinted: true };
+  };
+
   const TabRoot = () => (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        animationEnabled: Platform.OS === 'android' ? false : true,
-        tabBarIcon: ({ focused, color, size }) => <TabBarIcon routeName={route.name} focused={focused} color={color} size={size} isRTL={isRTL} t={t} />,
+        tabBarIcon: ({ focused }) => getNativeTabIcon(route.name, focused),
+        tabBarLabel:
+          route.name === 'DriverTrips'
+            ? t('task_list')
+            : route.name === 'RideList'
+              ? t('ride_list_title')
+              : t('profile'),
         tabBarActiveTintColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
         tabBarInactiveTintColor: colors.SHADOW,
         tabBarStyle: {
-          height: hasNotch ? 80 : 60,
           backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND,
-          direction: isRTL ? 'rtl' : 'ltr',
-          borderTopWidth: 0,
-          elevation: 8,
-          shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: mode === 'dark' ? 0.1 : 0.15,
-          shadowRadius: 8,
-          paddingBottom: hasNotch ? 10 : 5,
-          paddingTop: 5
+          shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
         },
-        tabBarLabelStyle: { display: 'none' },
-        tabBarShowLabel: false,
-        tabBarIndicatorStyle: {
-          borderBottomColor: '#C2D5A8',
-          borderBottomWidth: 2,
-          transform: [{ scaleX: isRTL ? -1 : 1 }]
-        }
+        tabBarLabelStyle: { fontFamily: 'Inter-Bold', fontSize: 11 },
+        tabBarLabelVisibilityMode: Platform.OS === 'android' ? 'labeled' : undefined,
+        tabBarActiveIndicatorEnabled: Platform.OS === 'android',
+        tabBarActiveIndicatorColor: `${mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}22`,
+        tabBarBlurEffect: Platform.OS === 'ios' ? 'systemChromeMaterial' : undefined
       })}
     >
       <Tab.Screen

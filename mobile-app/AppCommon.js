@@ -7,6 +7,7 @@ import { Alert, Platform, View, ActivityIndicator, Animated } from 'react-native
 import i18n from 'i18n-js';
 import { colors } from './src/common/theme';
 import GetPushToken from './src/components/GetPushToken';
+import SplashGradientBackground from './src/components/SplashGradientBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment/min/moment-with-locales';
 import CustomSplashScreen from './src/screens/CustomSplashScreen';
@@ -595,7 +596,7 @@ export default function AppCommon({ children }) {
 
   if (authStillNotResponded || !(languagedata && languagedata.langlist) || !settings || authState == 'loading') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.TAXIPRIMARY }}>
+      <SplashGradientBackground>
         <Animated.Image
           source={require('./assets/images/logo_splash.png')}
           style={{
@@ -605,7 +606,7 @@ export default function AppCommon({ children }) {
             transform: [{ scale: bounceAnim }],
           }}
         />
-      </View>
+      </SplashGradientBackground>
     );
   }
 

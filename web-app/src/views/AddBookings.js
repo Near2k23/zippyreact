@@ -8,6 +8,7 @@ import {
   FormControlLabel,
   FormControl,
   FormLabel,
+  Switch,
   Radio,
   RadioGroup,
   Modal,
@@ -28,6 +29,14 @@ import DialogActions from '@mui/material/DialogActions';
 import CircularProgress from '@mui/material/CircularProgress';
 import { MAIN_COLOR, SECONDORY_COLOR, FONT_FAMILY } from "../common/sharedFunctions"
 import { getLangKey } from 'common/src/other/getLangKey';
+import {
+  ERRAND_SERVICE_TYPE,
+  RIDE_SERVICE_TYPE,
+  canAcceptCashForErrand,
+  getErrandItemValue,
+  normalizeErrandData,
+  shouldForceErrandOnlinePayment,
+} from 'common/src/other/ErrandUtils';
 
 const { formatNumberInput, handleVietnameseNumberInput } = api;
 
@@ -308,6 +317,22 @@ export default function AddBookings(props) {
     parcelTypeSelected: null,
     optionSelected: null
   });
+  const initialErrandState = {
+    requestText: '',
+    illegalGoodsAccepted: false,
+    itemAlreadyPaid: true,
+    declaredItemValue: 0,
+    approvedItemValue: null,
+    requiresSearch: false,
+    searchArea: null,
+    searchCostApplied: false,
+    searchCostAmount: 0,
+    phase: 'TO_STORE',
+    activePriceChangeRequest: null,
+    priceChangeHistory: [],
+  };
+  const [serviceType, setServiceType] = useState(RIDE_SERVICE_TYPE);
+  const [errandData, setErrandData] = useState(initialErrandState);
 
   const [profileData, setProfileData] = useState({
     firstName: '',
@@ -317,25 +342,44 @@ export default function AddBookings(props) {
 
   const [payment_mode, setPaymentMode] = useState(0);
   const [radioProps, setRadioProps] = useState([]);
+  const normalizedErrand = normalizeErrandData(errandData, settings || {});
+  const isBackofficeUser = auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin';
+  const availableCarTypes = serviceType === ERRAND_SERVICE_TYPE
+    ? (cartypes || []).filter((car) => car.acceptErrands)
+    : (cartypes || []);
+  const estimatedTotal = serviceType === ERRAND_SERVICE_TYPE
+    ? (estimatedata?.estimate?.customerTotal || estimatedata?.estimate?.estimateFare || 0)
+    : (estimatedata?.estimate?.estimateFare || 0);
+  const estimatedUpfrontAmount = serviceType === ERRAND_SERVICE_TYPE
+    ? (estimatedata?.estimate?.upfrontOnlineAmount || estimatedTotal)
+    : (estimatedata?.estimate?.estimateFare || 0);
 
   const navigate = useNavigate();
 
   useEffect(() => {
     if (settings && providers) {
       setSelectedProvider(providers[0]);
-      let arr = [{ label: t('wallet'), value: 0, cat: 'wallet' }];
+      let arr = [];
       let val = 0;
-      if (!settings.disable_online && providers && providers.length > 0) {
+      if (!isBackofficeUser) {
+        arr.push({ label: t('wallet'), value: val, cat: 'wallet' });
         val++;
-        arr.push({ label: t('card'), value: val, cat: 'card' });
       }
-      if (!settings.disable_cash) {
+      if (!settings.disable_online && providers && providers.length > 0) {
+        arr.push({ label: t('card'), value: val, cat: 'card' });
         val++;
+      }
+      const allowCash = serviceType !== ERRAND_SERVICE_TYPE || canAcceptCashForErrand(normalizedErrand, settings);
+      if (!settings.disable_cash && allowCash) {
         arr.push({ label: t('cash'), value: val, cat: 'cash' });
+        val++;
       }
       setRadioProps(arr);
+      if (payment_mode >= arr.length) {
+        setPaymentMode(0);
+      }
     }
-  }, [settings, providers, t]);;
+  }, [settings, providers, t, serviceType, normalizedErrand, payment_mode, isBackofficeUser]);
 
   useEffect(() => {
     if (state && state !== null) {
@@ -354,6 +398,18 @@ export default function AddBookings(props) {
       setSelectedCarDetails(carDetails);
     }
   }, [state]);
+
+  useEffect(() => {
+    if (serviceType === ERRAND_SERVICE_TYPE && settings && settings.enableErrands === false) {
+      setCommonAlert({ open: true, msg: 'Los mandados estan deshabilitados desde ajustes.' });
+      setServiceType(RIDE_SERVICE_TYPE);
+      return;
+    }
+    if (serviceType === ERRAND_SERVICE_TYPE && selectedCarDetails && !selectedCarDetails.acceptErrands) {
+      setSelectedCarDetails(null);
+      setCarType(t('select_car'));
+    }
+  }, [serviceType, settings, selectedCarDetails, t]);
 
   const handleChange = (e) => {
     if (e.target.name === 'parcelTypeIndex') {
@@ -391,6 +447,34 @@ export default function AddBookings(props) {
         setOfferFare(e.target.value);
         setDisplayOfferFare(e.target.value);
       }
+    } else if (e.target.name === 'serviceType') {
+      const nextType = e.target.value;
+      setServiceType(nextType);
+      if (nextType === RIDE_SERVICE_TYPE) {
+        setErrandData(initialErrandState);
+      }
+    } else if (e.target.name === 'errandRequestText') {
+      setErrandData({ ...errandData, requestText: e.target.value });
+    } else if (e.target.name === 'errandIllegalGoodsAccepted') {
+      setErrandData({ ...errandData, illegalGoodsAccepted: e.target.checked });
+    } else if (e.target.name === 'errandItemAlreadyPaid') {
+      const checked = e.target.checked;
+      setErrandData({
+        ...errandData,
+        itemAlreadyPaid: checked,
+        declaredItemValue: checked ? 0 : errandData.declaredItemValue,
+        approvedItemValue: checked ? 0 : errandData.approvedItemValue,
+      });
+    } else if (e.target.name === 'errandDeclaredItemValue') {
+      setErrandData({ ...errandData, declaredItemValue: e.target.value });
+    } else if (e.target.name === 'errandRequiresSearch') {
+      const checked = e.target.checked;
+      setErrandData({
+        ...errandData,
+        requiresSearch: checked,
+        searchCostApplied: checked,
+        searchCostAmount: checked ? parseFloat(settings?.errandSearchCost || 0) : 0,
+      });
     } else {
       setInstructionData({ ...instructionData, [e.target.name]: e.target.value });
     }
@@ -411,6 +495,8 @@ export default function AddBookings(props) {
     setDropAddress(null);
     setSelectedCarDetails(null);
     setCarType(t('select_car'));
+    setServiceType(RIDE_SERVICE_TYPE);
+    setErrandData(initialErrandState);
     setBookingType('Book Now');
     setEstimateRequested(false);
     setOfferFare('');
@@ -454,16 +540,16 @@ export default function AddBookings(props) {
   const handleCarSelect = (event) => {
     setCarType(event.target.value);
     let carDetails = null;
-    for (let i = 0; i < cartypes.length; i++) {
-      if (cartypes[i].name === event.target.value) {
-        carDetails = cartypes[i];
+    for (let i = 0; i < availableCarTypes.length; i++) {
+      if (availableCarTypes[i].name === event.target.value) {
+        carDetails = availableCarTypes[i];
         let instObj = { ...instructionData };
-        if (Array.isArray(cartypes[i].parcelTypes) && instObj.parcelTypeSelected !== cartypes[i].parcelTypes[0]) {
-          instObj.parcelTypeSelected = cartypes[i].parcelTypes[0];
+        if (Array.isArray(availableCarTypes[i].parcelTypes) && instObj.parcelTypeSelected !== availableCarTypes[i].parcelTypes[0]) {
+          instObj.parcelTypeSelected = availableCarTypes[i].parcelTypes[0];
           instObj.parcelTypeIndex = 0;
         }
-        if (Array.isArray(cartypes[i].options) && instObj.optionSelected !== cartypes[i].options[0]) {
-          instObj.optionSelected = cartypes[i].options[0];
+        if (Array.isArray(availableCarTypes[i].options) && instObj.optionSelected !== availableCarTypes[i].options[0]) {
+          instObj.optionSelected = availableCarTypes[i].options[0];
           instObj.optionIndex = 0;
         }
         setInstructionData(instObj);
@@ -547,8 +633,31 @@ export default function AddBookings(props) {
 
   const handleGetOptions = async (e) => {
     e.preventDefault();
+    const selectedPaymentCategory = radioProps[payment_mode]?.cat;
+    if (serviceType === ERRAND_SERVICE_TYPE) {
+      if (settings && settings.enableErrands === false) {
+        setCommonAlert({ open: true, msg: 'Los mandados estan deshabilitados.' });
+        return;
+      }
+      if (!selectedCarDetails || !selectedCarDetails.acceptErrands) {
+        setCommonAlert({ open: true, msg: 'Selecciona un tipo de vehiculo que acepte mandados.' });
+        return;
+      }
+      if (!normalizedErrand.requestText || !String(normalizedErrand.requestText).trim()) {
+        setCommonAlert({ open: true, msg: 'Describe el mandado antes de continuar.' });
+        return;
+      }
+      if (!normalizedErrand.illegalGoodsAccepted) {
+        setCommonAlert({ open: true, msg: 'Debes confirmar que el mandado no contiene articulos ilegales.' });
+        return;
+      }
+      if (!normalizedErrand.itemAlreadyPaid && getErrandItemValue(normalizedErrand) <= 0) {
+        setCommonAlert({ open: true, msg: 'Debes indicar el valor del pedido.' });
+        return;
+      }
+    }
     if ((settings && settings.imageIdApproval && auth.profile.usertype === 'customer' && auth.profile.verifyId) || auth.profile.usertype === 'admin' || (settings && !settings.imageIdApproval && auth.profile.usertype === 'customer') || auth.profile.usertype === 'fleetadmin') {
-      if (!(settings && settings.disable_cash && (auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin')) || auth.profile.usertype === 'customer') {
+      if (selectedPaymentCategory) {
         if ((auth.profile.usertype === 'customer' && parseFloat(auth.profile.walletBalance) >= 0) || auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin') {
           setEstimateRequested(true);
           if (userCombo && pickupAddress && dropAddress && selectedCarDetails) {
@@ -571,7 +680,7 @@ export default function AddBookings(props) {
             if (pickupAddress && dropAddress) {
               if (bookingType === 'Book Now') {
                 if (mobile === true) {
-                  if (Array.isArray(selectedCarDetails.options) || Array.isArray(selectedCarDetails.parcelTypes)) {
+                  if (serviceType !== ERRAND_SERVICE_TYPE && (Array.isArray(selectedCarDetails.options) || Array.isArray(selectedCarDetails.parcelTypes))) {
                     setOptionModalStatus(true);
                   } else {
                     let estimateRequest = {
@@ -579,7 +688,17 @@ export default function AddBookings(props) {
                       drop: dropAddress,
                       carDetails: selectedCarDetails,
                       instructionData: instructionData,
-                      routeDetails: route
+                      routeDetails: route,
+                      serviceType: serviceType,
+                      errand: serviceType === ERRAND_SERVICE_TYPE ? {
+                        ...normalizedErrand,
+                        searchArea: normalizedErrand.requiresSearch && pickupAddress ? {
+                          lat: pickupAddress.coords.lat,
+                          lng: pickupAddress.coords.lng,
+                          add: pickupAddress.description
+                        } : null,
+                      } : null,
+                      payment_mode: radioProps[payment_mode]?.cat || 'cash'
                     };
                     dispatch(getEstimate(estimateRequest));
                   }
@@ -590,7 +709,7 @@ export default function AddBookings(props) {
                 if (bookingType === 'Book Later' && selectedDate) {
                   if (MinutesPassed(selectedDate) >= 15) {
                     if (mobile === true) {
-                      if (Array.isArray(selectedCarDetails.options) || Array.isArray(selectedCarDetails.parcelTypes)) {
+                      if (serviceType !== ERRAND_SERVICE_TYPE && (Array.isArray(selectedCarDetails.options) || Array.isArray(selectedCarDetails.parcelTypes))) {
                         setOptionModalStatus(true);
                       } else {
                         let estimateRequest = {
@@ -598,7 +717,17 @@ export default function AddBookings(props) {
                           drop: dropAddress,
                           carDetails: selectedCarDetails,
                           instructionData: instructionData,
-                          routeDetails: route
+                          routeDetails: route,
+                          serviceType: serviceType,
+                          errand: serviceType === ERRAND_SERVICE_TYPE ? {
+                            ...normalizedErrand,
+                            searchArea: normalizedErrand.requiresSearch && pickupAddress ? {
+                              lat: pickupAddress.coords.lat,
+                              lng: pickupAddress.coords.lng,
+                              add: pickupAddress.description
+                            } : null,
+                          } : null,
+                          payment_mode: radioProps[payment_mode]?.cat || 'cash'
                         };
                         dispatch(getEstimate(estimateRequest));
                       }
@@ -625,7 +754,7 @@ export default function AddBookings(props) {
           setCommonAlert({ open: true, msg: t('wallet_balance_low') })
         }
       } else {
-        setCommonAlert({ open: true, msg: t('cash_booking_false') })
+        setCommonAlert({ open: true, msg: 'No hay un metodo de pago disponible para este mandado.' })
       }
     } else {
       setCommonAlert({ open: true, msg: t('verifyid_error') })
@@ -635,7 +764,8 @@ export default function AddBookings(props) {
   const handleWalletPayment = (e) => {
     e.preventDefault();
     let curBooking = { ...bookingdata.booking.mainData };
-    if (parseFloat(curBooking.trip_cost) > parseFloat(auth.profile.walletBalance) && radioProps[payment_mode].cat === 'wallet') {
+    const walletChargeAmount = curBooking.upfrontOnlineAmount || curBooking.trip_cost;
+    if (parseFloat(walletChargeAmount) > parseFloat(auth.profile.walletBalance) && radioProps[payment_mode].cat === 'wallet') {
       setCommonAlert({ open: true, msg: t('wallet_balance_low') });
     } else {
       let requestedDrivers = {};
@@ -654,9 +784,9 @@ export default function AddBookings(props) {
       curBooking.prepaid = true;
       curBooking.status = 'NEW';
       curBooking.payment_mode = "wallet";
-      curBooking.customer_paid = parseFloat(curBooking.trip_cost).toFixed(settings.decimal);
+      curBooking.customer_paid = parseFloat(walletChargeAmount).toFixed(settings.decimal);
       curBooking.discount = 0;
-      curBooking.usedWalletMoney = parseFloat(curBooking.trip_cost).toFixed(settings.decimal);
+      curBooking.usedWalletMoney = parseFloat(walletChargeAmount).toFixed(settings.decimal);
       curBooking.cardPaymentAmount = 0;
       curBooking.cashPaymentAmount = 0;
       curBooking.payableAmount = 0;
@@ -684,7 +814,17 @@ export default function AddBookings(props) {
       drop: dropAddress,
       carDetails: selectedCarDetails,
       instructionData: instructionData,
-      routeDetails: tempRoute
+      routeDetails: tempRoute,
+      serviceType: serviceType,
+      errand: serviceType === ERRAND_SERVICE_TYPE ? {
+        ...normalizedErrand,
+        searchArea: normalizedErrand.requiresSearch && pickupAddress ? {
+          lat: pickupAddress.coords.lat,
+          lng: pickupAddress.coords.lng,
+          add: pickupAddress.description
+        } : null,
+      } : null,
+      payment_mode: radioProps[payment_mode]?.cat || 'cash'
     };
     dispatch(getEstimate(estimateRequest));
   };
@@ -692,6 +832,10 @@ export default function AddBookings(props) {
   const confirmBooking = (e) => {
     e.preventDefault();
     setLoading2(true);
+    const selectedPaymentCategory = radioProps[payment_mode]?.cat;
+    const checkoutAmount = serviceType === ERRAND_SERVICE_TYPE
+      ? estimatedUpfrontAmount
+      : estimatedata.estimate.estimateFare;
     let requestedDrivers = {};
     let driverEstimates = {};
 
@@ -705,11 +849,11 @@ export default function AddBookings(props) {
       }
     }
 
-    if ((radioProps[payment_mode].cat === 'wallet' && notfound && auth.profile.usertype === 'customer') || radioProps[payment_mode].cat !== 'wallet' || auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin') {
+    if ((selectedPaymentCategory === 'wallet' && notfound && auth.profile.usertype === 'customer') || selectedPaymentCategory !== 'wallet' || auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin') {
       const regx1 = /([0-9\s-]{7,})(?:\s*(?:#|x\.?|ext\.?|extension)\s*(\d+))?$/;
       if ((otherPerson && /\S/.test(instructionData.otherPerson) && regx1.test(instructionData.otherPersonPhone) && instructionData.otherPersonPhone && instructionData.otherPersonPhone.length > 6) || !otherPerson) {
         if ((offerFare > 0 && offerFare >= parseFloat(minimumPrice)) || offerFare === '') {
-          if ((radioProps[payment_mode].cat === 'wallet' && (parseFloat(auth.profile.walletBalance) >= parseFloat(estimatedata.estimate.estimateFare)) && !calcEst && auth.profile.usertype === 'customer') || radioProps[payment_mode].cat !== 'wallet' || (radioProps[payment_mode].cat === 'wallet' && calcEst && auth.profile.usertype === 'customer') || auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin') {
+          if ((selectedPaymentCategory === 'wallet' && (parseFloat(auth.profile.walletBalance) >= parseFloat(checkoutAmount)) && !calcEst && auth.profile.usertype === 'customer') || selectedPaymentCategory !== 'wallet' || (selectedPaymentCategory === 'wallet' && calcEst && auth.profile.usertype === 'customer') || auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin') {
             if (settings.autoDispatch && bookingType === 'Book Now') {
               for (let i = 0; i < drivers.length; i++) {
                 const driver = drivers[i];
@@ -742,7 +886,26 @@ export default function AddBookings(props) {
                 email: userCombo.email
               },
               estimate: estimatedata.estimate,
-              instructionData: instructionData,
+              instructionData: {
+                ...instructionData,
+                errand: serviceType === ERRAND_SERVICE_TYPE ? {
+                  ...normalizedErrand,
+                  searchArea: normalizedErrand.requiresSearch && pickupAddress ? {
+                    lat: pickupAddress.coords.lat,
+                    lng: pickupAddress.coords.lng,
+                    add: pickupAddress.description
+                  } : null,
+                } : null
+              },
+              serviceType: serviceType,
+              errand: serviceType === ERRAND_SERVICE_TYPE ? {
+                ...normalizedErrand,
+                searchArea: normalizedErrand.requiresSearch && pickupAddress ? {
+                  lat: pickupAddress.coords.lat,
+                  lng: pickupAddress.coords.lng,
+                  add: pickupAddress.description
+                } : null,
+              } : null,
               tripInstructions: tripInstructions,
               roundTrip: roundTrip === 0 ? false : true,
               tripdate: bookingType === 'Book Later' ? new Date(selectedDate).getTime() : new Date().getTime(),
@@ -751,13 +914,13 @@ export default function AddBookings(props) {
               booking_type_admin: auth.profile.usertype === 'admin' ? true : false,
               booking_type_fleetadmin: auth.profile.usertype === 'fleetadmin' ? true : false,
               fleetadmin: auth.profile.usertype === 'fleetadmin' ? auth.profile.uid : null,
-              requestedDrivers: calcEst ? requestedDrivers : (optionsRequired && radioProps[payment_mode].cat === 'cash') ? requestedDrivers : (settings.prepaid && radioProps[payment_mode].cat === 'cash') ? requestedDrivers : !settings.prepaid ? requestedDrivers : requestedDrivers,
+              requestedDrivers: calcEst ? requestedDrivers : (optionsRequired && selectedPaymentCategory === 'cash') ? requestedDrivers : (settings.prepaid && selectedPaymentCategory === 'cash') ? requestedDrivers : !settings.prepaid ? requestedDrivers : requestedDrivers,
               driverEstimates: driverEstimates,
-              payment_mode: (auth.profile.usertype === 'admin' || auth.profile.usertype === 'fleetadmin') ? 'cash' : radioProps[payment_mode].cat,
+              payment_mode: selectedPaymentCategory,
               booking_from_web: true,
-              deliveryWithBid: auth.profile.usertype === 'customer' ? deliveryWithBid === 0 ? false : true : false,
-              offerFare: (offerFare && offerFare > 0) ? offerFare : 0,
-              customer_offer: (offerFare && offerFare > 0) ? offerFare : 0
+              deliveryWithBid: serviceType === ERRAND_SERVICE_TYPE ? false : (auth.profile.usertype === 'customer' ? deliveryWithBid === 0 ? false : true : false),
+              offerFare: serviceType === ERRAND_SERVICE_TYPE ? 0 : ((offerFare && offerFare > 0) ? offerFare : 0),
+              customer_offer: serviceType === ERRAND_SERVICE_TYPE ? 0 : ((offerFare && offerFare > 0) ? offerFare : 0)
             };
 
             if (auth.profile.usertype === 'customer' && !(auth.profile.firstName && auth.profile.lastName && auth.profile.email && auth.profile.firstName.length > 0 && auth.profile.lastName.length > 0 && auth.profile.email.length > 0)) {
@@ -777,22 +940,23 @@ export default function AddBookings(props) {
                       alert(t('email_or_mobile_issue'));
                     } else {
                       setLoading(false);
-                      if (radioProps[payment_mode].cat === 'card') {
+                      if (selectedPaymentCategory === 'card') {
                         const paymentPacket = {
                           payment_mode: 'card',
-                          customer_paid: parseFloat(estimatedata.estimate.estimateFare).toFixed(settings.decimal),
-                          cardPaymentAmount: parseFloat(estimatedata.estimate.estimateFare).toFixed(settings.decimal),
+                          paymentType: 'BOOKING',
+                          customer_paid: parseFloat(checkoutAmount).toFixed(settings.decimal),
+                          cardPaymentAmount: parseFloat(checkoutAmount).toFixed(settings.decimal),
                           discount: 0,
                           usedWalletMoney: 0,
                           cashPaymentAmount: 0,
                           promo_applied: false,
                           promo_details: null,
-                          payableAmount: parseFloat(estimatedata.estimate.estimateFare).toFixed(settings.decimal),
+                          payableAmount: parseFloat(checkoutAmount).toFixed(settings.decimal),
                         };
                         bookingObject['paymentPacket'] = paymentPacket;
                       }
 
-                      const result = validateBookingObj(t, bookingObject, instructionData, otherPerson);
+                      const result = validateBookingObj(t, bookingObject, instructionData, otherPerson, serviceType, normalizedErrand, settings);
                       if (result.error) {
                         setLoading2(false);
                         setCommonAlert({ open: true, msg: result.msg });
@@ -821,21 +985,22 @@ export default function AddBookings(props) {
               //   setCommonAlert({ open: true, msg: t('deliveryDetailMissing') })
               // }
             } else {
-              if (radioProps[payment_mode].cat === 'card') {
+              if (selectedPaymentCategory === 'card') {
                 const paymentPacket = {
                   payment_mode: 'card',
-                  customer_paid: parseFloat(estimatedata.estimate.estimateFare).toFixed(settings.decimal),
-                  cardPaymentAmount: parseFloat(estimatedata.estimate.estimateFare).toFixed(settings.decimal),
+                  paymentType: 'BOOKING',
+                  customer_paid: parseFloat(checkoutAmount).toFixed(settings.decimal),
+                  cardPaymentAmount: parseFloat(checkoutAmount).toFixed(settings.decimal),
                   discount: 0,
                   usedWalletMoney: 0,
                   cashPaymentAmount: 0,
                   promo_applied: false,
                   promo_details: null,
-                  payableAmount: parseFloat(estimatedata.estimate.estimateFare).toFixed(settings.decimal),
+                  payableAmount: parseFloat(checkoutAmount).toFixed(settings.decimal),
                 };
                 bookingObject['paymentPacket'] = paymentPacket;
               }
-              const result = validateBookingObj(t, bookingObject, instructionData, otherPerson);
+              const result = validateBookingObj(t, bookingObject, instructionData, otherPerson, serviceType, normalizedErrand, settings);
               if (result.error) {
                 setLoading2(false);
                 setCommonAlert({ open: true, msg: result.msg });
@@ -943,10 +1108,38 @@ export default function AddBookings(props) {
                   />
                   : null}
               </Grid>
+              <Grid item xs={12} sm={6}>
+                <Select
+                  id="service-type"
+                  name="serviceType"
+                  value={serviceType}
+                  onChange={handleChange}
+                  variant="outlined"
+                  fullWidth
+                  className={classes.input}
+                  style={{ textAlign: isRTL === 'rtl' ? 'right' : 'left' }}
+                  sx={{
+                    color: colors.BLACK,
+                    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                      borderColor: MAIN_COLOR,
+                    },
+                  }}
+                >
+                  <MenuItem value={RIDE_SERVICE_TYPE} style={{ fontFamily: FONT_FAMILY }}>Viaje</MenuItem>
+                  <MenuItem value={ERRAND_SERVICE_TYPE} style={{ fontFamily: FONT_FAMILY }}>Mandado</MenuItem>
+                </Select>
+              </Grid>
+              {serviceType === ERRAND_SERVICE_TYPE ? (
+                <Grid item xs={12} sm={6}>
+                  <Typography style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: colors.RED, marginTop: 12 }}>
+                    No se aceptan drogas, armas ni articulos ilegales.
+                  </Typography>
+                </Grid>
+              ) : null}
               <Grid item xs={12} >
                 <GoogleMapsAutoComplete
                   variant={"outlined"}
-                  placeholder={t('pickup_location')}
+                  placeholder={serviceType === ERRAND_SERVICE_TYPE ? 'Tienda o zona de busqueda' : t('pickup_location')}
                   value={pickupAddress}
                   className={classes.items}
                   onChange={
@@ -957,7 +1150,7 @@ export default function AddBookings(props) {
                 />
               </Grid>
               <Grid item xs={12} >
-                <GoogleMapsAutoComplete placeholder={t('drop_location')}
+                <GoogleMapsAutoComplete placeholder={serviceType === ERRAND_SERVICE_TYPE ? 'Direccion de entrega' : t('drop_location')}
                   variant={"outlined"}
                   value={dropAddress}
                   className={classes.items}
@@ -968,8 +1161,92 @@ export default function AddBookings(props) {
                   }
                 />
               </Grid>
+              {serviceType === ERRAND_SERVICE_TYPE ? (
+                <>
+                  <Grid item xs={12}>
+                    <TextField
+                      InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                      className={isRTL === "rtl" ? classes.inputRtl : classes.textField}
+                      variant="outlined"
+                      margin="normal"
+                      required
+                      fullWidth
+                      multiline
+                      minRows={3}
+                      id="errandRequestText"
+                      label="Que debemos comprar o recoger"
+                      name="errandRequestText"
+                      onChange={handleChange}
+                      value={normalizedErrand.requestText}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={normalizedErrand.illegalGoodsAccepted}
+                          onChange={handleChange}
+                          name="errandIllegalGoodsAccepted"
+                          color="primary"
+                        />
+                      }
+                      label={<Typography style={{ fontFamily: FONT_FAMILY }}>Confirmo que es un mandado legal</Typography>}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={normalizedErrand.itemAlreadyPaid}
+                          onChange={handleChange}
+                          name="errandItemAlreadyPaid"
+                          color="primary"
+                        />
+                      }
+                      label={<Typography style={{ fontFamily: FONT_FAMILY }}>El producto ya esta pago</Typography>}
+                    />
+                  </Grid>
+                  {!normalizedErrand.itemAlreadyPaid ? (
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                        className={isRTL === "rtl" ? classes.inputRtl : classes.textField}
+                        variant="outlined"
+                        margin="normal"
+                        required
+                        fullWidth
+                        type="number"
+                        id="errandDeclaredItemValue"
+                        label="Valor estimado del pedido"
+                        name="errandDeclaredItemValue"
+                        onChange={handleChange}
+                        value={normalizedErrand.declaredItemValue}
+                        helperText={shouldForceErrandOnlinePayment(normalizedErrand, settings) ? 'Solo se permite wallet o tarjeta para este monto.' : 'Puedes cobrarlo en efectivo o en linea.'}
+                      />
+                    </Grid>
+                  ) : null}
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={normalizedErrand.requiresSearch}
+                          onChange={handleChange}
+                          name="errandRequiresSearch"
+                          color="primary"
+                        />
+                      }
+                      label={<Typography style={{ fontFamily: FONT_FAMILY }}>Aplicar costo por busqueda</Typography>}
+                    />
+                    {normalizedErrand.requiresSearch ? (
+                      <Typography style={{ fontFamily: FONT_FAMILY, fontSize: 13, color: colors.BLACK }}>
+                        Se cobrara {settings?.swipe_symbol ? `${formatAmount(settings?.errandSearchCost || 0, settings.decimal, settings.country)} ${settings.symbol}` : `${settings?.symbol || ''} ${formatAmount(settings?.errandSearchCost || 0, settings.decimal, settings.country)}`}
+                      </Typography>
+                    ) : null}
+                  </Grid>
+                </>
+              ) : null}
               <Grid item xs={12} sm={6} >
-                {cartypes ?
+                {availableCarTypes ?
                   <Select
                     labelId="demo-simple-select-label"
                     id="demo-simple-select"
@@ -986,12 +1263,12 @@ export default function AddBookings(props) {
                       },
                     }}
 
-                  >
+                    >
                     <MenuItem dense={true} value={t('select_car')} key={t('select_car')} style={{ direction: isRTL === 'rtl' ? 'rtl' : 'ltr', width: '100%', justifyContent: 'flex-start', paddingLeft: 10, fontFamily: FONT_FAMILY }}>
                       {t('select_car')}
                     </MenuItem>
                     {
-                      cartypes.sort((a, b) => a.pos - b.pos).map((car) =>
+                      availableCarTypes.sort((a, b) => a.pos - b.pos).map((car) =>
                         <MenuItem dense={true} key={car.name} value={car.name} style={{ direction: isRTL === 'rtl' ? 'rtl' : 'ltr', width: '100%', justifyContent: 'flex-start', paddingLeft: 10, fontFamily: FONT_FAMILY }}>
                           <img src={car.image} className={isRTL === 'rtl' ? classes.carphotoRtl : classes.carphoto} alt="car types" />{t(getLangKey(car.name))}
                         </MenuItem>
@@ -1145,21 +1422,24 @@ export default function AddBookings(props) {
               displayOfferFare={displayOfferFare}
               handleOfferFareChange={handleOfferFareChange}
               estimate={estimatedata.estimate}
+              serviceType={serviceType}
+              errandData={normalizedErrand}
+              formatAmount={formatAmount}
             />
             {showEst && settings && settings.hasOwnProperty("bookingFlow") && (settings.bookingFlow === "0" || settings.bookingFlow === "2") ? null :
               <Grid item xs={12} sm={12} md={12} lg={12} style={{ textAlign: isRTL === 'rtl' ? 'right' : 'left' }}>
                 {settings.swipe_symbol === false ?
                   <Typography color={'primary'} style={{ fontSize: 30, fontFamily: FONT_FAMILY, }}>
-                    {t('total')} - {settings ? settings.symbol : null} {estimatedata.estimate ? formatAmount(estimatedata.estimate.estimateFare, settings.decimal, settings.country) : null}
+                    {t('total')} - {settings ? settings.symbol : null} {estimatedata.estimate ? formatAmount(estimatedTotal, settings.decimal, settings.country) : null}
                   </Typography>
                   :
                   <Typography color={'primary'} style={{ fontSize: 30, fontFamily: FONT_FAMILY, }}>
-                    {t('total')} - {estimatedata.estimate ? formatAmount(estimatedata.estimate.estimateFare, settings.decimal, settings.country) : null} {settings ? settings.symbol : null}
+                    {t('total')} - {estimatedata.estimate ? formatAmount(estimatedTotal, settings.decimal, settings.country) : null} {settings ? settings.symbol : null}
                   </Typography>
                 }
               </Grid>
             }
-            {auth.profile.usertype === 'customer' ?
+            {radioProps.length > 0 ?
               <Grid item xs={12} sm={12} md={12} lg={12} style={{ textAlign: isRTL === 'rtl' ? 'right' : 'left' }}>
                 <FormControl component="fieldset">
                   <FormLabel component="legend" style={{ fontFamily: FONT_FAMILY, }}>{t('payment_mode')}</FormLabel>
@@ -1206,7 +1486,7 @@ export default function AddBookings(props) {
               </Typography>
               {bookingdata && bookingdata.booking ?
                 <Typography color={"primary"} style={{ fontSize: 30 }}>
-                  {(settings.swipe_symbol === false ? settings.symbol + formatAmount(bookingdata.booking.mainData.trip_cost, settings.decimal, settings.country) : formatAmount(bookingdata.booking.mainData.trip_cost, settings.decimal, settings.country) + settings.symbol)}
+                  {(settings.swipe_symbol === false ? settings.symbol + formatAmount(bookingdata.booking.mainData.upfrontOnlineAmount || bookingdata.booking.mainData.trip_cost, settings.decimal, settings.country) : formatAmount(bookingdata.booking.mainData.upfrontOnlineAmount || bookingdata.booking.mainData.trip_cost, settings.decimal, settings.country) + settings.symbol)}
                 </Typography>
                 : null}
               <Typography >
@@ -1236,15 +1516,15 @@ export default function AddBookings(props) {
             {providers && selectedProvider && bookingdata && bookingdata.booking ?
               <form action={selectedProvider.link} method="POST">
                 <input type='hidden' name='order_id' value={bookingdata.booking.booking_id} />
-                <input type='hidden' name='amount' value={bookingdata.booking.mainData.trip_cost} />
+                <input type='hidden' name='amount' value={bookingdata.booking.mainData.upfrontOnlineAmount || bookingdata.booking.mainData.trip_cost} />
                 <input type='hidden' name='currency' value={settings.code} />
                 <input type='hidden' name='product_name' value={t('bookingPayment')} />
-                <input type='hidden' name='first_name' value={auth.profile.firstName} />
-                <input type='hidden' name='last_name' value={auth.profile.lastName} />
+                <input type='hidden' name='first_name' value={userCombo?.firstName || auth.profile.firstName} />
+                <input type='hidden' name='last_name' value={userCombo?.lastName || auth.profile.lastName} />
                 <input type='hidden' name='quantity' value={1} />
                 <input type='hidden' name='cust_id' value={bookingdata.booking.mainData.customer} />
                 <input type='hidden' name='mobile_no' value={bookingdata.booking.mainData.customer_contact} />
-                <input type='hidden' name='email' value={bookingdata.booking.mainData.customer_email} />
+                <input type='hidden' name='email' value={bookingdata.booking.mainData.customer_email || userCombo?.email || auth.profile.email} />
                 <input type='hidden' name='platform'  value={'web'} />
                 <Grid item xs={12} sm={12} md={12} lg={12} style={{ marginBottom: '20px' }}>
                   <FormControl fullWidth>

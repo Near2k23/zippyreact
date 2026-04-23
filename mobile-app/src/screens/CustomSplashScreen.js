@@ -1,43 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { View, Image, Animated, Dimensions } from 'react-native';
-import { colors } from '../common/theme';
+import { Image, Animated, Dimensions } from 'react-native';
+import SplashGradientBackground from '../components/SplashGradientBackground';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 export default function CustomSplashScreen({ onAnimationComplete, forceShow = false }) {
     const [fadeAnim] = useState(new Animated.Value(0));
-    const [backgroundColor] = useState(new Animated.Value(0));
     const [bounceAnim] = useState(new Animated.Value(1));
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
-        // Si forceShow es true, siempre mostrar el splash
         if (forceShow) {
             setIsVisible(true);
         }
 
-        // Asegurar que la animación comience inmediatamente
         const startAnimations = () => {
             Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 800,
                 useNativeDriver: false,
-            }).start();
-
-            Animated.timing(backgroundColor, {
-                toValue: 1,
-                duration: 1500,
-                delay: 500,
-                useNativeDriver: false,
             }).start(() => {
-                // Iniciar animación de bounce al final
                 startBounceAnimation();
             });
         };
 
-        // Pequeño delay para asegurar que el componente esté montado
         const timer = setTimeout(startAnimations, 50);
-        
+
         return () => clearTimeout(timer);
     }, [forceShow]);
 
@@ -64,12 +52,10 @@ export default function CustomSplashScreen({ onAnimationComplete, forceShow = fa
                 useNativeDriver: true,
             }),
         ]).start(() => {
-            // Notificar que la animación está completa después del bounce
             setTimeout(() => {
                 if (onAnimationComplete) {
                     onAnimationComplete();
                 }
-                // Si forceShow es true, ocultar el splash después de la animación
                 if (forceShow) {
                     setIsVisible(false);
                 }
@@ -77,24 +63,12 @@ export default function CustomSplashScreen({ onAnimationComplete, forceShow = fa
         });
     };
 
-    const backgroundColorInterpolate = backgroundColor.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['#000000', colors.TAXIPRIMARY],
-    });
-
     if (!isVisible) {
         return null;
     }
 
     return (
-        <Animated.View
-            style={{
-                flex: 1,
-                backgroundColor: backgroundColorInterpolate,
-                justifyContent: 'center',
-                alignItems: 'center',
-            }}
-        >
+        <SplashGradientBackground>
             <Animated.View
                 style={{
                     opacity: fadeAnim,
@@ -120,6 +94,6 @@ export default function CustomSplashScreen({ onAnimationComplete, forceShow = fa
                     }}
                 />
             </Animated.View>
-        </Animated.View>
+        </SplashGradientBackground>
     );
 }

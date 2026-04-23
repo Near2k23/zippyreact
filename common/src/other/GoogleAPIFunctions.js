@@ -3,24 +3,73 @@ import { firebase } from '../config/configureFirebase';
 import AccessKey from './AccessKey';
 import store from '../store/store';
 
+const getGoogleApiEndpoints = () => {
+    const { config } = firebase;
+    const settings = store.getState()?.settingsdata?.settings || {};
+    const projectId = config?.projectId;
+    const websiteHost = `https://${projectId}.web.app`;
+    const companyWebsite = settings.CompanyWebsite;
+    const currentOrigin = typeof window !== 'undefined' ? window?.location?.origin : null;
+    const hostedBase = currentOrigin && companyWebsite === currentOrigin ? currentOrigin : websiteHost;
+    const functionBase = `https://us-central1-${projectId}.cloudfunctions.net`;
+    const isWeb = typeof document !== 'undefined';
+
+    return isWeb
+        ? [`${hostedBase}/googleapi`, `${functionBase}/googleapi`]
+        : [`${functionBase}/googleapi`, `${hostedBase}/googleapi`];
+};
+
+const parseGoogleApiResponse = async (response, endpoint) => {
+    const responseText = await response.text();
+    const contentType = response.headers?.get?.('content-type') || '';
+
+    if (!response.ok) {
+        throw new Error(`googleapi ${response.status} @ ${endpoint}: ${responseText.slice(0, 160)}`);
+    }
+
+    if (!contentType.toLowerCase().includes('application/json')) {
+        throw new Error(`googleapi non-json @ ${endpoint}: ${responseText.slice(0, 160)}`);
+    }
+
+    try {
+        return JSON.parse(responseText);
+    } catch (error) {
+        throw new Error(`googleapi invalid-json @ ${endpoint}: ${responseText.slice(0, 160)}`);
+    }
+};
+
+const callGoogleApi = async (payload) => {
+    const { config } = firebase;
+    const endpoints = getGoogleApiEndpoints();
+    let lastError = null;
+
+    for (const endpoint of endpoints) {
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Basic ${base64.encode(config.projectId + ":" + AccessKey)}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            return await parseGoogleApiResponse(response, endpoint);
+        } catch (error) {
+            lastError = error;
+            console.log(error);
+        }
+    }
+
+    throw lastError || new Error('googleapi Call Error');
+};
+
 export const fetchPlacesAutocomplete = (searchKeyword, sessionToken) => {
     return new Promise((resolve,reject)=>{
-        const { config } = firebase;
-        const settings = store.getState()?.settingsdata?.settings;
-        let host = window && window.location && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
-        fetch(`${host}/googleapi`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                "Authorization": "Basic " + base64.encode(config.projectId + ":" + AccessKey)
-            },
-            body: JSON.stringify({
+        callGoogleApi({
                 "searchKeyword": searchKeyword,
                 "sessiontoken": sessionToken
             })
-        }).then(response => {
-            return response.json();
-        })
         .then(json => {
             if(json && json.searchResults) {
                 resolve(json.searchResults);
@@ -36,21 +85,9 @@ export const fetchPlacesAutocomplete = (searchKeyword, sessionToken) => {
 
 export const fetchCoordsfromPlace = (place_id) => {
     return new Promise((resolve,reject)=>{
-        const { config } = firebase;
-        const settings = store.getState()?.settingsdata?.settings;
-        let host = window && window.location && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
-        fetch(`${host}/googleapi`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                "Authorization": "Basic " + base64.encode(config.projectId + ":" + AccessKey)
-            },
-            body: JSON.stringify({
+        callGoogleApi({
                 "place_id": place_id
             })
-        }).then(response => {
-            return response.json();
-        })
         .then(json => {
             if(json && json.coords) {
                 resolve(json.coords);
@@ -67,21 +104,9 @@ export const fetchCoordsfromPlace = (place_id) => {
 
 export const fetchAddressfromCoords = (latlng) => {
     return new Promise((resolve,reject)=>{
-        const { config } = firebase;
-        const settings = store.getState()?.settingsdata?.settings;
-        let host = window && window.location && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
-        fetch(`${host}/googleapi`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                "Authorization": "Basic " + base64.encode(config.projectId + ":" + AccessKey)
-            },
-            body: JSON.stringify({
+        callGoogleApi({
                 "latlng": latlng
             })
-        }).then(response => {
-            return response.json();
-        })
         .then(json => {
             if(json && json.address) {
                 resolve(json.address);
@@ -97,23 +122,11 @@ export const fetchAddressfromCoords = (latlng) => {
 
 export const getDistanceMatrix = (startLoc, destLoc) => {
     return new Promise((resolve,reject)=>{
-        const { config } = firebase;
-        const settings = store.getState()?.settingsdata?.settings;
-        let host = window && window.location && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
-        fetch(`${host}/googleapi`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                "Authorization": "Basic " + base64.encode(config.projectId + ":" + AccessKey)
-            },
-            body: JSON.stringify({
+        callGoogleApi({
                 "start": startLoc,
                 "dest": destLoc,
                 "calltype": "matrix",
             })
-        }).then(response => {
-            return response.json();
-        })
         .then(json => {
             if(json.error){
                 console.log(json.error);
@@ -130,9 +143,6 @@ export const getDistanceMatrix = (startLoc, destLoc) => {
 
 export const getDirectionsApi = (startLoc, destLoc, waypoints) => {
     return new Promise((resolve,reject)=>{
-        const { config } = firebase;
-        const settings = store.getState()?.settingsdata?.settings;
-        let host = window && window.location && settings.CompanyWebsite === window.location.origin? window.location.origin : `https://${config.projectId}.web.app`
         const body = {
             "start": startLoc,
             "dest": destLoc,
@@ -141,16 +151,7 @@ export const getDirectionsApi = (startLoc, destLoc, waypoints) => {
         if(waypoints){
             body["waypoints"] = waypoints;
         }
-        fetch(`${host}/googleapi`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                "Authorization": "Basic " + base64.encode(config.projectId + ":" + AccessKey)
-            },
-            body: JSON.stringify(body)
-        }).then(response => {
-            return response.json();
-        })
+        callGoogleApi(body)
         .then(json => {
             if (json.hasOwnProperty('distance_in_km')) {
                 resolve(json);
@@ -164,4 +165,3 @@ export const getDirectionsApi = (startLoc, destLoc, waypoints) => {
         })
     });
 }
-

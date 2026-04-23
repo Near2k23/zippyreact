@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Text, View, StyleSheet, Dimensions, FlatList, Modal, TouchableHighlight, Switch, Image, Platform, Linking, TouchableOpacity, KeyboardAvoidingView, useColorScheme, AppState } from 'react-native';
 import { Button, Icon } from 'react-native-elements';
 import MapView, { Polyline, PROVIDER_GOOGLE, Marker } from 'react-native-maps';
@@ -21,8 +21,12 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import customMapStyle from "../common/mapTheme.json";
 import * as LocalAuthentication from 'expo-local-authentication';
+import AppBannerCarousel from '../components/AppBannerCarousel';
 
 const ACCEPTANCE_TIMEOUT = 10; // seconds
+const BANNER_APP_DRIVER = 'DRIVER';
+const isBannerEnabled = (item) => item?.active === true || item?.active === 'true' || item?.active === 1;
+const matchesBannerApp = (item, appName) => String(item?.app || '').trim().toUpperCase() === appName;
 
 export default function DriverTrips(props) {
     const {
@@ -39,6 +43,7 @@ export default function DriverTrips(props) {
     const dispatch = useDispatch();
     const tasks = useSelector(state => state.taskdata.tasks);
     const settings = useSelector(state => state.settingsdata.settings);
+    const banners = useSelector(state => state.bannerdata.banners);
     const auth = useSelector(state => state.auth);
     const bookinglistdata = useSelector(state => state.bookinglistdata);
     const zonesdata = useSelector(state => state.zonesdata);
@@ -74,6 +79,10 @@ export default function DriverTrips(props) {
     const [isInZone, setIsInZone] = useState(true);
     const [currentZone, setCurrentZoneState] = useState(null);
     const [zoneDetectionMessage, setZoneDetectionMessage] = useState('');
+    const [showDriverBannerSection, setShowDriverBannerSection] = useState(true);
+    const driverBanners = useMemo(() => {
+        return (banners || []).filter((item) => matchesBannerApp(item, BANNER_APP_DRIVER) && isBannerEnabled(item));
+    }, [banners]);
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -208,7 +217,7 @@ export default function DriverTrips(props) {
                     t('alert'),
                     t('wallet_balance_threshold_reached')
                 );
-            } else if (appConsts.acceptWithAmount || item.deliveryWithBid) {
+            } else if ((appConsts.acceptWithAmount || item.deliveryWithBid) && item.serviceType !== 'ERRAND') {
                 if (item && item.customer_offer && !settings.coustomerBidPrice && !parseFloat(price)) {
                     price = item.customer_offer;
                 }
@@ -1149,6 +1158,16 @@ export default function DriverTrips(props) {
                             </Text>
                         }
                     </View>
+
+                    {showDriverBannerSection && driverBanners.length > 0 ? (
+                        <View style={{ width: '90%', alignSelf: 'center', marginTop: 16 }}>
+                            <AppBannerCarousel
+                                banners={driverBanners}
+                                showDismissButton={true}
+                                onDismiss={() => setShowDriverBannerSection(false)}
+                            />
+                        </View>
+                    ) : null}
                 </View>
 
             </KeyboardAvoidingView>

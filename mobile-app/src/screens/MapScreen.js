@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useContext } from 'react';
+import React, { useEffect, useState, useRef, useContext, useMemo } from 'react';
 import {
     StyleSheet,
     View,
@@ -16,9 +16,11 @@ import {
     useColorScheme,
     TouchableOpacity,
     Modal,
-    BackHandler
+    BackHandler,
+    TextInput,
+    Switch
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from 'react-native-elements';
 import { colors } from '../common/theme';
 import * as Location from 'expo-location';
@@ -31,18 +33,29 @@ import * as DecodePolyLine from '@mapbox/polyline';
 import { OptionModal } from '../components/OptionModal';
 import BookingModal, { appConsts, prepareEstimateObject } from '../common/sharedFunctions';
 import { getCarTypeWithZonePrices, getFilteredCarTypesWithZonePrices as getFilteredCarTypesWithZonePricesHelper } from 'common/src/other/ZonePriceHelper';
-import HeaderGradient from '../components/HeaderGradient';
 import WaygoDialog from '../components/WaygoDialog';
 import MapView, { PROVIDER_GOOGLE, Marker, Polyline } from 'react-native-maps';
 import { CommonActions } from '@react-navigation/native';
 import { MAIN_COLOR, MAIN_COLOR_DARK, CarHorizontal, CarVertical, validateBookingObj, SECONDORY_COLOR } from '../common/sharedFunctions';
+import {
+    ERRAND_SERVICE_TYPE,
+    RIDE_SERVICE_TYPE,
+    canAcceptCashForErrand,
+    getErrandItemValue,
+    normalizeErrandData,
+    shouldForceErrandOnlinePayment,
+} from 'common/src/other/ErrandUtils';
 import { startActivityAsync, ActivityAction } from 'expo-intent-launcher';
 import Button from '../components/Button';
 import { fonts } from "../common/font";
 import DeviceInfo from 'react-native-device-info';
 import customMapStyle from "../common/mapTheme.json";
+import AppBannerCarousel from '../components/AppBannerCarousel';
 
 const hasNotch = DeviceInfo.hasNotch();
+const BANNER_APP_RIDER = 'RIDER';
+const isBannerEnabled = (item) => item?.active === true || item?.active === 'true' || item?.active === 1;
+const matchesBannerApp = (item, appName) => String(item?.app || '').trim().toUpperCase() === appName;
 
 export default function MapScreen(props) {
     const {
@@ -76,6 +89,7 @@ export default function MapScreen(props) {
 
     const auth = useSelector(state => state.auth);
     const settings = useSelector(state => state.settingsdata.settings);
+    const banners = useSelector(state => state.bannerdata.banners);
     const cars = useSelector(state => state.cartypes.cars);
     const tripdata = useSelector(state => state.tripdata);
     const usersdata = useSelector(state => state.usersdata);
@@ -135,7 +149,23 @@ export default function MapScreen(props) {
         parcelTypeSelected: null,
         optionSelected: null
     };
+    const errandInitData = {
+        requestText: '',
+        illegalGoodsAccepted: false,
+        itemAlreadyPaid: true,
+        declaredItemValue: 0,
+        approvedItemValue: null,
+        requiresSearch: false,
+        searchArea: null,
+        searchCostApplied: false,
+        searchCostAmount: 0,
+        phase: 'TO_STORE',
+        activePriceChangeRequest: null,
+        priceChangeHistory: [],
+    };
     const [instructionData, setInstructionData] = useState(instructionInitData);
+    const [serviceType, setServiceType] = useState(RIDE_SERVICE_TYPE);
+    const [errandData, setErrandData] = useState(errandInitData);
     const bookingdata = useSelector(state => state.bookingdata);
     const [locationRejected, setLocationRejected] = useState(false);
     const mapRef = useRef();
@@ -184,6 +214,29 @@ export default function MapScreen(props) {
     const [showTermsDialog, setShowTermsDialog] = useState(false);
     const [showLocationPermissionDialog, setShowLocationPermissionDialog] = useState(false);
     const [noServiceInZoneDialogDismissed, setNoServiceInZoneDialogDismissed] = useState(false);
+    const insets = useSafeAreaInsets();
+    const normalizedErrand = normalizeErrandData(errandData, settings || {});
+    const riderBanners = useMemo(() => {
+        return (banners || []).filter((item) => matchesBannerApp(item, BANNER_APP_RIDER) && isBannerEnabled(item));
+    }, [banners]);
+    const compactLocationLabel = useMemo(() => {
+        if (currentZone?.name) {
+            return String(currentZone.name).trim();
+        }
+        if (currentLocation) {
+            return String(currentLocation).split(',')[0].trim();
+        }
+        return 'Tu ubicación';
+    }, [currentLocation, currentZone?.name]);
+    const displayLocationLabel = useMemo(() => {
+        if (currentLocation) {
+            return String(currentLocation).split(',')[0].trim();
+        }
+        if (currentZone?.name) {
+            return String(currentZone.name).trim();
+        }
+        return 'Tu ubicacion';
+    }, [currentLocation, currentZone?.name]);
 
     const handleTermsCancel = () => {
         BackHandler.exitApp();
@@ -373,13 +426,17 @@ export default function MapScreen(props) {
                 val++;
                 arr.push({ label: t('card'), value: val, cat: 'card' });
             }
-            if (!settings.disable_cash) {
+            const allowCash = serviceType !== ERRAND_SERVICE_TYPE || canAcceptCashForErrand(normalizedErrand, settings);
+            if (!settings.disable_cash && allowCash) {
                 val++;
                 arr.push({ label: t('cash'), value: val, cat: 'cash' });
             }
             setRadioProps(arr);
+            if (payment_mode >= arr.length) {
+                setPaymentMode(0);
+            }
         }
-    }, [settings, providers]);
+    }, [settings, providers, serviceType, errandData.itemAlreadyPaid, errandData.declaredItemValue, errandData.approvedItemValue, payment_mode]);
 
     useEffect(() => {
         if (usersdata.drivers) {
@@ -591,7 +648,7 @@ export default function MapScreen(props) {
                     if (currentZone && currentZone.id && tripdata.carType) {
                         tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
                     }
-                    let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
+                    let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData, serviceType, normalizedErrand, radioProps[payment_mode]?.cat || 'cash');
                     if (!result.error) {
                         dispatch(getEstimate(result.estimateObject));
                     }
@@ -703,8 +760,92 @@ export default function MapScreen(props) {
     }, [region, mapRef.current]);
 
     const getFilteredCarTypesWithZonePrices = () => {
-        return getFilteredCarTypesWithZonePricesHelper(cars, currentZone?.id);
+        const filteredCars = getFilteredCarTypesWithZonePricesHelper(cars, currentZone?.id);
+        if (serviceType === ERRAND_SERVICE_TYPE) {
+            return filteredCars.filter((car) => car.acceptErrands);
+        }
+        return filteredCars;
     };
+
+    const getCarTypesForServiceType = (nextType) => {
+        const filteredCars = getFilteredCarTypesWithZonePricesHelper(cars, currentZone?.id);
+        if (nextType === ERRAND_SERVICE_TYPE) {
+            return filteredCars.filter((car) => car.acceptErrands);
+        }
+        return filteredCars;
+    };
+
+    const handleServiceTypeChange = (nextType) => {
+        setServiceType(nextType);
+        if (nextType === RIDE_SERVICE_TYPE) {
+            setErrandData(errandInitData);
+        }
+        dispatch(updateTripCar(null));
+    };
+
+    const handlePrimaryServiceStart = (nextType) => {
+        if (!isInZone) {
+            setOutOfZoneDialog(true);
+            return;
+        }
+        if (nextType === ERRAND_SERVICE_TYPE && settings && settings.enableErrands === false) {
+            Alert.alert(t('alert'), 'Los mandados estan deshabilitados por el administrador.');
+            return;
+        }
+
+        const availableCars = getCarTypesForServiceType(nextType);
+        if (!availableCars.length) {
+            Alert.alert(
+                t('alert'),
+                nextType === ERRAND_SERVICE_TYPE
+                    ? 'No hay vehiculos disponibles para mandados en tu zona.'
+                    : 'No hay vehiculos disponibles para viajes en tu zona.'
+            );
+            return;
+        }
+
+        handleServiceTypeChange(nextType);
+        handleNewTrip();
+    };
+
+    const validateErrandForm = () => {
+        if (serviceType !== ERRAND_SERVICE_TYPE) {
+            return true;
+        }
+        if (settings && settings.enableErrands === false) {
+            Alert.alert(t('alert'), 'Los mandados estan deshabilitados por el administrador.');
+            return false;
+        }
+        if (!normalizedErrand.requestText || !String(normalizedErrand.requestText).trim()) {
+            Alert.alert(t('alert'), 'Describe el mandado antes de continuar.');
+            return false;
+        }
+        if (!normalizedErrand.illegalGoodsAccepted) {
+            Alert.alert(t('alert'), 'Debes confirmar que el mandado es legal.');
+            return false;
+        }
+        if (!normalizedErrand.itemAlreadyPaid && getErrandItemValue(normalizedErrand) <= 0) {
+            Alert.alert(t('alert'), 'Debes indicar el valor del pedido.');
+            return false;
+        }
+        if (tripdata.carType && !tripdata.carType.acceptErrands) {
+            Alert.alert(t('alert'), 'Selecciona un vehiculo que acepte mandados.');
+            return false;
+        }
+        return true;
+    };
+
+    useEffect(() => {
+        if (serviceType === ERRAND_SERVICE_TYPE && settings && settings.enableErrands === false) {
+            Alert.alert(t('alert'), 'Los mandados estan deshabilitados por el administrador.');
+            setServiceType(RIDE_SERVICE_TYPE);
+            return;
+        }
+        if (serviceType === ERRAND_SERVICE_TYPE && tripdata.carType && !tripdata.carType.acceptErrands) {
+            dispatch(updateTripCar(null));
+        }
+        resetCars();
+    }, [serviceType, settings?.enableErrands]);
 
 
     const resetCars = () => {
@@ -920,7 +1061,7 @@ export default function MapScreen(props) {
                         currentZoneId: currentZone?.id || null
                     };
 
-                    const result = await prepareEstimateObject(tempTripData, instructionData);
+                    const result = await prepareEstimateObject(tempTripData, instructionData, serviceType, normalizedErrand, radioProps[payment_mode]?.cat || 'cash');
                     if (!result.error && result.estimateObject) {
                         const estimateResult = await new Promise((resolve) => {
                             const tempDispatch = (action) => {
@@ -1253,6 +1394,17 @@ export default function MapScreen(props) {
         props.navigation.navigate('WalletDetails');
     };
 
+    const handleRechargeWallet = () => {
+        props.navigation.navigate('addMoney', {
+            userdata: auth?.profile,
+            providers: providers
+        });
+    };
+
+    const handleWhatsAppSupport = () => {
+        Linking.openURL('https://wa.me/573165627092');
+    };
+
     const handleQuickBooking = (carTypeName) => {
         if (!isInZone) {
             try { setOutOfZoneDialog(true); } catch (e) { }
@@ -1354,7 +1506,7 @@ export default function MapScreen(props) {
                 for (let i = 0; i < storedAddresses.length; i++) {
                     if (storedAddresses[i] && storedAddresses[i].lat && storedAddresses[i].lng) {
                         let distance = GetDistance(pos.latitude, pos.longitude, storedAddresses[i].lat, storedAddresses[i].lng);
-                        if (distance < 0.25) {
+                        if (distance < 0.08) {
                             res = storedAddresses[i].description;
                             found = true;
                             break;
@@ -1408,53 +1560,50 @@ export default function MapScreen(props) {
     const locationWatcherRef = useRef(null);
 
     const locateUser = async () => {
-        if (locationWatcherRef.current) {
-            locationWatcherRef.current.remove();
-            locationWatcherRef.current = null;
-        }
         setLoadingLocation(true);
         try {
-            locationWatcherRef.current = await Location.watchPositionAsync({
-                accuracy: Location.Accuracy.High,
-                timeInterval: 2000,
-                distanceInterval: 3
-            }, location => {
-                if (location && location.coords && location.coords.latitude && location.coords.longitude) {
-                    dispatch({
-                        type: 'UPDATE_GPS_LOCATION',
-                        payload: {
-                            lat: location.coords.latitude,
-                            lng: location.coords.longitude
-                        }
-                    });
-                    updateCurrentLocation({
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude
-                    });
-                    if (locationWatcherRef.current) {
-                        locationWatcherRef.current.remove();
-                        locationWatcherRef.current = null;
-                    }
-                    setLoadingLocation(false);
-                } else {
-                    console.warn('Invalid location data received:', location);
-                    setLoadingLocation(false);
-                }
-            });
-            setTimeout(() => {
-                if (locationWatcherRef.current) {
-                    locationWatcherRef.current.remove();
-                    locationWatcherRef.current = null;
-                }
+            const permission = await Location.getForegroundPermissionsAsync();
+            let status = permission.status;
+
+            if (status !== 'granted') {
+                const requestResult = await Location.requestForegroundPermissionsAsync();
+                status = requestResult.status;
+            }
+
+            if (status !== 'granted') {
                 setLoadingLocation(false);
-            }, 15000);
+                setShowLocationPermissionDialog(true);
+                return;
+            }
+
+            let location = null;
+            try {
+                location = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Highest
+                });
+            } catch (highAccuracyError) {
+                console.warn('High accuracy location failed:', highAccuracyError);
+                location = await Location.getLastKnownPositionAsync();
+            }
+
+            if (location?.coords?.latitude && location?.coords?.longitude) {
+                dispatch({
+                    type: 'UPDATE_GPS_LOCATION',
+                    payload: {
+                        lat: location.coords.latitude,
+                        lng: location.coords.longitude
+                    }
+                });
+                updateCurrentLocation({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+            } else {
+                setLoadingLocation(false);
+            }
         } catch (error) {
             console.warn('Error getting location:', error);
             setLoadingLocation(false);
-            if (locationWatcherRef.current) {
-                locationWatcherRef.current.remove();
-                locationWatcherRef.current = null;
-            }
         }
     };
 
@@ -1503,6 +1652,9 @@ export default function MapScreen(props) {
     const hasWorkAddress = savedAddresses.some(addr => addr.name?.toLowerCase() === t('work').toLowerCase());
 
     const onPressBook = async () => {
+        if (!validateErrandForm()) {
+            return;
+        }
         if (parseFloat(profile.walletBalance) >= 0) {
             setCheckType(true);
             setBookLoading(true);
@@ -1530,7 +1682,7 @@ export default function MapScreen(props) {
                                     setBookingDate(null);
                                     setBookingType(false);
                                     setShouldRequestEstimate(true);
-                                    if (appConsts.hasOptions &&
+                                    if (serviceType !== ERRAND_SERVICE_TYPE && appConsts.hasOptions &&
                                         (tripdata?.carType?.options?.length > 0 || tripdata?.carType?.parcelTypes?.length > 0)) {
                                         setOptionModalStatus(true);
                                         setBookLaterLoading(false);
@@ -1539,7 +1691,7 @@ export default function MapScreen(props) {
                                         if (currentZone && currentZone.id && tripdata.carType) {
                                             tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
                                         }
-                                        let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
+                                        let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData, serviceType, normalizedErrand, radioProps[payment_mode]?.cat || 'cash');
                                         if (result.error) {
                                             setBookLoading(false);
                                             Alert.alert(t('alert'), result.msg);
@@ -1586,6 +1738,9 @@ export default function MapScreen(props) {
 
 
     const onPressBookLater = () => {
+        if (!validateErrandForm()) {
+            return;
+        }
         setCheckType(false);
         if (parseFloat(profile.walletBalance) >= 0) {
             if (!(profile.mobile && profile.mobile.length > 6)) {
@@ -1670,7 +1825,7 @@ export default function MapScreen(props) {
                 setBookingDate(date);
                 setBookingType(true);
                 setShouldRequestEstimate(true);
-                if (appConsts.hasOptions) {
+                if (serviceType !== ERRAND_SERVICE_TYPE && appConsts.hasOptions) {
                     setOptionModalStatus(true);
                     setBookLaterLoading(false);
                 } else {
@@ -1678,7 +1833,7 @@ export default function MapScreen(props) {
                     if (currentZone && currentZone.id && tripdata.carType) {
                         tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
                     }
-                    let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
+                    let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData, serviceType, normalizedErrand, radioProps[payment_mode]?.cat || 'cash');
                     if (result.error) {
                         setBookLoading(false);
                         Alert.alert(t('alert'), result.msg);
@@ -1694,6 +1849,11 @@ export default function MapScreen(props) {
 
 
     const handleGetEstimate = async () => {
+        if (!validateErrandForm()) {
+            setBookLoading(false);
+            setBookLaterLoading(false);
+            return;
+        }
         if (checkType) {
             setBookLoading(true);
         } else {
@@ -1705,7 +1865,7 @@ export default function MapScreen(props) {
         if (currentZone && currentZone.id && tripdata.carType) {
             tripdataWithZonePrices.carType = getCarTypeWithZonePrices(tripdata.carType, currentZone.id);
         }
-        let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData);
+        let result = await prepareEstimateObject(tripdataWithZonePrices, instructionData, serviceType, normalizedErrand, radioProps[payment_mode]?.cat || 'cash');
         if (result.error) {
             setBookLoading(false);
             Alert.alert(t('alert'), result.msg);
@@ -1733,6 +1893,8 @@ export default function MapScreen(props) {
 
     const onModalCancel = () => {
         setInstructionData(instructionInitData);
+        setErrandData(errandInitData);
+        setServiceType(RIDE_SERVICE_TYPE);
         setTripInstructions("");
         setOfferFare(0)
         setRoundTrip(false);
@@ -1749,6 +1911,8 @@ export default function MapScreen(props) {
     const finaliseBooking = (bookingData) => {
         dispatch(addBooking(bookingData));
         setInstructionData(instructionInitData);
+        setErrandData(errandInitData);
+        setServiceType(RIDE_SERVICE_TYPE);
         setBookingModalStatus(false);
         setOptionModalStatus(false);
         resetCars();
@@ -1761,6 +1925,10 @@ export default function MapScreen(props) {
     const bookNow = async () => {
         setBookModelLoading(true);
         let wallet_balance = profile.walletBalance;
+        const selectedPaymentCategory = radioProps[payment_mode]?.cat || 'cash';
+        const bookingChargeAmount = serviceType === ERRAND_SERVICE_TYPE
+            ? (estimatedata?.estimate?.upfrontOnlineAmount || estimatedata?.estimate?.customerTotal || estimatedata?.estimate?.estimateFare || 0)
+            : (estimatedata?.estimate?.estimateFare || 0);
         let notfound = true;
         if (activeBookings) {
             for (let i = 0; i < activeBookings.length; i++) {
@@ -1773,8 +1941,8 @@ export default function MapScreen(props) {
         const regx1 = /([0-9\s-]{7,})(?:\s*(?:#|x\.?|ext\.?|extension)\s*(\d+))?$/;
         if ((otherPerson && /\S/.test(instructionData.otherPerson) && regx1.test(instructionData.otherPersonPhone) && instructionData.otherPersonPhone && instructionData.otherPersonPhone.length > 6) || !otherPerson) {
             if ((offerFare > 0 && offerFare >= parseFloat(minimumPrice)) || offerFare == 0) {
-                if ((radioProps[payment_mode].cat === 'wallet' && notfound) || radioProps[payment_mode].cat !== 'wallet') {
-                    if ((radioProps[payment_mode].cat === 'wallet' && (parseFloat(wallet_balance) >= parseFloat(estimatedata.estimate.estimateFare)) && appConsts.checkWallet) || radioProps[payment_mode].cat !== 'wallet' || (radioProps[payment_mode].cat === 'wallet' && !appConsts.checkWallet)) {
+                if ((selectedPaymentCategory === 'wallet' && notfound) || selectedPaymentCategory !== 'wallet') {
+                    if ((selectedPaymentCategory === 'wallet' && (parseFloat(wallet_balance) >= parseFloat(bookingChargeAmount)) && appConsts.checkWallet) || selectedPaymentCategory !== 'wallet' || (selectedPaymentCategory === 'wallet' && !appConsts.checkWallet)) {
                         const addBookingObj = {
                             pickup: estimatedata.estimate.pickup,
                             drop: estimatedata.estimate.drop,
@@ -1786,12 +1954,21 @@ export default function MapScreen(props) {
                             settings: settings,
                             booking_type_admin: false,
                             booking_type_fleetadmin: false,
-                            deliveryWithBid: deliveryWithBid ? deliveryWithBid : false,
-                            payment_mode: radioProps[payment_mode].cat,
-                            customer_offer: offerFare
+                            deliveryWithBid: serviceType === ERRAND_SERVICE_TYPE ? false : (deliveryWithBid ? deliveryWithBid : false),
+                            payment_mode: selectedPaymentCategory,
+                            customer_offer: serviceType === ERRAND_SERVICE_TYPE ? 0 : offerFare,
+                            serviceType: serviceType,
+                            errand: serviceType === ERRAND_SERVICE_TYPE ? {
+                                ...normalizedErrand,
+                                searchArea: normalizedErrand.requiresSearch && estimatedata.estimate.pickup ? {
+                                    lat: estimatedata.estimate.pickup.coords ? estimatedata.estimate.pickup.coords.lat : estimatedata.estimate.pickup.lat,
+                                    lng: estimatedata.estimate.pickup.coords ? estimatedata.estimate.pickup.coords.lng : estimatedata.estimate.pickup.lng,
+                                    add: estimatedata.estimate.pickup.description || estimatedata.estimate.pickup.add
+                                } : null
+                            } : null
                         };
                         if (auth && auth.profile && auth.profile.firstName && auth.profile.firstName.length > 0 && auth.profile.lastName && auth.profile.lastName.length > 0 && auth.profile.email && auth.profile.email.length > 0) {
-                            const result = await validateBookingObj(t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare);
+                            const result = await validateBookingObj(t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare, serviceType, normalizedErrand);
                             if (result.error) {
                                 Alert.alert(
                                     t('alert'),
@@ -1813,7 +1990,7 @@ export default function MapScreen(props) {
                                     lastName: profileData.lastName
                                 }
                                 if (auth.profile.email) {
-                                    const result = await validateBookingObj(t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare);
+                                    const result = await validateBookingObj(t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare, serviceType, normalizedErrand);
                                     let bookingData = result.addBookingObj;
                                     bookingData.userDetails.firstName = profileData.firstName;
                                     bookingData.userDetails.lastName = profileData.lastName;
@@ -1831,7 +2008,7 @@ export default function MapScreen(props) {
                                                 Alert.alert(t('alert'), t('email_or_mobile_issue'));
                                                 setBookModelLoading(false);
                                             } else {
-                                                const result = await validateBookingObj(t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare);
+                                                const result = await validateBookingObj(t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare, serviceType, normalizedErrand);
                                                 if (result.error) {
                                                     Alert.alert(
                                                         t('alert'),
@@ -2241,102 +2418,66 @@ export default function MapScreen(props) {
                 : null}
 
             {showInitialScreen ? (
-                <SafeAreaView style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
+                <SafeAreaView edges={['left', 'right', 'bottom']} style={[styles.container, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND }]}>
                     <StatusBar
                         translucent
                         backgroundColor="transparent"
-                        barStyle="light-content"
+                        barStyle={mode === 'dark' ? 'light-content' : 'dark-content'}
                     />
-                    {mode !== 'dark' && (
-                        <Image
-                            source={require('../../assets/images/wall.jpg')}
-                            style={styles.headerBackgroundImage}
-                            resizeMode="cover"
-                        />
-                    )}
-                    <View style={[styles.headerContainer]}>
+                    <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top - (Platform.OS === 'ios' ? 6 : 0), Platform.OS === 'ios' ? 10 : 16) }]}>
                         <View style={[styles.header]}>
-                            <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                                <View style={[styles.profileSection, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                            <View style={[styles.homeTopRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <View style={styles.homeLocationBlock}>
+                                    <Text style={[styles.homeLocationCaption, { color: mode === 'dark' ? '#B5BCC8' : '#60646C' }]}>
+                                        Ubicacion actual
+                                    </Text>
                                     <TouchableOpacity
-                                        onPress={() => props.navigation.navigate('Profile')}
-                                        style={[styles.profileImageContainer, {
-                                            marginRight: isRTL ? 0 : 12,
-                                            marginLeft: isRTL ? 12 : 0,
-                                        }]}
+                                        onPress={locateUser}
+                                        style={[
+                                            styles.homeLocationPill,
+                                            { flexDirection: isRTL ? 'row-reverse' : 'row' }
+                                        ]}
                                     >
-                                        <Image
-                                            source={
-                                                auth.profile?.profile_image
-                                                    ? { uri: auth.profile.profile_image }
-                                                    : require('../../assets/images/profilePic.png')
-                                            }
-                                            style={[styles.profileImage, {
-                                                borderColor: mode === 'dark' ? colors.BLACK : colors.WHITE
-                                            }]}
-                                        />
-                                    </TouchableOpacity>
-                                    <View style={styles.locationSection}>
-                                        <Text style={[styles.greetingText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                            {`${t('hello_user')}, ${auth.profile?.firstName || t('rider')}!`}
+                                        <Text style={[styles.homeLocationValue, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
+                                            {displayLocationLabel}
                                         </Text>
-                                        <TouchableOpacity
-                                            onPress={locateUser}
-                                            style={[styles.currentLocationContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                                        >
-                                            <Icon
-                                                name="location-on"
-                                                type="material"
-                                                size={16}
-                                                color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
-                                            />
                                             {loadingLocation ? (
                                                 <ActivityIndicator size="small" color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR} />
                                             ) : (
-                                                <Text style={[styles.currentLocationText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1} ellipsizeMode="tail">
-                                                    {currentLocation || 'Detecting location...'}
-                                                </Text>
+                                                <Icon name="chevron-down" type="ionicon" size={16} color={mode === 'dark' ? '#F27830' : colors.BLACK} />
                                             )}
-                                        </TouchableOpacity>
-                                    </View>
+                                    </TouchableOpacity>
                                 </View>
                                 <TouchableOpacity
                                     onPress={() => props.navigation.navigate('Notifications')}
-                                    style={[styles.notificationButton, { backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE }]}
+                                    style={[styles.homeIconButton, { backgroundColor: mode === 'dark' ? '#23262B' : colors.WHITE, borderWidth: mode === 'dark' ? 1 : 0, borderColor: mode === 'dark' ? '#2E3238' : 'transparent' }]}
                                 >
                                     <Icon
                                         name="notifications-outline"
                                         type="ionicon"
                                         size={20}
-                                        color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                                        color={mode === 'dark' ? '#F27830' : colors.BLACK}
                                     />
                                 </TouchableOpacity>
                             </View>
-                            <Text style={[styles.searchTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                {t('where_can_we_take_you')}
-                            </Text>
                             <TouchableOpacity
                                 onPress={isInZone ? handleNewTrip : () => setOutOfZoneDialog(true)}
-                                style={[styles.searchInput, {
-                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                    borderColor: mode === 'dark' ? colors.WHITE + '20' : colors.SHADOW + '20',
+                                style={[styles.homeSearchBar, {
+                                    backgroundColor: mode === 'dark' ? '#23262B' : colors.WHITE,
+                                    borderWidth: mode === 'dark' ? 1 : 0,
+                                    borderColor: mode === 'dark' ? '#2E3238' : 'transparent',
                                     opacity: isInZone ? 1 : 0.5
                                 }]}
                             >
                                 <Icon
-                                    name="search"
+                                    name="search-outline"
                                     type="ionicon"
                                     size={20}
-                                    color={mode === 'dark' ? colors.WHITE : colors.BLACK}
+                                    color={mode === 'dark' ? '#F27830' : colors.BLACK}
                                 />
-                                <Text style={[styles.searchPlaceholder, { color: colors.SHADOW }]}>
-                                    {t('write_the_address')}
+                                <Text style={[styles.homeSearchText, { color: mode === 'dark' ? '#E7EAF0' : '#4B5563' }]}>
+                                    Que quieres hoy?
                                 </Text>
-                                <Image
-                                    source={require('../../assets/images/map.png')}
-                                    style={styles.mapIcon}
-                                    resizeMode="contain"
-                                />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -2344,42 +2485,8 @@ export default function MapScreen(props) {
                     <ScrollView
                         style={styles.scrollContainer}
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 110, 132) }]}
                     >
-                        {savedAddresses.filter(address => address && address.lat && address.lng).length > 0 && (
-                            <View style={[styles.chipWrapper]}>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    style={styles.chipScrollContainer}
-                                    contentContainerStyle={styles.chipContainer}
-                                >
-                                    {savedAddresses
-                                        .filter(address => address && address.lat && address.lng)
-                                        .map((address, index) => (
-                                            <TouchableOpacity
-                                                key={index}
-                                                onPress={() => handleAddressSelect(address)}
-                                                style={[styles.chip, {
-                                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                                    borderWidth: 1,
-                                                    borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR,
-                                                    marginRight: isRTL ? 0 : 8,
-                                                    marginLeft: isRTL ? 8 : 0,
-                                                }]}
-                                            >
-                                                <Text style={[styles.chipText, { color: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }]} numberOfLines={1} ellipsizeMode="tail">
-                                                    {(address.description || address.name || '').length > 20
-                                                        ? (address.description || address.name || '').substring(0, 20) + '...'
-                                                        : (address.description || address.name || '')
-                                                    }
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                </ScrollView>
-                            </View>
-                        )}
-
                         {(() => {
                             const filteredCars = getFilteredCarTypesWithZonePrices();
 
@@ -2403,6 +2510,9 @@ export default function MapScreen(props) {
 
                             const isLoading = !currentZone || cars == null;
                             const noServiceInZone = !isLoading && (cars.length === 0 || filteredCars.length === 0);
+                            const rideCars = getCarTypesForServiceType(RIDE_SERVICE_TYPE);
+                            const errandCars = getCarTypesForServiceType(ERRAND_SERVICE_TYPE);
+                            const errandsDisabled = settings && settings.enableErrands === false;
 
                             if (isLoading) {
                                 return (
@@ -2416,39 +2526,155 @@ export default function MapScreen(props) {
                             if (noServiceInZone) {
                                 return null;
                             }
-                            return filteredCars.length > 0 ? (
-                                <View style={styles.serviceTypesContainer}>
-                                    <ScrollView
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        style={styles.serviceTypesScrollView}
-                                        contentContainerStyle={styles.serviceTypesContent}
-                                        nestedScrollEnabled={true}
-                                    >
-                                        {filteredCars.map((car, index) => (
-                                            <TouchableOpacity
-                                                key={index}
-                                                onPress={() => handleQuickBooking(car.name)}
-                                                style={[styles.serviceTypeCard, {
-                                                    backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE,
-                                                    shadowColor: mode === 'dark' ? colors.WHITE : colors.BLACK
-                                                }]}
-                                            >
-                                                <View style={[styles.serviceTypeIcon, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK + '20' : MAIN_COLOR + '20' }]}>
-                                                    <Image
-                                                        resizeMode="contain"
-                                                        source={car.image ? { uri: car.image } : require('../../assets/images/microBlackCar.png')}
-                                                        style={styles.serviceTypeImage}
-                                                    />
+
+                            return (
+                                <View style={styles.homeServicesContainer}>
+                                    <View style={[styles.serviceShortcutRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                        <TouchableOpacity
+                                            activeOpacity={0.92}
+                                            onPress={() => handlePrimaryServiceStart(RIDE_SERVICE_TYPE)}
+                                            style={[
+                                                styles.serviceShortcutCard,
+                                                {
+                                                    backgroundColor: mode === 'dark' ? '#23262B' : 'transparent',
+                                                    borderWidth: mode === 'dark' ? 1 : 0,
+                                                    borderColor: mode === 'dark' ? '#2E3238' : 'transparent'
+                                                }
+                                            ]}
+                                        >
+                                            <View style={[styles.serviceShortcutIconWrap, { backgroundColor: mode === 'dark' ? '#33261E' : '#F6C7A5' }]}>
+                                                <Image source={require('../../assets/images/taxi.png')} resizeMode="contain" style={styles.serviceShortcutImageRide} />
+                                            </View>
+                                            <Text style={[styles.serviceShortcutTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Viajes</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            activeOpacity={0.92}
+                                            onPress={() => handlePrimaryServiceStart(ERRAND_SERVICE_TYPE)}
+                                            style={[
+                                                styles.serviceShortcutCard,
+                                                {
+                                                    backgroundColor: mode === 'dark' ? '#23262B' : 'transparent',
+                                                    borderWidth: mode === 'dark' ? 1 : 0,
+                                                    borderColor: mode === 'dark' ? '#2E3238' : 'transparent'
+                                                }
+                                            ]}
+                                        >
+                                            <View style={[styles.serviceShortcutIconWrap, { backgroundColor: mode === 'dark' ? '#381D26' : '#F4B8C3' }]}>
+                                                <Image source={require('../../assets/images/mandado.png')} resizeMode="contain" style={styles.serviceShortcutImageErrand} />
+                                            </View>
+                                            <Text style={[styles.serviceShortcutTitle, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Mandado</Text>
+                                            {errandsDisabled ? (
+                                                <View style={styles.homeServiceBadge}>
+                                                    <Text style={styles.homeServiceBadgeText}>Deshabilitado</Text>
                                                 </View>
-                                                <Text style={[styles.serviceTypeName, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                                    {car.name}
+                                            ) : null}
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={[styles.quickActionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                        {[
+                                            {
+                                                key: 'addresses',
+                                                label: 'Direcciones',
+                                                icon: 'location-outline',
+                                                onPress: handleAddAddress,
+                                                backgroundColor: '#D7E8FA',
+                                                darkBackgroundColor: '#33261E',
+                                                iconColor: '#2F80ED'
+                                            },
+                                            {
+                                                key: 'whatsapp',
+                                                label: 'WhatsApp',
+                                                icon: 'logo-whatsapp',
+                                                onPress: handleWhatsAppSupport,
+                                                backgroundColor: '#D8F3E3',
+                                                darkBackgroundColor: '#153225',
+                                                iconColor: '#25D366'
+                                            },
+                                            {
+                                                key: 'recent',
+                                                label: 'Recientes',
+                                                icon: 'time-outline',
+                                                onPress: handleRecentTrips,
+                                                backgroundColor: '#F7E3B8',
+                                                darkBackgroundColor: '#362C17',
+                                                iconColor: '#F2A93B'
+                                            },
+                                            {
+                                                key: 'wallet',
+                                                label: 'Billetera',
+                                                icon: 'wallet-outline',
+                                                onPress: handleWallet,
+                                                backgroundColor: '#F6CDB8',
+                                                darkBackgroundColor: '#2D2020',
+                                                iconColor: '#F27830'
+                                            }
+                                        ].map((item) => (
+                                            <TouchableOpacity
+                                                key={item.key}
+                                                style={[
+                                                    styles.quickActionCard,
+                                                    {
+                                                        backgroundColor: mode === 'dark' ? '#23262B' : 'transparent',
+                                                        borderWidth: mode === 'dark' ? 1 : 0,
+                                                        borderColor: mode === 'dark' ? '#2E3238' : 'transparent'
+                                                    }
+                                                ]}
+                                                onPress={item.onPress}
+                                                activeOpacity={0.9}
+                                            >
+                                                <View style={[styles.quickActionIconWrap, { backgroundColor: mode === 'dark' ? item.darkBackgroundColor : item.backgroundColor }]}>
+                                                    <Icon name={item.icon} type="ionicon" size={28} color={mode === 'dark' ? item.iconColor : '#20242B'} />
+                                                </View>
+                                                <Text style={[styles.quickActionText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]} numberOfLines={1}>
+                                                    {item.label}
                                                 </Text>
                                             </TouchableOpacity>
                                         ))}
-                                    </ScrollView>
+                                    </View>
+
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.walletBalanceCard,
+                                            {
+                                                backgroundColor: mode === 'dark' ? '#23262B' : '#111111',
+                                                borderWidth: mode === 'dark' ? 1 : 0,
+                                                borderColor: mode === 'dark' ? '#2E3238' : 'transparent',
+                                                flexDirection: isRTL ? 'row-reverse' : 'row'
+                                            }
+                                        ]}
+                                        onPress={handleWallet}
+                                        activeOpacity={0.92}
+                                    >
+                                        <View style={styles.walletBalanceLeft}>
+                                            <View style={[styles.walletBalanceIcon, { backgroundColor: mode === 'dark' ? '#381D26' : '#F27830' }]}>
+                                                <Icon name="wallet-outline" type="ionicon" size={22} color={colors.WHITE} />
+                                            </View>
+                                            <View style={styles.walletBalanceTextBlock}>
+                                                <Text style={[styles.walletBalanceLabel, { color: mode === 'dark' ? '#B5BCC8' : '#F5F7FB' }]}>
+                                                    Saldo disponible
+                                                </Text>
+                                                <Text style={[styles.walletBalanceAmount, { color: colors.WHITE }]}>
+                                                    {settings?.swipe_symbol === false
+                                                        ? `${settings?.symbol || '$'} ${formatAmount(auth?.profile?.walletBalance || 0, settings?.decimal || 2, settings?.country)}`
+                                                        : `${formatAmount(auth?.profile?.walletBalance || 0, settings?.decimal || 2, settings?.country)} ${settings?.symbol || '$'}`}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={[styles.walletRechargeButton, { backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : '#FFFFFF' }]}
+                                            onPress={handleRechargeWallet}
+                                            activeOpacity={0.9}
+                                        >
+                                            <Text style={[styles.walletRechargeText, { color: mode === 'dark' ? colors.WHITE : '#111111' }]}>
+                                                Recargar
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </TouchableOpacity>
                                 </View>
-                            ) : null;
+                            );
                         })()}
 
                         {(gps.error || (!checkTerm && settings.term_required) || (!auth.profile.approved) || needsSocialSecurity()) && (
@@ -2515,49 +2741,11 @@ export default function MapScreen(props) {
                             </View>
                         )}
 
-                        {(() => {
-                            const filteredCarsForButtons = getFilteredCarTypesWithZonePrices();
-                            const hasAvailableCars = filteredCarsForButtons.length > 0;
-                            if (!hasAvailableCars) {
-                                return null;
-                            }
-                            return (
-                                <>
-                                    <View style={styles.actionButtonsContainer}>
-                                        <TouchableOpacity
-                                            onPress={handleRecentTrips}
-                                            style={[styles.primaryButton, {
-                                                backgroundColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                borderWidth: 2
-                                            }]}
-                                        >
-                                            <Text style={[styles.primaryButtonText, { color: mode === 'dark' ? colors.BLACK : colors.WHITE }]}>{t('recent_trips')}</Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            onPress={handleWallet}
-                                            style={[styles.secondaryButton, {
-                                                borderColor: mode === 'dark' ? colors.WHITE : colors.BLACK,
-                                                backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND
-                                            }]}
-                                        >
-                                            <Text style={[styles.secondaryButtonText, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
-                                                {t('my_wallet_tile')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-
-                                    <View style={{ width: '100%', alignItems: 'center' }}>
-                                        <Image
-                                            source={require('../../assets/images/banner.png')}
-                                            style={styles.bannerImage}
-                                            resizeMode="cover"
-                                        />
-                                    </View>
-                                </>
-                            );
-                        })()}
+                        {riderBanners.length > 0 ? (
+                            <View style={{ width: '100%', marginTop: 18 }}>
+                                <AppBannerCarousel banners={riderBanners} />
+                            </View>
+                        ) : null}
 
                         {!isInZone && zoneDetectionMessage ? (
                             <View style={[styles.zoneWarningBanner, {
@@ -2670,6 +2858,43 @@ export default function MapScreen(props) {
                             >
                                 <View style={[styles.bar, { backgroundColor: '#E2E6EA', marginVertical: 8, alignSelf: 'center' }]} ></View>
                                 <View style={{ backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.SCREEN_BACKGROUND, paddingHorizontal: 15 }}>
+                                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginBottom: 15 }}>
+                                        <TouchableOpacity
+                                            onPress={() => handleServiceTypeChange(RIDE_SERVICE_TYPE)}
+                                            style={{
+                                                flex: 1,
+                                                height: 42,
+                                                borderRadius: 12,
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                backgroundColor: serviceType === RIDE_SERVICE_TYPE ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : (mode === 'dark' ? colors.BLACK : colors.WHITE),
+                                                borderWidth: 1,
+                                                borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
+                                            }}
+                                        >
+                                            <Text style={{ color: serviceType === RIDE_SERVICE_TYPE ? colors.WHITE : (mode === 'dark' ? colors.WHITE : colors.BLACK), fontFamily: fonts.Bold }}>
+                                                Viaje
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => handleServiceTypeChange(ERRAND_SERVICE_TYPE)}
+                                            style={{
+                                                flex: 1,
+                                                height: 42,
+                                                borderRadius: 12,
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                                backgroundColor: serviceType === ERRAND_SERVICE_TYPE ? (mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR) : (mode === 'dark' ? colors.BLACK : colors.WHITE),
+                                                borderWidth: 1,
+                                                borderColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR
+                                            }}
+                                        >
+                                            <Text style={{ color: serviceType === ERRAND_SERVICE_TYPE ? colors.WHITE : (mode === 'dark' ? colors.WHITE : colors.BLACK), fontFamily: fonts.Bold }}>
+                                                Mandado
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+
                                     <View style={[styles.addressRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginBottom: 15 }]}>
                                         <View style={styles.iconColumn}>
                                             <View style={[styles.pickupIconContainer, {
@@ -2705,8 +2930,96 @@ export default function MapScreen(props) {
                                         </View>
                                     </View>
 
+                                    {serviceType === ERRAND_SERVICE_TYPE ? (
+                                        <View style={{ marginBottom: 15, padding: 12, borderRadius: 14, backgroundColor: mode === 'dark' ? colors.BLACK : colors.WHITE, borderWidth: 1, borderColor: mode === 'dark' ? colors.WHITE + '20' : colors.SHADOW + '40' }}>
+                                            <Text style={{ fontFamily: fonts.Bold, fontSize: 15, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginBottom: 6 }}>
+                                                Mandado
+                                            </Text>
+                                            <TextInput
+                                                value={normalizedErrand.requestText}
+                                                onChangeText={(text) => setErrandData({ ...errandData, requestText: text })}
+                                                placeholder="Que debemos comprar o recoger"
+                                                placeholderTextColor={colors.SHADOW}
+                                                multiline
+                                                style={{
+                                                    minHeight: 74,
+                                                    borderWidth: 1,
+                                                    borderColor: colors.SHADOW + '60',
+                                                    borderRadius: 12,
+                                                    paddingHorizontal: 12,
+                                                    paddingVertical: 10,
+                                                    color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                    fontFamily: fonts.Regular,
+                                                    marginBottom: 10
+                                                }}
+                                            />
+                                            <TouchableOpacity
+                                                onPress={() => setErrandData({ ...errandData, illegalGoodsAccepted: !normalizedErrand.illegalGoodsAccepted })}
+                                                style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: 10 }}
+                                            >
+                                                <Icon
+                                                    name={normalizedErrand.illegalGoodsAccepted ? 'checkbox' : 'square-outline'}
+                                                    type="ionicon"
+                                                    size={20}
+                                                    color={mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}
+                                                />
+                                                <Text style={{ marginHorizontal: 8, fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK, flex: 1 }}>
+                                                    No se aceptan drogas, armas ni articulos ilegales.
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                                <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                                                    El producto ya esta pago
+                                                </Text>
+                                                <Switch
+                                                    value={normalizedErrand.itemAlreadyPaid}
+                                                    onValueChange={(value) => setErrandData({ ...errandData, itemAlreadyPaid: value, declaredItemValue: value ? 0 : errandData.declaredItemValue })}
+                                                    trackColor={{ false: colors.SHADOW, true: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}
+                                                    thumbColor={colors.WHITE}
+                                                />
+                                            </View>
+                                            {!normalizedErrand.itemAlreadyPaid ? (
+                                                <TextInput
+                                                    value={String(normalizedErrand.declaredItemValue || '')}
+                                                    onChangeText={(text) => setErrandData({ ...errandData, declaredItemValue: text.replace(/[^0-9.]/g, '') })}
+                                                    placeholder="Valor estimado del pedido"
+                                                    placeholderTextColor={colors.SHADOW}
+                                                    keyboardType="numeric"
+                                                    style={{
+                                                        height: 46,
+                                                        borderWidth: 1,
+                                                        borderColor: colors.SHADOW + '60',
+                                                        borderRadius: 12,
+                                                        paddingHorizontal: 12,
+                                                        color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                                        fontFamily: fonts.Regular,
+                                                        marginBottom: 10
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK }}>
+                                                    Aplicar costo por busqueda
+                                                </Text>
+                                                <Switch
+                                                    value={normalizedErrand.requiresSearch}
+                                                    onValueChange={(value) => setErrandData({ ...errandData, requiresSearch: value, searchCostApplied: value, searchCostAmount: value ? parseFloat(settings?.errandSearchCost || 0) : 0 })}
+                                                    trackColor={{ false: colors.SHADOW, true: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}
+                                                    thumbColor={colors.WHITE}
+                                                />
+                                            </View>
+                                            {!normalizedErrand.itemAlreadyPaid ? (
+                                                <Text style={{ marginTop: 10, color: shouldForceErrandOnlinePayment(normalizedErrand, settings) ? colors.RED : (mode === 'dark' ? colors.WHITE : colors.BLACK), fontFamily: fonts.Regular, fontSize: 12 }}>
+                                                    {shouldForceErrandOnlinePayment(normalizedErrand, settings)
+                                                        ? 'Este mandado solo permite wallet o tarjeta por el valor del pedido.'
+                                                        : 'Puedes cobrar el producto en efectivo o en linea.'}
+                                                </Text>
+                                            ) : null}
+                                        </View>
+                                    ) : null}
+
                                     {showCarTypesExpanded && (
-                                        <View style={{ paddingBottom: 15 }}>
+                                        <View style={{ paddingBottom: 24 }}>
                                             {(() => {
                                                 const isLoading = !currentZone || !cars || cars.length === 0;
                                                 const filteredCars = getFilteredCarTypesWithZonePrices();
@@ -2720,7 +3033,12 @@ export default function MapScreen(props) {
                                                 }
 
                                                 return filteredCars && filteredCars.length > 0 ? (
-                                                    <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={{ paddingHorizontal: 5 }}>
+                                                    <ScrollView
+                                                        horizontal={true}
+                                                        showsHorizontalScrollIndicator={false}
+                                                        style={styles.carTypesExpandedScroll}
+                                                        contentContainerStyle={styles.carTypesExpandedContent}
+                                                    >
                                                         <View style={{ flexDirection: 'row', gap: 10 }}>
                                                             {filteredCars.map((prop, index) => {
                                                                 const activeProp = allCarTypes.find(ct => ct.name === prop.name) || prop;
@@ -2820,6 +3138,9 @@ export default function MapScreen(props) {
                 settings={settings}
                 tripdata={tripdata}
                 estimate={estimatedata.estimate}
+                serviceType={serviceType}
+                errandData={normalizedErrand}
+                setErrandData={setErrandData}
                 instructionData={instructionData}
                 setInstructionData={setInstructionData}
                 tripInstructions={tripInstructions}
@@ -3479,6 +3800,14 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
     },
+    carTypesExpandedScroll: {
+        marginHorizontal: -5,
+        paddingHorizontal: 5,
+        paddingVertical: 4,
+    },
+    carTypesExpandedContent: {
+        paddingBottom: 14,
+    },
     carTypeImage: {
         width: 40,
         height: 25,
@@ -3503,7 +3832,7 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         overflow: 'visible',
-        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 10 : 5) : 60,
+        paddingTop: Platform.OS === 'ios' ? (hasNotch ? 8 : 4) : 50,
         backgroundColor: 'transparent',
         zIndex: 1,
     },
@@ -3528,7 +3857,7 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingBottom: 15,
+        paddingBottom: 8,
         backgroundColor: 'transparent',
         position: 'relative',
         zIndex: 2,
@@ -3542,6 +3871,64 @@ const styles = StyleSheet.create({
         marginTop: 10,
         marginBottom: 20,
         marginHorizontal: -20,
+    },
+    homeTopRow: {
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: 18,
+    },
+    homeLocationBlock: {
+        flex: 1,
+        marginRight: 12,
+    },
+    homeLocationCaption: {
+        fontSize: 14,
+        fontFamily: fonts.Regular,
+        marginBottom: 2,
+    },
+    homeLocationPill: {
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        gap: 8,
+        borderRadius: 16,
+        paddingVertical: 2,
+        paddingHorizontal: 0,
+    },
+    homeLocationValue: {
+        fontSize: 19,
+        lineHeight: 24,
+        fontFamily: fonts.Bold,
+        maxWidth: width * 0.62,
+    },
+    homeIconButton: {
+        width: 46,
+        height: 46,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+    },
+    homeSearchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        borderRadius: 28,
+        height: 58,
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.08,
+        shadowRadius: 24,
+        elevation: 5,
+    },
+    homeSearchText: {
+        marginLeft: 10,
+        fontSize: 17,
+        fontFamily: fonts.Regular,
+        flex: 1,
     },
     chipScrollContainer: {
     },
@@ -3616,8 +4003,8 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 20,
-        paddingTop: 0,
-        paddingBottom: 20,
+        paddingTop: 6,
+        paddingBottom: 26,
     },
     searchInput: {
         flexDirection: 'row',
@@ -3704,6 +4091,191 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontFamily: fonts.Regular,
         textAlign: 'center',
+    },
+    homeServicesContainer: {
+        marginBottom: 22,
+    },
+    serviceShortcutRow: {
+        gap: 12,
+        alignItems: 'stretch',
+    },
+    serviceShortcutCard: {
+        flex: 1,
+        minHeight: 246,
+        borderRadius: 34,
+        paddingHorizontal: 14,
+        paddingTop: 14,
+        paddingBottom: 16,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+    },
+    homeServiceCardDisabled: {
+        opacity: 0.55,
+    },
+    serviceShortcutIconWrap: {
+        width: '100%',
+        flex: 1,
+        minHeight: 174,
+        borderRadius: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    serviceShortcutImageRide: {
+        width: 156,
+        height: 116,
+    },
+    serviceShortcutImageErrand: {
+        width: 164,
+        height: 164,
+    },
+    serviceShortcutTitle: {
+        fontSize: 24,
+        fontFamily: fonts.Medium,
+        color: '#111111',
+        textAlign: 'center',
+    },
+    quickActionsRow: {
+        marginTop: 14,
+        justifyContent: 'center',
+        gap: 2,
+    },
+    quickActionCard: {
+        flex: 1,
+        minHeight: 88,
+        borderRadius: 20,
+        paddingHorizontal: 2,
+        paddingVertical: 2,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        backgroundColor: 'transparent',
+    },
+    quickActionIconWrap: {
+        width: 58,
+        height: 58,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    quickActionText: {
+        fontSize: 12,
+        lineHeight: 15,
+        fontFamily: fonts.Regular,
+        textAlign: 'center',
+    },
+    walletBalanceCard: {
+        marginTop: 18,
+        borderRadius: 28,
+        minHeight: 104,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        elevation: 6,
+        marginBottom: 16,
+    },
+    walletBalanceLeft: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        minWidth: 0,
+    },
+    walletBalanceIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    walletBalanceTextBlock: {
+        flex: 1,
+        minWidth: 0,
+    },
+    walletBalanceLabel: {
+        fontSize: 12,
+        fontFamily: fonts.Regular,
+        marginBottom: 4,
+    },
+    walletBalanceAmount: {
+        fontSize: 23,
+        lineHeight: 28,
+        fontFamily: fonts.Bold,
+    },
+    walletRechargeButton: {
+        minWidth: 104,
+        height: 44,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+        marginLeft: 12,
+    },
+    walletRechargeText: {
+        fontSize: 14,
+        fontFamily: fonts.Bold,
+    },
+    homeInfoStrip: {
+        marginTop: 16,
+        borderRadius: 20,
+        minHeight: 74,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        elevation: 2,
+    },
+    homeInfoStripItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    homeInfoStripIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    homeInfoStripTextBlock: {
+        flex: 1,
+    },
+    homeInfoStripTitle: {
+        fontSize: 15,
+        fontFamily: fonts.Bold,
+        marginBottom: 2,
+    },
+    homeInfoStripSubtitle: {
+        fontSize: 12,
+        fontFamily: fonts.Regular,
+    },
+    homeInfoStripDivider: {
+        width: 1,
+        alignSelf: 'stretch',
+        marginHorizontal: 12,
+        borderRadius: 999,
+    },
+    homeServiceBadge: {
+        alignSelf: 'flex-start',
+        marginTop: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 999,
+        backgroundColor: '#111111',
+    },
+    homeServiceBadgeText: {
+        color: colors.WHITE,
+        fontFamily: fonts.Bold,
+        fontSize: 12,
     },
     actionButtonsContainer: {
         gap: 15,

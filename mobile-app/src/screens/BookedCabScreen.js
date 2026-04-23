@@ -37,6 +37,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../common/font';
 import { getLangKey } from 'common/src/other/getLangKey';
 import { getVehicleColorByKey } from 'common/src/other/VehicleColors';
+import { ERRAND_PHASES, ERRAND_SERVICE_TYPE, appendErrandPriceHistory, getErrandItemValue, normalizeErrandData } from 'common/src/other/ErrandUtils';
 import DeviceInfo from 'react-native-device-info';
 import customMapStyle from "../common/mapTheme.json";
 import WaygoDialog from '../components/WaygoDialog';
@@ -93,6 +94,10 @@ export default function BookedCabScreen(props) {
     const [driverFeedback, setDriverFeedback] = useState('');
     const [tipOptions, setTipOptions] = useState([10, 15, 25, 40]);
     const [selectedTipPercent, setSelectedTipPercent] = useState(null);
+    const [errandPriceModalVisible, setErrandPriceModalVisible] = useState(false);
+    const [errandPriceValue, setErrandPriceValue] = useState('');
+    const [errandPriceNote, setErrandPriceNote] = useState('');
+    const [errandAlternativeNote, setErrandAlternativeNote] = useState('');
 
     function formatAmount(value, decimal, country) {
         const number = parseFloat(value || 0);
@@ -108,6 +113,10 @@ export default function BookedCabScreen(props) {
             });
         }
     }
+
+    const isErrand = curBooking?.serviceType === ERRAND_SERVICE_TYPE;
+    const errand = normalizeErrandData(curBooking?.errand, settings || {});
+    const errandItemValue = getErrandItemValue(errand);
 
     useEffect(() => {
         if (auth?.profile?.mode) {
@@ -328,6 +337,100 @@ export default function BookedCabScreen(props) {
     }, [activeBookings, role, pageActive.current]);
 
     const renderButtons = () => {
+        if (isErrand) {
+            return (
+                <View style={{ width: '98%', alignSelf: 'center', marginVertical: 5, marginBottom: 15 }}>
+                    {(role == 'customer' && (curBooking.status == 'NEW' || curBooking.status == 'ACCEPTED')) ? (
+                        <View style={{ height: 50 }}>
+                            <Button
+                                title={t('cancel_ride')}
+                                titleStyle={{ fontFamily: fonts.Bold, fontSize: 13 }}
+                                onPress={() => setModalVisible(true)}
+                                buttonStyle={{ height: '100%', backgroundColor: colors.RED, borderRadius: 10 }}
+                            />
+                        </View>
+                    ) : null}
+
+                    {role == 'driver' && curBooking.status == 'ACCEPTED' ? (
+                        <View style={{ height: 50 }}>
+                            <Button
+                                title={'Llegue a tienda/zona'}
+                                titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 13 }}
+                                onPress={markErrandArrival}
+                                buttonStyle={{ height: '100%', backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderRadius: 10 }}
+                            />
+                        </View>
+                    ) : null}
+
+                    {role == 'driver' && curBooking.status == 'ARRIVED' ? (
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+                            <View style={{ flex: 1, height: 50 }}>
+                                <Button
+                                    title={'Solicitar cambio'}
+                                    titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 12 }}
+                                    onPress={() => setErrandPriceModalVisible(true)}
+                                    disabled={!!errand.activePriceChangeRequest}
+                                    buttonStyle={{ height: '100%', backgroundColor: colors.BLACK, borderRadius: 10 }}
+                                />
+                            </View>
+                            {errand.phase === ERRAND_PHASES.ITEM_CONFIRMED ? (
+                                <View style={{ flex: 1, height: 50 }}>
+                                    <Button
+                                        title={'Iniciar entrega'}
+                                        titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 12 }}
+                                        onPress={startErrandDelivery}
+                                        buttonStyle={{ height: '100%', backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderRadius: 10 }}
+                                    />
+                                </View>
+                            ) : (
+                                <View style={{ flex: 1, height: 50 }}>
+                                    <Button
+                                        title={'Producto comprado'}
+                                        titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 12 }}
+                                        onPress={confirmErrandItemPurchased}
+                                        disabled={!!errand.activePriceChangeRequest || !!errand.requiresAdditionalPayment}
+                                        buttonStyle={{ height: '100%', backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderRadius: 10 }}
+                                    />
+                                </View>
+                            )}
+                        </View>
+                    ) : null}
+
+                    {role == 'driver' && curBooking.status == 'STARTED' ? (
+                        <View style={{ height: 50, marginTop: 10 }}>
+                            <Button
+                                title={'Completar mandado'}
+                                loading={loading}
+                                titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 16 }}
+                                onPress={endBooking}
+                                buttonStyle={{ height: '100%', backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderRadius: 10 }}
+                            />
+                        </View>
+                    ) : null}
+
+                    {role == 'customer' && errand.activePriceChangeRequest && errand.activePriceChangeRequest.status === 'PENDING' ? (
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10, marginTop: 10 }}>
+                            <View style={{ flex: 1, height: 50 }}>
+                                <Button
+                                    title={'Rechazar cambio'}
+                                    titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 12 }}
+                                    onPress={rejectErrandPriceChange}
+                                    buttonStyle={{ height: '100%', backgroundColor: colors.RED, borderRadius: 10 }}
+                                />
+                            </View>
+                            <View style={{ flex: 1, height: 50 }}>
+                                <Button
+                                    title={'Aceptar cambio'}
+                                    titleStyle={{ color: colors.WHITE, fontFamily: fonts.Bold, fontSize: 12 }}
+                                    onPress={acceptErrandPriceChange}
+                                    buttonStyle={{ height: '100%', backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR, borderRadius: 10 }}
+                                />
+                            </View>
+                        </View>
+                    ) : null}
+                </View>
+            );
+        }
         return (
             (curBooking && role == 'customer' && (curBooking.status == 'NEW' || curBooking.status == 'ACCEPTED')) ||
                 (curBooking && role == 'driver' && (curBooking.status == 'ACCEPTED' || curBooking.status == 'ARRIVED' || curBooking.status == 'STARTED')) ?
@@ -443,6 +546,108 @@ export default function BookedCabScreen(props) {
         dispatch(updateBooking(booking));
         setOtpModalVisible(false);
     }
+
+    const updateErrand = (errandChanges = {}, bookingChanges = {}) => {
+        let booking = { ...curBooking, ...bookingChanges };
+        booking.errand = {
+            ...errand,
+            ...errandChanges,
+        };
+        dispatch(updateBooking(booking));
+    };
+
+    const markErrandArrival = () => {
+        updateErrand(
+            { phase: errand.requiresSearch ? ERRAND_PHASES.SEARCHING : ERRAND_PHASES.TO_STORE },
+            { status: 'ARRIVED' }
+        );
+    };
+
+    const submitErrandPriceChange = () => {
+        if (errand.activePriceChangeRequest) {
+            Alert.alert(t('alert'), 'Ya existe una solicitud de cambio pendiente para este mandado.');
+            return;
+        }
+        const proposedAmount = parseFloat(errandPriceValue);
+        if (!proposedAmount || proposedAmount <= 0) {
+            Alert.alert(t('alert'), 'Ingresa un valor valido para el producto.');
+            return;
+        }
+        const request = {
+            proposedAmount,
+            note: errandPriceNote,
+            alternativeNote: errandAlternativeNote,
+            requestedAt: Date.now(),
+            requestedBy: role,
+            status: 'PENDING'
+        };
+        updateErrand({
+            activePriceChangeRequest: request,
+            phase: ERRAND_PHASES.AWAITING_PRICE_APPROVAL,
+            priceChangeHistory: appendErrandPriceHistory(errand.priceChangeHistory, request, 'PENDING', role)
+        });
+        setErrandPriceValue('');
+        setErrandPriceNote('');
+        setErrandAlternativeNote('');
+        setErrandPriceModalVisible(false);
+    };
+
+    const acceptErrandPriceChange = () => {
+        if (!errand.activePriceChangeRequest) {
+            return;
+        }
+        const proposedAmount = parseFloat(errand.activePriceChangeRequest.proposedAmount || 0);
+        const alreadyPaidOnline = parseFloat(errand.itemValuePaidOnline || 0);
+        const needsExtraOnlinePayment = curBooking.payment_mode !== 'cash' && proposedAmount > alreadyPaidOnline;
+        const refundPending = curBooking.payment_mode !== 'cash' && alreadyPaidOnline > proposedAmount
+            ? parseFloat((alreadyPaidOnline - proposedAmount).toFixed(settings?.decimal || 2))
+            : 0;
+
+        let booking = { ...curBooking };
+        booking.errand = {
+            ...errand,
+            approvedItemValue: proposedAmount,
+            activePriceChangeRequest: null,
+            phase: needsExtraOnlinePayment ? ERRAND_PHASES.AWAITING_PRICE_APPROVAL : ERRAND_PHASES.ITEM_CONFIRMED,
+            pendingOnlinePayment: needsExtraOnlinePayment
+                ? parseFloat((proposedAmount - alreadyPaidOnline).toFixed(settings?.decimal || 2))
+                : 0,
+            requiresAdditionalPayment: needsExtraOnlinePayment,
+            pendingWalletRefund: refundPending,
+            priceChangeHistory: appendErrandPriceHistory(errand.priceChangeHistory, errand.activePriceChangeRequest, 'ACCEPTED', role)
+        };
+        dispatch(updateBooking(booking));
+        if (needsExtraOnlinePayment) {
+            props.navigation.navigate('PaymentDetails', { booking });
+        }
+    };
+
+    const rejectErrandPriceChange = () => {
+        if (!errand.activePriceChangeRequest) {
+            return;
+        }
+        updateErrand({
+            activePriceChangeRequest: null,
+            phase: ERRAND_PHASES.SEARCHING,
+            priceChangeHistory: appendErrandPriceHistory(errand.priceChangeHistory, errand.activePriceChangeRequest, 'REJECTED', role)
+        });
+    };
+
+    const confirmErrandItemPurchased = () => {
+        updateErrand({
+            phase: ERRAND_PHASES.ITEM_CONFIRMED
+        });
+    };
+
+    const startErrandDelivery = () => {
+        let booking = { ...curBooking };
+        booking.status = 'STARTED';
+        booking.errand = {
+            ...errand,
+            phase: ERRAND_PHASES.DELIVERING
+        };
+        dispatch(updateBooking(booking));
+    };
 
     const acceptBid = (item) => {
         let bookingObj = { ...curBooking };
@@ -800,7 +1005,39 @@ export default function BookedCabScreen(props) {
                 <View style={styles.centeredView}>
                     <View style={[styles.modalView, { backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE }]}>
                         <View style={{ width: '100%' }}>
-                            {(curBooking?.parcelTypeSelected?.description || curBooking?.optionSelected?.description || curBooking?.otherPerson || curBooking?.otherPersonPhone || curBooking?.pickUpInstructions || curBooking?.deliveryInstructions) ? <>
+                            {(isErrand || curBooking?.parcelTypeSelected?.description || curBooking?.optionSelected?.description || curBooking?.otherPerson || curBooking?.otherPersonPhone || curBooking?.pickUpInstructions || curBooking?.deliveryInstructions) ? <>
+                                {isErrand ? (
+                                    <>
+                                        <View style={[styles.textContainerStyle, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                                            <Text style={[styles.textHeading, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Servicio</Text>
+                                            <Text style={[styles.textContent, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Mandado</Text>
+                                        </View>
+                                        <View style={[styles.textContainerStyle, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                                            <Text style={[styles.textHeading, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Pedido</Text>
+                                            <Text style={[styles.textContent, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{errand.requestText}</Text>
+                                        </View>
+                                        <View style={[styles.textContainerStyle, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                                            <Text style={[styles.textHeading, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Fase</Text>
+                                            <Text style={[styles.textContent, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{errand.phase}</Text>
+                                        </View>
+                                        {!errand.itemAlreadyPaid ? (
+                                            <View style={[styles.textContainerStyle, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                                                <Text style={[styles.textHeading, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Valor del producto</Text>
+                                                <Text style={[styles.textContent, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                                    {settings.swipe_symbol === false ? `${settings.symbol} ${formatAmount(errand.approvedItemValue ?? errand.declaredItemValue, settings.decimal, settings.country)}` : `${formatAmount(errand.approvedItemValue ?? errand.declaredItemValue, settings.decimal, settings.country)} ${settings.symbol}`}
+                                                </Text>
+                                            </View>
+                                        ) : null}
+                                        {errand.searchCostApplied ? (
+                                            <View style={[styles.textContainerStyle, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
+                                                <Text style={[styles.textHeading, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>Costo por busqueda</Text>
+                                                <Text style={[styles.textContent, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>
+                                                    {settings.swipe_symbol === false ? `${settings.symbol} ${formatAmount(errand.searchCostAmount, settings.decimal, settings.country)}` : `${formatAmount(errand.searchCostAmount, settings.decimal, settings.country)} ${settings.symbol}`}
+                                                </Text>
+                                            </View>
+                                        ) : null}
+                                    </>
+                                ) : null}
                                 {curBooking?.parcelTypeSelected?.description ?
                                     <View style={[styles.textContainerStyle, { alignItems: isRTL ? "flex-end" : "flex-start" }]}>
                                         <Text style={[styles.textHeading, { color: mode === 'dark' ? colors.WHITE : colors.BLACK }]}>{t('parcel_type')}</Text>
@@ -1590,6 +1827,84 @@ export default function BookedCabScreen(props) {
             {
                 PurchaseInfoModal()
             }
+            <WaygoDialog
+                visible={errandPriceModalVisible}
+                onClose={() => setErrandPriceModalVisible(false)}
+                title={'Solicitud de cambio de precio'}
+                showButtons={false}
+                showIcon={false}
+                customContent={(
+                    <View>
+                        <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK, marginBottom: 10 }}>
+                            Usa esta opcion cuando el producto cueste distinto a lo declarado o cuando encuentres una alternativa.
+                        </Text>
+                        <TextInput
+                            value={errandPriceValue}
+                            onChangeText={setErrandPriceValue}
+                            placeholder="Nuevo valor del producto"
+                            keyboardType="numeric"
+                            placeholderTextColor={colors.SHADOW}
+                            style={{
+                                height: 44,
+                                borderWidth: 1,
+                                borderColor: colors.SHADOW,
+                                borderRadius: 10,
+                                paddingHorizontal: 12,
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                marginBottom: 10
+                            }}
+                        />
+                        <TextInput
+                            value={errandPriceNote}
+                            onChangeText={setErrandPriceNote}
+                            placeholder="Nota para el cliente"
+                            placeholderTextColor={colors.SHADOW}
+                            style={{
+                                height: 44,
+                                borderWidth: 1,
+                                borderColor: colors.SHADOW,
+                                borderRadius: 10,
+                                paddingHorizontal: 12,
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                marginBottom: 10
+                            }}
+                        />
+                        <TextInput
+                            value={errandAlternativeNote}
+                            onChangeText={setErrandAlternativeNote}
+                            placeholder="Alternativa sugerida"
+                            placeholderTextColor={colors.SHADOW}
+                            style={{
+                                height: 44,
+                                borderWidth: 1,
+                                borderColor: colors.SHADOW,
+                                borderRadius: 10,
+                                paddingHorizontal: 12,
+                                color: mode === 'dark' ? colors.WHITE : colors.BLACK,
+                                marginBottom: 12
+                            }}
+                        />
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 10 }}>
+                            <View style={{ flex: 1 }}>
+                                <Button
+                                    title={t('cancel')}
+                                    titleStyle={{ fontFamily: fonts.Bold }}
+                                    onPress={() => setErrandPriceModalVisible(false)}
+                                    buttonStyle={{ height: 44, borderRadius: 10, backgroundColor: colors.RED }}
+                                />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Button
+                                    title={'Enviar'}
+                                    titleStyle={{ fontFamily: fonts.Bold }}
+                                    onPress={submitErrandPriceChange}
+                                    buttonStyle={{ height: 44, borderRadius: 10, backgroundColor: mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR }}
+                                />
+                            </View>
+                        </View>
+                    </View>
+                )}
+            />
             <WaygoDialog
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}

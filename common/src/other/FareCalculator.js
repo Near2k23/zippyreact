@@ -1,4 +1,6 @@
-export const FareCalculator = (distance,time,rateDetails,instructionData, decimal, dynamicRule)=>{  
+import { getErrandSearchCost, shouldApplyErrandSearchCost } from "./ErrandUtils";
+
+export const FareCalculator = (distance,time,rateDetails,instructionData, decimal, dynamicRule, settings = {})=>{  
 
     let baseCalculated =  (parseFloat(rateDetails.rate_per_unit_distance) * parseFloat(distance)) + (parseFloat(rateDetails.rate_per_hour) * (parseFloat(time) / 3600));
     if(rateDetails.base_fare>0){
@@ -9,6 +11,10 @@ export const FareCalculator = (distance,time,rateDetails,instructionData, decima
     }
     if(instructionData && instructionData.optionSelected){
         baseCalculated = baseCalculated + instructionData.optionSelected.amount;
+    }
+    if(instructionData && instructionData.errand && shouldApplyErrandSearchCost(instructionData.errand)){
+        const errandSearchCost = instructionData.errand.searchCostAmount || getErrandSearchCost(settings);
+        baseCalculated = baseCalculated + parseFloat(errandSearchCost || 0);
     }
     let total = baseCalculated > parseFloat(rateDetails.min_fare) ? baseCalculated : parseFloat(rateDetails.min_fare);
 

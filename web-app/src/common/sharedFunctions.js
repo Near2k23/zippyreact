@@ -11,6 +11,15 @@ import {
 import { useTranslation } from "react-i18next";
 import OtherPerson from 'components/OtherPerson';
 import { getLangKey } from 'common/src/other/getLangKey';
+import {
+  ERRAND_ILLEGAL_NOTICE,
+  ERRAND_SERVICE_TYPE,
+  RIDE_SERVICE_TYPE,
+  canAcceptCashForErrand,
+  getErrandItemValue,
+  normalizeErrandData,
+  shouldForceErrandOnlinePayment,
+} from 'common/src/other/ErrandUtils';
 
 
 export const calcEst = false;
@@ -25,6 +34,11 @@ export const FONT_FAMILY = '"Roboto", "Helvetica", "Arial", sans-serif';
 
 export const bookingHistoryColumns = (role, settings, t, isRTL, formatAmount) => [
   { title: t('booking_ref'), field: 'reference' },
+  {
+    title: 'Servicio',
+    field: 'serviceType',
+    render: rowData => (rowData?.serviceType === ERRAND_SERVICE_TYPE ? 'Mandado' : 'Viaje'),
+  },
   { title: t('booking_date'), field: 'bookingDate', render: rowData => rowData.bookingDate ? moment(rowData.bookingDate).format('lll') : null },
   { title: t('car_type'), field: 'carType', render: rowData => rowData.carType ? t(getLangKey(rowData.carType)) : null },
   { title: t('assign_driver'), field: 'driver_name' },
@@ -52,7 +66,23 @@ export const bookingHistoryColumns = (role, settings, t, isRTL, formatAmount) =>
 export const BookingModalBody = (props) => {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.dir();
-  const { classes, handleChange, auth, profileData, instructionData, otherPerson, setOtherPerson } = props;
+  const {
+    classes,
+    handleChange,
+    auth,
+    profileData,
+    instructionData,
+    otherPerson,
+    setOtherPerson,
+    serviceType,
+    errandData,
+    settings,
+    formatAmount,
+  } = props;
+  const errand = normalizeErrandData(errandData, settings);
+  const errandItemValue = getErrandItemValue(errand);
+  const requiresOnline = shouldForceErrandOnlinePayment(errand, settings);
+  const canUseCash = canAcceptCashForErrand(errand, settings);
   return (
     <span>
       {auth.profile.usertype === 'customer' && !auth.profile.firstName ?
@@ -120,6 +150,105 @@ export const BookingModalBody = (props) => {
         setOtherPerson={setOtherPerson}
         instructionData={instructionData}
       />
+      {serviceType === ERRAND_SERVICE_TYPE ? (
+        <>
+          <Typography component="h2" variant="h6" style={{ marginTop: 15, color: colors.BLACK, fontFamily: FONT_FAMILY }}>
+            Mandado
+          </Typography>
+          <Grid item xs={12}>
+            <TextField
+              InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+              variant="outlined"
+              margin="normal"
+              required
+              fullWidth
+              multiline
+              minRows={3}
+              id="errandRequestText"
+              label="Que necesitas que compremos o recojamos"
+              name="errandRequestText"
+              onChange={handleChange}
+              value={errand.requestText}
+              className={isRTL === 'rtl' ? classes.inputRtl : classes.textField}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Typography style={{ color: colors.RED, fontFamily: FONT_FAMILY, fontSize: 14 }}>
+              {errand.illegalNotice || ERRAND_ILLEGAL_NOTICE}
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={errand.illegalGoodsAccepted}
+                  onChange={handleChange}
+                  name="errandIllegalGoodsAccepted"
+                  color="primary"
+                />
+              }
+              label={<Typography style={{ fontFamily: FONT_FAMILY }}>Confirmo que mi mandado es legal</Typography>}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={errand.itemAlreadyPaid}
+                  onChange={handleChange}
+                  name="errandItemAlreadyPaid"
+                  color="primary"
+                />
+              }
+              label={<Typography style={{ fontFamily: FONT_FAMILY }}>El producto ya esta pago</Typography>}
+            />
+          </Grid>
+          {!errand.itemAlreadyPaid ? (
+            <Grid item xs={12}>
+              <TextField
+                InputLabelProps={{ style: { fontFamily: FONT_FAMILY } }}
+                variant="outlined"
+                margin="normal"
+                required
+                fullWidth
+                type="number"
+                id="errandDeclaredItemValue"
+                label="Valor estimado del pedido"
+                name="errandDeclaredItemValue"
+                onChange={handleChange}
+                value={errand.declaredItemValue}
+                helperText={
+                  requiresOnline
+                    ? 'Este pedido requiere pago online por exceder el umbral configurado.'
+                    : 'Puedes cobrar este pedido en efectivo o en linea.'
+                }
+                className={isRTL === 'rtl' ? classes.inputRtl : classes.textField}
+              />
+            </Grid>
+          ) : null}
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={errand.requiresSearch}
+                  onChange={handleChange}
+                  name="errandRequiresSearch"
+                  color="primary"
+                />
+              }
+              label={<Typography style={{ fontFamily: FONT_FAMILY }}>Cobrar costo por busqueda</Typography>}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Typography style={{ color: colors.BLACK, fontFamily: FONT_FAMILY, fontSize: 14 }}>
+              {settings?.swipe_symbol
+                ? `Producto: ${formatAmount(errandItemValue, settings.decimal, settings.country)} ${settings.symbol}`
+                : `Producto: ${settings?.symbol || ''} ${formatAmount(errandItemValue, settings.decimal, settings.country)}`}
+            </Typography>
+            <Typography style={{ color: colors.BLACK, fontFamily: FONT_FAMILY, fontSize: 14 }}>
+              {canUseCash ? 'Pago permitido: efectivo, wallet o tarjeta.' : 'Pago permitido: wallet o tarjeta.'}
+            </Typography>
+          </Grid>
+        </>
+      ) : null}
       <Typography component="h2" variant="h5" style={{ marginTop: 15, color: colors.BLACK, fontFamily: FONT_FAMILY }}>
         {t('estimate_fare_text')}
       </Typography>
@@ -127,8 +256,28 @@ export const BookingModalBody = (props) => {
   )
 }
 
-export const validateBookingObj = (t, bookingObject, instructionData) => {
+export const validateBookingObj = (t, bookingObject, instructionData, otherPerson, serviceType = RIDE_SERVICE_TYPE, errandData = {}, settings = {}) => {
   delete bookingObject.driverEstimates;
+  if (serviceType === ERRAND_SERVICE_TYPE) {
+    const errand = normalizeErrandData(errandData, settings);
+    if (!errand.requestText || !String(errand.requestText).trim()) {
+      return { error: true, msg: 'Debes describir el mandado.' };
+    }
+    if (!errand.illegalGoodsAccepted) {
+      return { error: true, msg: 'Debes confirmar que el mandado no incluye articulos ilegales.' };
+    }
+    if (!errand.itemAlreadyPaid && getErrandItemValue(errand) <= 0) {
+      return { error: true, msg: 'Debes indicar el valor del pedido.' };
+    }
+    if (!errand.itemAlreadyPaid && shouldForceErrandOnlinePayment(errand, settings) && bookingObject.payment_mode === 'cash') {
+      return { error: true, msg: 'Este mandado supera el umbral permitido para efectivo. Usa wallet o tarjeta.' };
+    }
+    bookingObject.serviceType = ERRAND_SERVICE_TYPE;
+    bookingObject.errand = normalizeErrandData(errand, settings);
+  } else {
+    bookingObject.serviceType = RIDE_SERVICE_TYPE;
+    delete bookingObject.errand;
+  }
   return { bookingObject };
 }
 

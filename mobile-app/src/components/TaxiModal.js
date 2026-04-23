@@ -19,6 +19,7 @@ import RadioForm from 'react-native-simple-radio-button';
 import OtherPerson from './OtherPerson';
 import { fonts } from '../common/font';
 import DeviceInfo from 'react-native-device-info';
+import { ERRAND_SERVICE_TYPE, getErrandItemValue, normalizeErrandData } from 'common/src/other/ErrandUtils';
 
 const hasNotch = DeviceInfo.hasNotch();
 
@@ -29,7 +30,10 @@ export const SECONDORY_COLOR = colors.TAXISECONDORY;
 export default function TaxiModal(props) {
     const { t } = i18n;
     const isRTL = i18n.locale.indexOf('he') === 0 || i18n.locale.indexOf('ar') === 0;
-    const { settings, tripdata, estimate, bookingModalStatus, onPressCancel, bookNow, payment_mode, setPaymentMode, radioProps, profileData, setProfileData, auth, bookModelLoading, instructionData, setInstructionData, otherPerson, setOtherPerson, mode, formatAmount } = props;
+    const { settings, tripdata, estimate, bookingModalStatus, onPressCancel, bookNow, payment_mode, setPaymentMode, radioProps, profileData, setProfileData, auth, bookModelLoading, instructionData, setInstructionData, otherPerson, setOtherPerson, mode, formatAmount, serviceType, errandData } = props;
+    const errand = normalizeErrandData(errandData, settings || {});
+    const displayTotal = serviceType === ERRAND_SERVICE_TYPE ? (estimate?.customerTotal || estimate?.estimateFare || 0) : (estimate?.estimateFare || 0);
+    const errandItemValue = getErrandItemValue(errand);
 
     const mapRef = useRef(null);
 
@@ -221,9 +225,30 @@ export default function TaxiModal(props) {
                         <View style={[auth && auth.profile && (auth.profile.firstName && auth.profile.lastName && auth.profile.email) ? styles.bottomContainer : styles.bottomContainer1, {marginTop: - 10, backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
                             <View style={[styles.offerContainer,{borderBottomColor:mode === 'dark' ? MAIN_COLOR_DARK : MAIN_COLOR}]}>
                                 <TouchableOpacity >
-                                    <Text style={[styles.offerText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {t('estimate_fare_text')}</Text>
+                                    <Text style={[styles.offerText,{color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {serviceType === ERRAND_SERVICE_TYPE ? 'Resumen del mandado' : t('estimate_fare_text')}</Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {serviceType === ERRAND_SERVICE_TYPE ? (
+                                <View style={{ width: '90%', marginTop: 10 }}>
+                                    <Text style={{ fontFamily: fonts.Bold, color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize: 14, marginBottom: 4 }}>
+                                        Pedido
+                                    </Text>
+                                    <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize: 13, marginBottom: 6 }}>
+                                        {errand.requestText}
+                                    </Text>
+                                    {!errand.itemAlreadyPaid ? (
+                                        <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize: 13, marginBottom: 4 }}>
+                                            Producto: {settings.swipe_symbol === false ? `${settings.symbol} ${formatAmount(errandItemValue, settings.decimal, settings.country)}` : `${formatAmount(errandItemValue, settings.decimal, settings.country)} ${settings.symbol}`}
+                                        </Text>
+                                    ) : null}
+                                    {errand.searchCostApplied ? (
+                                        <Text style={{ fontFamily: fonts.Regular, color: mode === 'dark' ? colors.WHITE : colors.BLACK, fontSize: 13, marginBottom: 8 }}>
+                                            Costo por busqueda: {settings.swipe_symbol === false ? `${settings.symbol} ${formatAmount(errand.searchCostAmount, settings.decimal, settings.country)}` : `${formatAmount(errand.searchCostAmount, settings.decimal, settings.country)} ${settings.symbol}`}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            ) : null}
 
                             <View style={[styles.priceDetailsContainer,{backgroundColor: mode === 'dark' ? colors.PAGEBACK : colors.WHITE}]}>
                                 <View style={styles.priceDetailsLeft}>
@@ -242,9 +267,9 @@ export default function TaxiModal(props) {
 
                                     <View style={styles.iconContainer}>
                                         {settings.swipe_symbol === false ?
-                                            <Text style={[styles.priceText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {settings ? settings.symbol : null} {estimate ? formatAmount(estimate.estimateFare, settings.decimal, settings.country) : null}</Text>
+                                            <Text style={[styles.priceText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {settings ? settings.symbol : null} {estimate ? formatAmount(displayTotal, settings.decimal, settings.country) : null}</Text>
                                             :
-                                            <Text style={[styles.priceText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {estimate ? formatAmount(estimate.estimateFare, settings.decimal, settings.country) : null} {settings ? settings.symbol : null}</Text>
+                                            <Text style={[styles.priceText, {color: mode === 'dark' ? colors.WHITE : colors.BLACK}]}> {estimate ? formatAmount(displayTotal, settings.decimal, settings.country) : null} {settings ? settings.symbol : null}</Text>
                                         }
                                     </View>
                                 </View>

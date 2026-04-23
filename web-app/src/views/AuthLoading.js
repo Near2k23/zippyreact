@@ -15,6 +15,7 @@ function AuthLoading(props) {
     fetchBookings,
     fetchCancelReasons,
     fetchPromos,
+    fetchBanners,
     fetchDriverEarnings,
     fetchUsers,
     fetchNotifications,
@@ -108,6 +109,7 @@ function AuthLoading(props) {
           dispatch(fetchUsers());
           dispatch(fetchBookings());
           dispatch(fetchPromos());
+          dispatch(fetchBanners());
           dispatch(fetchDriverEarnings());
           dispatch(fetchFleetAdminEarnings());
           dispatch(fetchNotifications());
@@ -148,6 +150,7 @@ function AuthLoading(props) {
     fetchEarningsReport,
     fetchNotifications,
     fetchPromos,
+    fetchBanners,
     fetchUsers,
     fetchWithdraws,
     signOff,

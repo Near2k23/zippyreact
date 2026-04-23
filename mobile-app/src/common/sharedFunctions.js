@@ -10,6 +10,14 @@ import { fonts } from './font';
 import { useState } from 'react';
 import {Tooltip,Icon } from 'react-native-elements';
 import { getLangKey } from 'common/src/other/getLangKey';
+import {
+    ERRAND_SERVICE_TYPE,
+    RIDE_SERVICE_TYPE,
+    buildErrandDataForBooking,
+    canAcceptCashForErrand,
+    getErrandItemValue,
+    shouldForceErrandOnlinePayment,
+} from 'common/src/other/ErrandUtils';
 
 export const MAIN_COLOR = colors.TAXIPRIMARY;
 export const MAIN_COLOR_DARK = colors.TAXIPRIMARYDARK;
@@ -151,13 +159,36 @@ export const CarVertical = (props) =>{
     )
 }
 
-export const validateBookingObj = async (t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson) => {
+export const validateBookingObj = async (t, addBookingObj, instructionData, settings, bookingType, roundTrip, tripInstructions, tripdata, drivers, otherPerson, offerFare, serviceType = RIDE_SERVICE_TYPE, errandData = {}) => {
     const {
         getDistanceMatrix,
         GetDistance,
     } = api;
+    if (serviceType === ERRAND_SERVICE_TYPE) {
+        const errand = buildErrandDataForBooking(errandData, settings, addBookingObj.payment_mode, addBookingObj.estimate?.estimateFare || 0);
+        if (!errand.requestText || !String(errand.requestText).trim()) {
+            return { error: true, msg: 'Debes describir el mandado.' };
+        }
+        if (!errand.illegalGoodsAccepted) {
+            return { error: true, msg: 'Debes confirmar que el mandado no incluye articulos ilegales.' };
+        }
+        if (!errand.itemAlreadyPaid && getErrandItemValue(errand) <= 0) {
+            return { error: true, msg: 'Debes indicar el valor del pedido.' };
+        }
+        if (!canAcceptCashForErrand(errand, settings) && addBookingObj.payment_mode === 'cash') {
+            return { error: true, msg: 'Este mandado requiere pago online por el valor del pedido.' };
+        }
+        addBookingObj.serviceType = ERRAND_SERVICE_TYPE;
+        addBookingObj.errand = errand;
+        addBookingObj.instructionData = {
+            ...instructionData,
+            errand
+        };
+    } else {
+        addBookingObj.serviceType = RIDE_SERVICE_TYPE;
+    }
     if (settings.autoDispatch && bookingType == false) {
-        if(otherPerson)addBookingObj['instructionData'] = instructionData;
+        if(otherPerson)addBookingObj['instructionData'] = { ...addBookingObj.instructionData, ...instructionData };
         let preRequestedDrivers = {};
         let requestedDrivers = {};
         let driverEstimates = {};
@@ -222,7 +253,7 @@ export default function BookingModal(props){
     return <TaxiModal {...props} />
 }
 
-export const prepareEstimateObject =  async (tripdata, instructionData) => {
+export const prepareEstimateObject =  async (tripdata, instructionData, serviceType = RIDE_SERVICE_TYPE, errandData = null, paymentMode = 'cash') => {
     const { t } = i18n;
     const {
         getDirectionsApi
@@ -251,7 +282,14 @@ export const prepareEstimateObject =  async (tripdata, instructionData) => {
             drop: { coords: { lat: tripdata.drop.lat, lng: tripdata.drop.lng }, description: tripdata.drop.add, waypointsStr: waypoints != '' ? waypoints : null, waypoints: waypoints != '' ? tripdata.drop.waypoints : null },
             carDetails: tripdata.carType,
             routeDetails: routeDetails,
-            currentZoneId: tripdata.currentZoneId || null
+            currentZoneId: tripdata.currentZoneId || null,
+            serviceType,
+            payment_mode: paymentMode,
+            errand: serviceType === ERRAND_SERVICE_TYPE ? buildErrandDataForBooking(errandData || {}, {}, paymentMode, 0) : null,
+            instructionData: {
+                ...instructionData,
+                errand: serviceType === ERRAND_SERVICE_TYPE ? buildErrandDataForBooking(errandData || {}, {}, paymentMode, 0) : null,
+            }
         };
         return { estimateObject };
     } catch (err) {

@@ -8,6 +8,7 @@ import { estimatereducer } from "../reducers/estimatereducer";
 import { bookingreducer } from "../reducers/bookingreducer";
 import { cancelreasonreducer } from "../reducers/cancelreasonreducer";
 import { promoreducer } from "../reducers/promoreducer";
+import { bannerreducer } from "../reducers/bannerreducer";
 import { usersreducer } from "../reducers/usersreducer";
 import { notificationreducer } from "../reducers/notificationreducer";
 import { driverearningreducer } from '../reducers/driverearningreducer';
@@ -41,6 +42,7 @@ const rootReducer = {
   bookingdata: bookingreducer,
   cancelreasondata: cancelreasonreducer,
   promodata: promoreducer,
+  bannerdata: bannerreducer,
   usersdata: usersreducer,
   notificationdata: notificationreducer,
   driverearningdata: driverearningreducer,

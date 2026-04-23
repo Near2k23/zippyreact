@@ -68,11 +68,11 @@ export default {
   },
   version: AppConfig.ios_app_version,
   orientation: 'portrait',
-  icon: './assets/images/logo1024x1024.png',
+  icon: './assets/images/logo_splash.png',
   splash: {
-    image: './assets/images/logo_splash.png',
-    resizeMode: 'contain',
-    backgroundColor: '#000000'
+    image: './assets/images/splash.png',
+    resizeMode: 'cover',
+    backgroundColor: '#f27830'
   },
   updates: {
     fallbackToCacheTimeout: 0,
@@ -91,9 +91,9 @@ export default {
   ios: {
     associatedDomains: ['applinks:' + AppConfig.expo_slug + '.page.link'],
     splash: {
-      image: './assets/images/logo_splash.png',
-      resizeMode: 'contain',
-      backgroundColor: '#000000'
+      image: './assets/images/splash.png',
+      resizeMode: 'cover',
+      backgroundColor: '#f27830'
     },
     supportsTablet: true,
     usesAppleSignIn: true,
@@ -135,9 +135,9 @@ export default {
     package: AppConfig.android_package,
     versionCode: AppConfig.android_app_version,
     splash: {
-      image: './assets/images/logo_splash.png',
-      resizeMode: 'contain',
-      backgroundColor: '#000000'
+      image: './assets/images/splash.png',
+      resizeMode: 'cover',
+      backgroundColor: '#f27830'
     },
     permissions: androidPermissions,
     blockedPermissions: ['com.google.android.gms.permission.AD_ID'],
@@ -160,10 +160,9 @@ export default {
     [
       'expo-splash-screen',
       {
-        backgroundColor: '#000000',
-        image: './assets/images/logo_splash.png',
-        imageWidth: 200,
-        resizeMode: 'contain'
+        backgroundColor: '#f27830',
+        image: './assets/images/splash.png',
+        resizeMode: 'cover'
       }
     ],
     [

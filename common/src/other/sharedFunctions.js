@@ -2,6 +2,12 @@ import { firebase } from "../config/configureFirebase";
 import { FareCalculator } from "../other/FareCalculator";
 import { GetDistance, GetTripDistance } from "../other/GeoFunctions";
 import { fetchAddressfromCoords } from '../other/GoogleAPIFunctions';
+import {
+  ERRAND_SERVICE_TYPE,
+  RIDE_SERVICE_TYPE,
+  buildErrandDataForBooking,
+  getErrandPaymentSummary,
+} from "../other/ErrandUtils";
 import store from '../store/store';
 import { onValue, child, push, query, update, get, orderByKey } from "firebase/database";
 
@@ -42,6 +48,34 @@ export const formatBookingObject = async (bookingData, settings) => {
     otp = false;
   }
 
+  const serviceType = bookingData.serviceType === ERRAND_SERVICE_TYPE ? ERRAND_SERVICE_TYPE : RIDE_SERVICE_TYPE;
+  const errand =
+    serviceType === ERRAND_SERVICE_TYPE
+      ? buildErrandDataForBooking(
+          bookingData.errand || bookingData.instructionData?.errand || {},
+          settings,
+          bookingData.payment_mode,
+          bookingData.estimate?.estimateFare || 0
+        )
+      : null;
+  const errandPaymentSummary =
+    serviceType === ERRAND_SERVICE_TYPE
+      ? getErrandPaymentSummary(
+          {
+            trip_cost: bookingData.estimate?.estimateFare || 0,
+            payment_mode: bookingData.payment_mode,
+            errand,
+          },
+          settings
+        )
+      : null;
+  const paymentPacket = bookingData.paymentPacket
+    ? {
+        ...bookingData.paymentPacket,
+        paymentType: bookingData.paymentPacket.paymentType || 'BOOKING',
+      }
+    : null;
+
   return {
     carType: bookingData.carDetails.name,
     carImage: bookingData.carDetails.image,
@@ -74,11 +108,17 @@ export const formatBookingObject = async (bookingData, settings) => {
     convenience_fees: bookingData.estimate.convenience_fees,
     driver_share: (parseFloat(bookingData.estimate.estimateFare) - parseFloat(bookingData.estimate.convenience_fees)).toFixed(settings.decimal),
     fleet_admin_comission: bookingData.carDetails.fleet_admin_fee ? bookingData.carDetails.fleet_admin_fee : null,
-    paymentPacket: bookingData.paymentPacket ? bookingData.paymentPacket : null,
+    paymentPacket: paymentPacket,
     preRequestedDrivers: bookingData.preRequestedDrivers ? bookingData.preRequestedDrivers : null,
     requestedDrivers: bookingData.requestedDrivers ? bookingData.requestedDrivers : null,
     driverEstimates: bookingData.driverEstimates ? bookingData.driverEstimates : null,
     ...bookingData.instructionData,
+    serviceType: serviceType,
+    errand: errand,
+    customerTotalEstimate: errandPaymentSummary ? errandPaymentSummary.customerTotal : bookingData.estimate.estimateFare,
+    upfrontOnlineAmount: errandPaymentSummary ? errandPaymentSummary.upfrontOnlineAmount : bookingData.estimate.estimateFare,
+    cashItemCollectionAmount: errandPaymentSummary ? errandPaymentSummary.cashItemCollectionAmount : 0,
+    pendingOnlinePayment: errandPaymentSummary ? errandPaymentSummary.pendingOnlinePayment : 0,
     fleetadmin: bookingData.fleetadmin ? bookingData.fleetadmin : null,
     payment_mode: bookingData.payment_mode,
     booking_from_web: bookingData.booking_from_web ? bookingData.booking_from_web : false,
@@ -163,7 +203,9 @@ export const addActualsToBooking = async (booking, address, driverLocation) => {
       totalTimeTaken,
       rates,
       null,
-      settings.decimal
+      settings.decimal,
+      null,
+      settings
     );
     booking.drop = {
       add: address,

@@ -5,6 +5,7 @@ import { Alert, View, Animated, Platform } from 'react-native';
 import i18n from 'i18n-js';
 import { colors } from './src/common/theme';
 import GetPushToken from './src/components/GetPushToken';
+import SplashGradientBackground from './src/components/SplashGradientBackground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import moment from 'moment/min/moment-with-locales';
 
@@ -51,6 +52,7 @@ export function useAppCommonShared() {
       dispatch(api.fetchSettings());
       dispatch(api.fetchLanguages());
       dispatch(api.fetchCarTypes());
+      dispatch(api.fetchBanners());
       dispatch(api.fetchZones());
       langCalled.current = true;
     }
@@ -168,7 +170,7 @@ export function useAppCommonShared() {
 
 export function AppCommonLoadingScreen({ bounceAnim }) {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.TAXIPRIMARY }}>
+    <SplashGradientBackground>
       <Animated.Image
         source={require('./assets/images/logo_splash.png')}
         style={{
@@ -178,6 +180,6 @@ export function AppCommonLoadingScreen({ bounceAnim }) {
           transform: [{ scale: bounceAnim }]
         }}
       />
-    </View>
+    </SplashGradientBackground>
   );
 }

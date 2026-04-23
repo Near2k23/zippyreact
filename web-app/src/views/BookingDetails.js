@@ -165,6 +165,7 @@ function BookingDetails() {
                     [
                       { key: "booking_id", label: t("booking_id"), value: data.id },
                       { key: "booking_ref", label: t("booking_ref"), value: data.reference },
+                      { key: "service_type", label: "Servicio", value: data?.serviceType === 'ERRAND' ? 'Mandado' : 'Viaje' },
                       {
                         key: "booking_status_web",
                         label: t("booking_status_web"),
@@ -227,6 +228,16 @@ function BookingDetails() {
                       { key: "deliveryInstructions", label: t("deliveryInstructions"), value: data?.deliveryInstructions },
                       { key: "otherPerson", label: t("otherPerson"), value: data?.otherPerson },
                       { key: "otherPersonPhone", label: t("otherPersonPhone"), value: data?.otherPersonPhone },
+                      { key: "errand_request", label: "Pedido", value: data?.errand?.requestText },
+                      { key: "errand_illegal_notice", label: "Validacion legal", value: data?.serviceType === 'ERRAND' ? (data?.errand?.illegalGoodsAccepted ? 'Confirmado por el cliente' : 'No confirmado') : '' },
+                      { key: "errand_item_paid", label: "Producto pagado", value: data?.serviceType === 'ERRAND' ? (data?.errand?.itemAlreadyPaid ? 'Si' : 'No') : '' },
+                      { key: "errand_declared_item_value", label: "Valor declarado", value: data?.serviceType === 'ERRAND' && data?.errand && !data?.errand?.itemAlreadyPaid ? (settings.swipe_symbol ? `${formatAmount(data?.errand?.declaredItemValue, settings.decimal, settings.country)} ${settings.symbol}` : `${settings.symbol} ${formatAmount(data?.errand?.declaredItemValue, settings.decimal, settings.country)}`) : '' },
+                      { key: "errand_approved_item_value", label: "Valor aprobado", value: data?.serviceType === 'ERRAND' && data?.errand?.approvedItemValue !== null && data?.errand?.approvedItemValue !== undefined ? (settings.swipe_symbol ? `${formatAmount(data?.errand?.approvedItemValue, settings.decimal, settings.country)} ${settings.symbol}` : `${settings.symbol} ${formatAmount(data?.errand?.approvedItemValue, settings.decimal, settings.country)}`) : '' },
+                      { key: "errand_requires_search", label: "Busqueda", value: data?.serviceType === 'ERRAND' ? (data?.errand?.requiresSearch ? 'Con costo por busqueda' : 'Tienda definida por el cliente') : '' },
+                      { key: "errand_search_cost", label: "Costo por busqueda", value: data?.serviceType === 'ERRAND' && data?.errand?.searchCostApplied ? (settings.swipe_symbol ? `${formatAmount(data?.errand?.searchCostAmount, settings.decimal, settings.country)} ${settings.symbol}` : `${settings.symbol} ${formatAmount(data?.errand?.searchCostAmount, settings.decimal, settings.country)}`) : '' },
+                      { key: "errand_phase", label: "Fase del mandado", value: data?.serviceType === 'ERRAND' ? data?.errand?.phase : '' },
+                      { key: "errand_search_area", label: "Zona de busqueda", value: data?.serviceType === 'ERRAND' ? data?.errand?.searchArea?.add : '' },
+                      { key: "errand_price_change_request", label: "Solicitud activa de cambio", value: data?.serviceType === 'ERRAND' && data?.errand?.activePriceChangeRequest ? `${data?.errand?.activePriceChangeRequest?.status || 'PENDING'} - ${data?.errand?.activePriceChangeRequest?.proposedAmount || 0}` : '' },
                       { key: "feedback", label: t("feedback"), value: data?.feedback },
                       { key: "you_rated_text", label: t("you_rated_text"), value: <Rating  name="half-rating-read" value={data?.rating || 0}   precision={0.5} readOnly /> },
                       {
@@ -376,6 +387,21 @@ function BookingDetails() {
                         key: "payable_ammount", label: t("payable_ammount"), value: data?.payableAmount ? (settings.swipe_symbol
                           ? formatAmount(data?.payableAmount, settings.decimal, settings.country) + " " + settings.symbol
                           : settings.symbol + " " + formatAmount(data?.payableAmount, settings.decimal, settings.country)) : ""
+                      },
+                      {
+                        key: "customer_total_estimate", label: "Total cliente", value: data?.customerTotalEstimate ? (settings.swipe_symbol
+                          ? formatAmount(data?.customerTotalEstimate, settings.decimal, settings.country) + " " + settings.symbol
+                          : settings.symbol + " " + formatAmount(data?.customerTotalEstimate, settings.decimal, settings.country)) : ""
+                      },
+                      {
+                        key: "upfront_online_amount", label: "Cobro online inicial", value: data?.upfrontOnlineAmount ? (settings.swipe_symbol
+                          ? formatAmount(data?.upfrontOnlineAmount, settings.decimal, settings.country) + " " + settings.symbol
+                          : settings.symbol + " " + formatAmount(data?.upfrontOnlineAmount, settings.decimal, settings.country)) : ""
+                      },
+                      {
+                        key: "cash_item_collection_amount", label: "Producto a cobrar en efectivo", value: data?.cashItemCollectionAmount ? (settings.swipe_symbol
+                          ? formatAmount(data?.cashItemCollectionAmount, settings.decimal, settings.country) + " " + settings.symbol
+                          : settings.symbol + " " + formatAmount(data?.cashItemCollectionAmount, settings.decimal, settings.country)) : ""
                       },
                     ].map((item) =>
                       item.value ? renderGridItem(item, isRTL): null

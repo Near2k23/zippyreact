@@ -28,11 +28,13 @@ import { useTranslation } from "react-i18next";
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ContactPhoneIcon from '@mui/icons-material/ContactPhone';
 import ViewListIcon from '@mui/icons-material/ViewList';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import EmojiPeopleIcon from '@mui/icons-material/EmojiPeople';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import MoneyIcon from '@mui/icons-material/Money';
 import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
+import CampaignIcon from '@mui/icons-material/Campaign';
 import {calcEst, showEst, optionsRequired} from '../common/sharedFunctions';
 import SosIcon from '@mui/icons-material/Sos';
 import PublicIcon from '@mui/icons-material/Public';
@@ -73,7 +75,6 @@ export default function ResponsiveDrawer(props) {
     signOff
   } = api;
   const auth = useSelector(state => state.auth);
-  const settings = useSelector(state => state.settingsdata.settings);
   const dispatch = useDispatch();
 
   const LogOut = () => {
@@ -123,6 +124,7 @@ export default function ResponsiveDrawer(props) {
     '': 'home',
     'dashboard': 'dashboard_text',
     'bookings': 'booking_history',
+    'errands': 'Mandados',
     'addbookings': 'addbookinglable',
     'users': 'user',
     'cartypes': 'car_type',
@@ -131,6 +133,7 @@ export default function ResponsiveDrawer(props) {
     'addtowallet': 'add_to_wallet',
     'allreports': 'report',
     'promos': 'promo',
+    'banners': 'Banner',
     'taxes': 'taxes',
     'dynamic-hours': 'dynamic_hours',
     'notifications': 'push_notifications',
@@ -166,6 +169,7 @@ export default function ResponsiveDrawer(props) {
             {name : t('home'), url:'/', icon: <HomeIcon/>, access: ['admin','fleetadmin','driver','customer']},
             {name : t('dashboard_text'), url:'/dashboard', icon: <DashboardIcon/>, access: ['admin','fleetadmin']},
             {name : t('booking_history'), url:'/bookings', icon: <ViewListIcon/>, access: ['admin','fleetadmin','driver','customer']},
+            {name : 'Mandados', url:'/errands', icon: <LocalShippingIcon/>, access: ['admin','fleetadmin','driver','customer']},
             {name : t('addbookinglable'), url:'/addbookings', icon: <ContactPhoneIcon/>, access: calcEst && !showEst && !optionsRequired ? ['customer'] : ['admin','fleetadmin','customer']},
 
             {name : t('user'), url:'/users/0', icon: <EmojiPeopleIcon />, access: ['admin','fleetadmin']},
@@ -179,6 +183,7 @@ export default function ResponsiveDrawer(props) {
           
             {name : t('report'), url:'/allreports', icon: <AssessmentIcon />, access: ['admin','fleetadmin']},
             {name : t('promo'), url:'/promos', icon: <OfferIcon />, access: ['admin']},
+            {name : 'Banner', url:'/banners', icon: <CampaignIcon />, access: ['admin']},
             {name : t('taxes'), url:'/taxes', icon: <ReceiptLongIcon />, access: ['admin']},
             {name : t('dynamic_hours'), url:'/dynamic-hours', icon: <OfferIcon />, access: ['admin']},
             {name : t('push_notifications'), url:'/notifications', icon: <NotifyIcon />, access: ['admin']},

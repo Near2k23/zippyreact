@@ -24,6 +24,7 @@ import { CommonActions } from '@react-navigation/native';
 import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { fonts } from '../common/font';
 import DeviceInfo from 'react-native-device-info';
+import { ERRAND_SERVICE_TYPE, getErrandItemValue } from 'common/src/other/ErrandUtils';
 
 const hasNotch = DeviceInfo.hasNotch();
 
@@ -84,13 +85,25 @@ export default function PaymentDetails(props) {
     }
   }, [auth, colorScheme]);
 
+  const isErrand = booking.serviceType === ERRAND_SERVICE_TYPE;
+  const errandItemValue = isErrand ? getErrandItemValue(booking.errand || {}) : 0;
+  const errandCustomerTotal = isErrand ? (booking.customerTotalEstimate || (parseFloat(booking.trip_cost || 0) + parseFloat(errandItemValue || 0))) : booking.trip_cost;
+  const upfrontOnlineAmount = booking.upfrontOnlineAmount || booking.trip_cost;
+  const errandPendingDelta = isErrand ? parseFloat(booking?.errand?.pendingOnlinePayment || 0) : 0;
+  const isErrandDeltaPayment = errandPendingDelta > 0;
+  const paymentBaseAmount = isErrandDeltaPayment
+    ? errandPendingDelta
+    : booking.payment_mode === 'cash'
+      ? errandCustomerTotal
+      : upfrontOnlineAmount;
+
   const [payDetails, setPayDetails] = useState({
-    amount: booking.trip_cost,
+    amount: paymentBaseAmount,
     discount: booking.discount? booking.discount:0,
-    usedWalletMoney: booking.payment_mode === 'wallet'? booking.trip_cost:0,
+    usedWalletMoney: booking.payment_mode === 'wallet'? paymentBaseAmount:0,
     promo_applied: booking.promo_applied?booking.promo_applied:false,
     promo_details: booking.promo_details?booking.promo_details:null,
-    payableAmount: booking.payableAmount?booking.payableAmount:booking.trip_cost,
+    payableAmount: booking.payableAmount?booking.payableAmount:paymentBaseAmount,
     taxAmount: 0
   });
 
@@ -99,7 +112,7 @@ export default function PaymentDetails(props) {
 
   const visibleTaxes = useMemo(() => {
     if (!isCustomer || !taxesData) return [];
-    const baseAmount = booking.trip_cost;
+    const baseAmount = paymentBaseAmount;
     return taxesData
       .filter(tax => tax.active && tax.isVisible)
       .filter(tax => !tax.onlyPaymentOnline || isOnlinePayment)
@@ -109,11 +122,11 @@ export default function PaymentDetails(props) {
           ? parseFloat((baseAmount * tax.value / 100).toFixed(settings.decimal || 2))
           : parseFloat(tax.value)
       }));
-  }, [isCustomer, taxesData, isOnlinePayment, booking.trip_cost, settings.decimal]);
+  }, [isCustomer, taxesData, isOnlinePayment, paymentBaseAmount, settings.decimal]);
 
   useEffect(() => {
     if (!isCustomer || !taxesData || !settings.decimal) return;
-    const baseAmount = booking.trip_cost;
+    const baseAmount = paymentBaseAmount;
     let totalTax = 0;
     taxesData.forEach(tax => {
       if (!tax.active) return;
@@ -130,7 +143,7 @@ export default function PaymentDetails(props) {
       taxAmount: totalTax,
       payableAmount: parseFloat((parseFloat(prev.amount) + totalTax - parseFloat(prev.discount)).toFixed(settings.decimal))
     }));
-  }, [isCustomer, taxesData, settings.decimal, isOnlinePayment, booking.trip_cost]);
+  }, [isCustomer, taxesData, settings.decimal, isOnlinePayment, paymentBaseAmount]);
 
   const promoModal = () => {
     return (
@@ -225,6 +238,8 @@ export default function PaymentDetails(props) {
 
     if (payment_mode == 'cash'){
       let curBooking = { ...booking };
+      const customerSettlementAmount = parseFloat((parseFloat(payDetails.amount) - parseFloat(payDetails.discount)).toFixed(settings.decimal));
+      const serviceSettlementAmount = parseFloat(curBooking.trip_cost || 0).toFixed(settings.decimal);
       if(booking.status == "PAYMENT_PENDING"){
         curBooking.status = 'NEW';
 
@@ -240,14 +255,17 @@ export default function PaymentDetails(props) {
         curBooking.status = 'ACCEPTED';
       }
       curBooking.payment_mode = payment_mode;
-      curBooking.customer_paid = curBooking.status == 'NEW'? 0: parseFloat((parseFloat(payDetails.amount) - parseFloat(payDetails.discount)).toFixed(settings.decimal));
+      curBooking.customer_paid = curBooking.status == 'NEW'? 0: customerSettlementAmount;
       curBooking.discount = parseFloat(parseFloat(payDetails.discount).toFixed(settings.decimal));
       curBooking.usedWalletMoney = 0;
       curBooking.cardPaymentAmount = 0;
-      curBooking.cashPaymentAmount = curBooking.status == 'NEW'? 0 : parseFloat((payDetails.amount- parseFloat(payDetails.discount)).toFixed(settings.decimal));
+      curBooking.cashPaymentAmount = curBooking.status == 'NEW'? 0 : serviceSettlementAmount;
       curBooking.payableAmount = parseFloat(parseFloat(payDetails.payableAmount).toFixed(settings.decimal));
       curBooking.promo_applied = payDetails.promo_applied;
       curBooking.promo_details = payDetails.promo_details;
+      if (isErrand) {
+        curBooking.cashItemCollectionAmount = curBooking.errand?.itemAlreadyPaid ? 0 : errandItemValue;
+      }
       if (isCustomer) {
         curBooking.taxAmount = payDetails.taxAmount || 0;
       }
@@ -286,6 +304,26 @@ export default function PaymentDetails(props) {
 
     } else if(payment_mode == 'wallet') {
       let curBooking = { ...booking };
+      if (isErrandDeltaPayment) {
+        const nextPaidAmount = parseFloat((parseFloat(curBooking?.errand?.itemValuePaidOnline || 0) + parseFloat(payDetails.payableAmount)).toFixed(settings.decimal));
+        curBooking.errand = {
+          ...(curBooking.errand || {}),
+          itemValuePaidOnline: nextPaidAmount,
+          pendingOnlinePayment: 0,
+          requiresAdditionalPayment: false,
+          phase: 'ITEM_CONFIRMED'
+        };
+        curBooking.customer_paid = parseFloat((parseFloat(curBooking.customer_paid || 0) + parseFloat(payDetails.payableAmount)).toFixed(settings.decimal));
+        curBooking.usedWalletMoney = parseFloat((parseFloat(curBooking.usedWalletMoney || 0) + parseFloat(payDetails.payableAmount)).toFixed(settings.decimal));
+        curBooking.payableAmount = 0;
+        setIsLoading(true);
+        dispatch(updateBooking(curBooking));
+        setTimeout(() => {
+          props.navigation.navigate('BookedCab', { bookingId: booking.id });
+          setIsLoading(false);
+        }, 1500);
+        return;
+      }
       if(booking.status == "PAYMENT_PENDING"){
         curBooking.prepaid = true;
         curBooking.status = 'NEW';
@@ -363,6 +401,7 @@ export default function PaymentDetails(props) {
 
         const paymentPacket = { 
           payment_mode: payment_mode,
+          paymentType: isErrandDeltaPayment ? 'ERRAND_DELTA' : 'BOOKING',
           customer_paid: parseFloat((parseFloat(payDetails.amount) - parseFloat(payDetails.discount)).toFixed(settings.decimal)),
           discount: parseFloat(parseFloat(payDetails.discount).toFixed(settings.decimal)),
           usedWalletMoney: parseFloat(parseFloat(payDetails.usedWalletMoney).toFixed(settings.decimal)),
@@ -371,7 +410,8 @@ export default function PaymentDetails(props) {
           payableAmount: parseFloat(parseFloat(payDetails.payableAmount).toFixed(settings.decimal)),
           promo_applied: payDetails.promo_applied,
           promo_details: payDetails.promo_details,
-          taxAmount: payDetails.taxAmount || 0
+          taxAmount: payDetails.taxAmount || 0,
+          errandDeltaAmount: isErrandDeltaPayment ? parseFloat(parseFloat(payDetails.payableAmount).toFixed(settings.decimal)) : 0
         };
         curBooking.paymentPacket = paymentPacket;
         curBooking.taxAmount = payDetails.taxAmount || 0;

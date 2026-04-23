@@ -130,8 +130,10 @@ const BookingHistory = (props) => {
 
   const columns = bookingHistoryColumns(role, settings, t, isRTL, formatAmount);
   const [walletModalStatus, setWalletModalStatus] = useState(false);
-  const {state} = useLocation();
+  const location = useLocation();
+  const {state} = location;
   const [currentPage, setCurrentPage] = useState(0);
+  const serviceTypeFilter = props.serviceTypeFilter || (location.pathname === '/errands' ? 'ERRAND' : null);
   
   useEffect(()=>{
     setCurrentPage(state?.pageNo)
@@ -143,11 +145,14 @@ const BookingHistory = (props) => {
 
   useEffect(() => {
     if (bookinglistdata.bookings) {
-      setData(bookinglistdata.bookings);
+      const filtered = serviceTypeFilter
+        ? bookinglistdata.bookings.filter((booking) => (booking.serviceType || 'RIDE') === serviceTypeFilter)
+        : bookinglistdata.bookings;
+      setData(filtered);
     } else {
       setData([]);
     }
-  }, [bookinglistdata.bookings]);
+  }, [bookinglistdata.bookings, serviceTypeFilter]);
 
   useEffect(() => {
     if (userdata.users) {
@@ -480,7 +485,7 @@ const BookingHistory = (props) => {
       { data?.length >0 ? 
       <ThemeProvider theme={theme}>
         <MaterialTable
-          title={t("booking_title")}
+          title={serviceTypeFilter === 'ERRAND' ? 'Mandados' : t("booking_title")}
           style={{
             direction: isRTL === "rtl" ? "rtl" : "ltr",
             borderRadius: "8px",
@@ -733,7 +738,7 @@ const BookingHistory = (props) => {
             }
           ]}
         />
-      </ThemeProvider> : <BlankTable title={t('booking_title')}  columns={columns}  data={[]} localization={localization(t)} options={TableStyle()}/>}
+      </ThemeProvider> : <BlankTable title={serviceTypeFilter === 'ERRAND' ? 'Mandados' : t('booking_title')}  columns={columns}  data={[]} localization={localization(t)} options={TableStyle()}/>}
       <BidModal
         ref={rootRef.current}
         role={role}

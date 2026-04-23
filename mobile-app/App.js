@@ -4,10 +4,6 @@ import * as Font from 'expo-font';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import {
-  ActivityIndicator,
-  StyleSheet,
-  View,
-  ImageBackground,
   LogBox,
   Animated
 } from "react-native";
@@ -17,13 +13,13 @@ import {
   store
 } from 'common';
 import { FirebaseConfig } from './config/FirebaseConfig';
-import { colors } from './src/common/theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { GluestackUIProvider } from '@gluestack-ui/themed';
 import { config } from '@gluestack-ui/config';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { isDriver } from './src/appVariant';
+import SplashGradientBackground from './src/components/SplashGradientBackground';
 
 const AppContainer = isDriver
   ? require('./src/navigation/AppNavigator.driver').default
@@ -54,7 +50,6 @@ export default function App() {
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [fadeAnim] = useState(new Animated.Value(0));
-  const [backgroundColor] = useState(new Animated.Value(0));
   const [bounceAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
@@ -81,13 +76,6 @@ export default function App() {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 800,
-      useNativeDriver: false,
-    }).start();
-
-    Animated.timing(backgroundColor, {
-      toValue: 1,
-      duration: 1500,
-      delay: 500,
       useNativeDriver: false,
     }).start(() => {
       startBounceAnimation();
@@ -172,20 +160,8 @@ export default function App() {
   }
 
   if (showCustomSplash || !assetsLoaded) {
-    const backgroundColorInterpolate = backgroundColor.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['#000000', colors.TAXIPRIMARY],
-    });
-
     return (
-      <Animated.View
-        style={{
-          flex: 1,
-          backgroundColor: backgroundColorInterpolate,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
+      <SplashGradientBackground>
         <Animated.View
           style={{
             opacity: fadeAnim,
@@ -211,7 +187,7 @@ export default function App() {
             }}
           />
         </Animated.View>
-      </Animated.View>
+      </SplashGradientBackground>
     );
   }
 
@@ -233,13 +209,3 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1
-  },
-  imagebg: {
-    flex:1,
-    justifyContent: "flex-end",
-    alignItems: 'center'
-  }
-});

@@ -18,6 +18,14 @@ const { getDatabase } = require('firebase-admin/database');
 const { getAuth } = require('firebase-admin/auth');
 const functions = require("firebase-functions/v2");
 const {setGlobalOptions} = require("firebase-functions/v2");
+const {
+    getBookingUpfrontAmount,
+    getErrandCancellationFee,
+    getErrandItemValue,
+    getErrandPendingDelta,
+    isErrandBooking,
+    toNumber,
+} = require('./common/errand');
 
 /** Misma heurística que antes: RTDB regional *.REGION.firebasedatabase.app → parts.length === 4 */
 function regionFromDatabaseUrl(databaseURL) {
@@ -55,6 +63,53 @@ var methods = [
     "xendit",
      "tap"
 ];
+
+const getErrandActiveRequest = (booking) => {
+    return booking && booking.errand && booking.errand.activePriceChangeRequest
+        ? booking.errand.activePriceChangeRequest
+        : null;
+};
+
+const getErrandLatestHistory = (booking) => {
+    if (!booking || !booking.errand || !Array.isArray(booking.errand.priceChangeHistory) || booking.errand.priceChangeHistory.length === 0) {
+        return null;
+    }
+    return booking.errand.priceChangeHistory[booking.errand.priceChangeHistory.length - 1];
+};
+
+const sendPushFromProfile = (profile, payload) => {
+    if (profile && profile.pushToken) {
+        const pushPayload = Object.assign({}, payload, {
+            ios: profile.userPlatform === 'IOS' ? true : false
+        });
+        RequestPushMsg(
+            profile.pushToken,
+            pushPayload
+        );
+    }
+};
+
+const fetchUserProfile = async (db, uid) => {
+    if (!uid) {
+        return null;
+    }
+    const snapshot = await db.ref("users/" + uid).once('value');
+    return snapshot.val();
+};
+
+const pushToUser = async (db, uid, payload) => {
+    const profile = await fetchUserProfile(db, uid);
+    sendPushFromProfile(profile, payload);
+    return profile;
+};
+
+const notifyWalletUpdated = (profile, language) => {
+    sendPushFromProfile(profile, {
+        title: language.notification_title,
+        msg: language.wallet_updated,
+        screen: 'Wallet'
+    });
+};
 
 for (let i = 0; i < methods.length; i++) {
     exports[methods[i]] = require(`./providers/${methods[i]}`);
@@ -192,7 +247,48 @@ exports.updateBooking = onValueUpdated(
         let booking = event.data.after.val();
         const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
         const language = Object.values(langSnap.val())[0].keyValuePairs;
+        const currentSettingsSnap = await db.ref('settings').once("value");
+        const currentSettings = currentSettingsSnap.val() || {};
+        const decimal = currentSettings.decimal || 2;
         booking.key = event.params.bookingId;
+
+        if (isErrandBooking(booking)) {
+            const previousRequest = getErrandActiveRequest(oldrow);
+            const currentRequest = getErrandActiveRequest(booking);
+            const latestErrandHistory = getErrandLatestHistory(booking);
+
+            if (!previousRequest && currentRequest && currentRequest.status === 'PENDING') {
+                await pushToUser(db, booking.customer, {
+                    title: language.notification_title,
+                    msg: 'El conductor solicito aprobar un nuevo valor para tu mandado.',
+                    screen: 'BookedCab'
+                });
+            }
+
+            if (previousRequest && !currentRequest && latestErrandHistory && latestErrandHistory.status === 'ACCEPTED') {
+                await pushToUser(db, booking.driver, {
+                    title: language.notification_title,
+                    msg: 'El cliente aprobo el nuevo valor del mandado.',
+                    screen: 'BookedCab'
+                });
+            }
+
+            if (previousRequest && !currentRequest && latestErrandHistory && latestErrandHistory.status === 'REJECTED') {
+                await pushToUser(db, booking.driver, {
+                    title: language.notification_title,
+                    msg: 'El cliente rechazo el cambio de precio del mandado.',
+                    screen: 'BookedCab'
+                });
+            }
+
+            if (getErrandPendingDelta(oldrow) > 0 && getErrandPendingDelta(booking) === 0) {
+                await pushToUser(db, booking.driver, {
+                    title: language.notification_title,
+                    msg: 'El pago adicional del mandado fue completado.',
+                    screen: 'BookedCab'
+                });
+            }
+        }
 
         if (!booking.bookLater && oldrow.status === 'PAYMENT_PENDING' && booking.status === 'NEW' && !booking.requestedDrivers && booking.preRequestedDrivers) {
             db.ref('bookings').child(booking.key).update({
@@ -207,7 +303,7 @@ exports.updateBooking = onValueUpdated(
                         driver.pushToken, 
                         {
                             title: language.notification_title, 
-                            msg: language.new_booking_notification,
+                            msg: isErrandBooking(booking) ? 'Nuevo mandado disponible.' : language.new_booking_notification,
                             screen: 'DriverTrips'
                         }
                     );
@@ -222,7 +318,22 @@ exports.updateBooking = onValueUpdated(
             if (booking.booking_from_web && booking.payment_mode!=='cash' && appcat && appcat === "bidcab") {
                 addToWallet(booking.customer, parseFloat(booking.payableAmount), "Admin Credit", null)
             }
-            if (oldrow.status === 'ACCEPTED' && booking.cancelledBy === 'customer') {
+            if (booking.cancelledBy === 'customer' && isErrandBooking(booking)) {
+                const errandCancellationFee = getErrandCancellationFee(booking, decimal);
+                if (errandCancellationFee > 0 && !booking.cancellationFee) {
+                    await db.ref("bookings/" + booking.key + "/cancellationFee").set(errandCancellationFee);
+                    deductFromWallet(booking.customer, errandCancellationFee, 'Errand Cancellation Fee');
+                    if (booking.driver) {
+                        addToWallet(booking.driver, errandCancellationFee, "Errand Cancellation Fee", null);
+                    }
+                    await pushToUser(db, booking.customer, {
+                        title: language.notification_title,
+                        msg: 'Se aplico un cargo de cancelacion por el mandado.',
+                        screen: 'Wallet'
+                    });
+                }
+            }
+            if (oldrow.status === 'ACCEPTED' && booking.cancelledBy === 'customer' && !isErrandBooking(booking)) {
                 db.ref("tracking/" + booking.key).orderByChild("status").equalTo("ACCEPTED").once("value", (sdata) => {
                     let items = sdata.val();
                     if (items) {
@@ -443,30 +554,46 @@ exports.updateBooking = onValueUpdated(
         ) {
             const snapshot = await db.ref("users/" + booking.customer).once('value');
             let profile = snapshot.val();
-            const settingdata = await db.ref('settings').once("value");
-            let settings = settingdata.val();
-            let walletBal = parseFloat(profile.walletBalance) - parseFloat(parseFloat(booking.trip_cost) - parseFloat(booking.discount));
+            const walletDebitAmount = isErrandBooking(booking)
+                ? getBookingUpfrontAmount(booking)
+                : parseFloat(parseFloat(booking.trip_cost) - parseFloat(booking.discount));
+            let walletBal = toNumber(profile.walletBalance, 0) - walletDebitAmount;
             let tDate = new Date();
             let details = {
                 type: 'Debit',
-                amount: parseFloat(parseFloat(booking.trip_cost) - parseFloat(booking.discount)),
+                amount: walletDebitAmount,
                 date: tDate.getTime(),
                 txRef: booking.id
             }
-            await db.ref("users/" + booking.customer).update({walletBalance: parseFloat(parseFloat(walletBal).toFixed(settings.decimal))})
+            await db.ref("users/" + booking.customer).update({walletBalance: parseFloat(parseFloat(walletBal).toFixed(decimal))})
             await db.ref("walletHistory/" + booking.customer).push(details);
-            const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
-            const language = Object.values(langSnap.val())[0].keyValuePairs;
-            if(profile.pushToken){
-                RequestPushMsg(
-                    profile.pushToken,
-                    {
-                        title: language.notification_title,
-                        msg: language.wallet_updated,
-                        screen: 'Wallet',
-                        ios:  profile.userPlatform === "IOS"? true: false
-                    }
-                );
+            notifyWalletUpdated(profile, language);
+        }
+        if (
+            booking.payment_mode === 'wallet' &&
+            isErrandBooking(booking) &&
+            getErrandPendingDelta(oldrow) > 0 &&
+            getErrandPendingDelta(booking) === 0 &&
+            toNumber(booking.errand && booking.errand.itemValuePaidOnline, 0) > toNumber(oldrow.errand && oldrow.errand.itemValuePaidOnline, 0)
+        ) {
+            const deltaAmount = parseFloat(
+                (
+                    toNumber(booking.errand && booking.errand.itemValuePaidOnline, 0) -
+                    toNumber(oldrow.errand && oldrow.errand.itemValuePaidOnline, 0)
+                ).toFixed(decimal)
+            );
+            if (deltaAmount > 0) {
+                const snapshot = await db.ref("users/" + booking.customer).once('value');
+                let profile = snapshot.val();
+                let walletBal = toNumber(profile.walletBalance, 0) - deltaAmount;
+                await db.ref("users/" + booking.customer).update({walletBalance: parseFloat(parseFloat(walletBal).toFixed(decimal))});
+                await db.ref("walletHistory/" + booking.customer).push({
+                    type: 'Debit',
+                    amount: deltaAmount,
+                    date: new Date().getTime(),
+                    txRef: booking.id
+                });
+                notifyWalletUpdated(profile, language);
             }
         }
         if((oldrow.status === 'REACHED' && booking.status === 'PAID') || 
@@ -476,9 +603,10 @@ exports.updateBooking = onValueUpdated(
         ){
             const snapshotDriver = await db.ref("users/" + booking.driver).once('value');
             let profileDriver = snapshotDriver.val();
-            const settingdata = await db.ref('settings').once("value");
-            let settings = settingdata.val();
-            let driverWalletBal = parseFloat(profileDriver.walletBalance);
+            let driverWalletBal = toNumber(profileDriver.walletBalance, 0);
+            const errandReimbursement = isErrandBooking(booking) && booking.payment_mode !== 'cash'
+                ? getErrandItemValue(booking.errand || {})
+                : 0;
             if(booking.payment_mode ==='cash' && booking.cashPaymentAmount && parseFloat(booking.cashPaymentAmount)> 0){
                 let details = {
                     type: 'Debit',
@@ -501,8 +629,18 @@ exports.updateBooking = onValueUpdated(
                     txRef: booking.id
                 }
                 await db.ref("walletHistory/" + booking.fleetadmin).push(detailsFleet);
-                await db.ref("users/" + booking.fleetadmin).update({walletBalance: parseFloat(parseFloat(fleetWalletBal).toFixed(settings.decimal))})
+                await db.ref("users/" + booking.fleetadmin).update({walletBalance: parseFloat(parseFloat(fleetWalletBal).toFixed(decimal))})
             }
+            if (errandReimbursement > 0) {
+                await db.ref("walletHistory/" + booking.driver).push({
+                    type: 'Credit',
+                    amount: errandReimbursement,
+                    date: new Date().getTime(),
+                    txRef: booking.id,
+                    reason: 'Errand Item Reimbursement'
+                });
+            }
+            driverWalletBal = driverWalletBal + errandReimbursement;
             driverWalletBal = driverWalletBal + parseFloat(booking.driver_share);
             let driverDetails = {
                 type: 'Credit',
@@ -510,21 +648,19 @@ exports.updateBooking = onValueUpdated(
                 date: new Date().getTime(),
                 txRef: booking.id
             }
-            await db.ref("users/" + booking.driver).update({walletBalance: parseFloat(parseFloat(driverWalletBal).toFixed(settings.decimal))})
+            await db.ref("users/" + booking.driver).update({walletBalance: parseFloat(parseFloat(driverWalletBal).toFixed(decimal))})
             await db.ref("walletHistory/" + booking.driver).push(driverDetails);
-            const langSnap = await db.ref("languages").orderByChild("default").equalTo(true).once('value');
-            const language = Object.values(langSnap.val())[0].keyValuePairs;
-            if(profileDriver.pushToken){
-                RequestPushMsg(
-                    profileDriver.pushToken,
-                    {
-                        title: language.notification_title,
-                        msg: language.wallet_updated,
-                        screen: 'Wallet',
-                        ios:  profileDriver.userPlatform === "IOS"? true: false
-                    }
-                );
+            if (isErrandBooking(booking) && booking.errand && toNumber(booking.errand.pendingWalletRefund, 0) > 0) {
+                const refundAmount = toNumber(booking.errand.pendingWalletRefund, 0);
+                addToWallet(booking.customer, refundAmount, "Errand Adjustment", booking.id);
+                await db.ref("bookings/" + booking.key + "/errand/pendingWalletRefund").set(0);
+                await pushToUser(db, booking.customer, {
+                    title: language.notification_title,
+                    msg: 'Se acredito un ajuste del mandado en tu billetera.',
+                    screen: 'Wallet'
+                });
             }
+            notifyWalletUpdated(profileDriver, language);
         }
     }
 )
@@ -579,6 +715,16 @@ exports.withdrawCreate = onValueCreated(
     const db = getDatabase();
     const settingdata = await db.ref('settings').once("value");
     let settings = settingdata.val();
+    const cartypeData = await db.ref('cartypes').once("value");
+    const cartypes = cartypeData.val() || {};
+    const cartypeMap = {};
+
+    Object.keys(cartypes).forEach((key) => {
+        const car = cartypes[key];
+        if (car && car.name) {
+            cartypeMap[car.name] = car;
+        }
+    });
 
     if(settings.blockIps){
         const day = new Date().getFullYear() + '-' + new Date().getMonth() + '-' + new Date().getDate();
@@ -619,7 +765,9 @@ exports.withdrawCreate = onValueCreated(
                                             if(settings.convert_to_mile){
                                                 originalDistance = originalDistance / 1.609344;
                                             }
-                                            if (originalDistance <= settings.driverRadius && ((driver.carType === booking.carType  && settings.carType_required) || !settings.carType_required) && settings.autoDispatch) {
+                                            const selectedCarType = cartypeMap[booking.carType];
+                                            const canServeErrand = !isErrandBooking(booking) || (selectedCarType && selectedCarType.acceptErrands);
+                                            if (originalDistance <= settings.driverRadius && ((driver.carType === booking.carType  && settings.carType_required) || !settings.carType_required) && settings.autoDispatch && canServeErrand) {
                                                 db.ref('bookings/' + booking.key + '/requestedDrivers/' + driver.key).set(true);
                                                 addEstimate(booking.key, driver.key, originalDistance, booking.deliveryWithBid);
                                                 if(driver.pushToken){
@@ -627,7 +775,7 @@ exports.withdrawCreate = onValueCreated(
                                                         driver.pushToken, 
                                                         {
                                                             title: language.notification_title, 
-                                                            msg: language.new_booking_notification,
+                                                            msg: isErrandBooking(booking) ? 'Nuevo mandado disponible.' : language.new_booking_notification,
                                                             screen: 'DriverTrips'
                                                         }
                                                     );

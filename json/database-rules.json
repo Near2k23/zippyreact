@@ -20,6 +20,10 @@
             ".read": "auth != null",
             ".write": "root.child('users').child(auth.uid).child('usertype').val() === 'admin' || root.child('users').child(auth.uid).child('usertype').val() === 'customer'"
         },
+        "banners": {
+            ".read": "auth != null",
+            ".write": "root.child('users').child(auth.uid).child('usertype').val() === 'admin'"
+        },
         "cartypes": {
             ".read": "true",
             ".write": "root.child('users').child(auth.uid).child('usertype').val() === 'admin'"

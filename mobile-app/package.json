@@ -1,6 +1,6 @@
 {
   "name": "mobile-app",
-  "version": "1.0.4",
+  "version": "1.5.0",
   "main": "index.js",
   "private": true,
   "scripts": {
@@ -28,9 +28,9 @@
     "@react-native-google-signin/google-signin": "^10.0.1",
     "@react-native-masked-view/masked-view": "0.3.2",
     "@react-native-picker/picker": "2.11.4",
-    "@react-navigation/bottom-tabs": "^6.5.8",
-    "@react-navigation/native": "^6.1.7",
-    "@react-navigation/stack": "^6.3.17",
+    "@react-navigation/bottom-tabs": "^7.0.0",
+    "@react-navigation/native": "^7.0.0",
+    "@react-navigation/stack": "^7.0.0",
     "common": "1.0.0",
     "expo": "~55.0.15",
     "expo-apple-authentication": "~55.0.13",

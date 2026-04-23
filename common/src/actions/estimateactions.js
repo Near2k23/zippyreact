@@ -8,6 +8,7 @@ import Polyline from '@mapbox/polyline';
 import { firebase } from '../config/configureFirebase';
 import { FareCalculator } from '../other/FareCalculator';
 import { getCarTypeWithZonePrices } from '../other/ZonePriceHelper';
+import { ERRAND_SERVICE_TYPE, buildErrandDataForBooking, getErrandPaymentSummary } from '../other/ErrandUtils';
 import { onValue } from "firebase/database";
 
 export const getEstimate = (bookingData) => async (dispatch) => {
@@ -97,14 +98,51 @@ export const getEstimate = (bookingData) => async (dispatch) => {
           carDetailsWithZonePrices = getCarTypeWithZonePrices(bookingData.carDetails, bookingData.currentZoneId);
         }
 
+        const serviceType = bookingData.serviceType === ERRAND_SERVICE_TYPE ? ERRAND_SERVICE_TYPE : 'RIDE';
+        const instructionData = {
+          ...bookingData.instructionData,
+          errand:
+            serviceType === ERRAND_SERVICE_TYPE
+              ? buildErrandDataForBooking(
+                  bookingData.errand || bookingData.instructionData?.errand || {},
+                  settings,
+                  bookingData.payment_mode || 'cash',
+                  0
+                )
+              : null,
+        };
+
         let {totalCost, grandTotal, convenience_fees, dynamic_fee} = FareCalculator(
           distance,
           res.time_in_secs,
           carDetailsWithZonePrices,
-          bookingData.instructionData,
+          instructionData,
           settings.decimal,
-          activeRule
+          activeRule,
+          settings
         );
+
+        const errand =
+          serviceType === ERRAND_SERVICE_TYPE
+            ? buildErrandDataForBooking(
+                bookingData.errand || bookingData.instructionData?.errand || {},
+                settings,
+                bookingData.payment_mode || 'cash',
+                grandTotal
+              )
+            : null;
+
+        const errandPaymentSummary =
+          serviceType === ERRAND_SERVICE_TYPE
+            ? getErrandPaymentSummary(
+                {
+                  trip_cost: grandTotal,
+                  payment_mode: bookingData.payment_mode || 'cash',
+                  errand,
+                },
+                settings
+              )
+            : null;
         
         dispatch({
           type: FETCH_ESTIMATE_SUCCESS,
@@ -112,14 +150,21 @@ export const getEstimate = (bookingData) => async (dispatch) => {
             pickup:bookingData.pickup,
             drop:bookingData.drop,
             carDetails:carDetailsWithZonePrices,
-            instructionData: bookingData.instructionData,
+            instructionData: instructionData,
             estimateDistance: parseFloat(parseFloat(distance).toFixed(settings.decimal)),
             fareCost: totalCost ? parseFloat(parseFloat(totalCost).toFixed(settings.decimal)) : 0,
             estimateFare: grandTotal ? parseFloat(parseFloat(grandTotal).toFixed(settings.decimal)) : 0,
             estimateTime:res.time_in_secs,
             convenience_fees: convenience_fees ? parseFloat(parseFloat(convenience_fees).toFixed(settings.decimal)) : 0,
             dynamic_fee: dynamic_fee ? parseFloat(parseFloat(dynamic_fee).toFixed(settings.decimal)) : 0,
-            waypoints: waypoints
+            waypoints: waypoints,
+            serviceType,
+            errand,
+            customerTotal: errandPaymentSummary ? errandPaymentSummary.customerTotal : grandTotal,
+            upfrontOnlineAmount: errandPaymentSummary ? errandPaymentSummary.upfrontOnlineAmount : grandTotal,
+            pendingOnlinePayment: errandPaymentSummary ? errandPaymentSummary.pendingOnlinePayment : 0,
+            itemValue: errandPaymentSummary ? errandPaymentSummary.itemValue : 0,
+            cashItemCollectionAmount: errandPaymentSummary ? errandPaymentSummary.cashItemCollectionAmount : 0,
           },
         });
       }, {onlyOnce:true});
