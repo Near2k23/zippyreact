@@ -2450,7 +2450,7 @@ export default function MapScreen(props) {
                                 </View>
                                 <TouchableOpacity
                                     onPress={() => props.navigation.navigate('Notifications')}
-                                    style={[styles.homeIconButton, { backgroundColor: mode === 'dark' ? '#23262B' : colors.WHITE, borderWidth: mode === 'dark' ? 1 : 0, borderColor: mode === 'dark' ? '#2E3238' : 'transparent' }]}
+                                    style={[styles.homeIconButton, { backgroundColor: mode === 'dark' ? 'transparent' : colors.WHITE, borderWidth: mode === 'dark' ? 1 : 0, borderColor: mode === 'dark' ? '#2E3238' : 'transparent' }]}
                                 >
                                     <Icon
                                         name="notifications-outline"
@@ -2463,7 +2463,7 @@ export default function MapScreen(props) {
                             <TouchableOpacity
                                 onPress={isInZone ? handleNewTrip : () => setOutOfZoneDialog(true)}
                                 style={[styles.homeSearchBar, {
-                                    backgroundColor: mode === 'dark' ? '#23262B' : colors.WHITE,
+                                    backgroundColor: mode === 'dark' ? 'transparent' : colors.WHITE,
                                     borderWidth: mode === 'dark' ? 1 : 0,
                                     borderColor: mode === 'dark' ? '#2E3238' : 'transparent',
                                     opacity: isInZone ? 1 : 0.5
@@ -2638,7 +2638,7 @@ export default function MapScreen(props) {
                                         style={[
                                             styles.walletBalanceCard,
                                             {
-                                                backgroundColor: mode === 'dark' ? '#23262B' : '#111111',
+                                                backgroundColor: mode === 'dark' ? 'transparent' : '#111111',
                                                 borderWidth: mode === 'dark' ? 1 : 0,
                                                 borderColor: mode === 'dark' ? '#2E3238' : 'transparent',
                                                 flexDirection: isRTL ? 'row-reverse' : 'row'
